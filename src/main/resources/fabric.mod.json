@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "autism-seedcracker",
+  "version": "${version}",
+  "name": "AUTISM SeedCracker",
+  "description": "SeedCrackerX engine packaged as an AUTISM Client addon: finds the seed of multiplayer or singleplayer worlds.",
+  "authors": [
+    "KaptainWutax",
+    "19MisterX98",
+    "AUTISM addon port"
+  ],
+  "license": "MIT",
+  "icon": "assets/seedcrackerx/icon.png",
+  "custom": {
+    "autism:color": "80,200,120",
+    "modmenu": {
+      "parent": {
+        "id": "autism"
+      }
+    }
+  },
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.autism.seedcracker.SeedcrackerInit"
+    ],
+    "autism": [
+      "com.autism.seedcracker.SeedcrackerAddon"
+    ]
+  },
+  "mixins": [
+    "seedcracker.mixins.json"
+  ],
+  "accessWidener": "seedcrackerx.aw",
+  "depends": {
+    "java": ">=25",
+    "minecraft": "${mc_compat}",
+    "fabricloader": ">=0.19.3",
+    "fabric-api": ">=${fabric_api_version}",
+    "autism": ">=${autism_api_version}"
+  }
+}
