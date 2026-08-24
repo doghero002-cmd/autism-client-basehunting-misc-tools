@@ -83,9 +83,9 @@ tasks {
             "mc_compat" to toMinecraftCompat(libs.versions.minecraft.get()),
             "fabric_api_version" to libs.versions.fabric.api.get(),
             // The runtime constraint is intentionally not pinned to a specific client version:
-            // AUTISM's own apiVersion() handshake gates real compatibility, so the addon loads
-            // against any AUTISM Client build (release or dev) rather than requiring the exact
-            // version it was compiled against.
+            // a bare "*" tells Fabric "any AUTISM Client version", and AUTISM's own apiVersion()
+            // handshake gates real compatibility, so the addon loads against any client build
+            // (release or dev) rather than requiring the exact version it was compiled against.
             "autism_api_version" to "*"
         )
         inputs.properties(propertyMap)
