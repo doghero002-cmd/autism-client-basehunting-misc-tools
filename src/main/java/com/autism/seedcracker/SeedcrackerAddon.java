@@ -1,6 +1,8 @@
 package com.autism.seedcracker;
 
+import com.autism.seedcracker.commands.BedrockFinderCommand;
 import com.autism.seedcracker.hud.SeedHud;
+import com.autism.seedcracker.modules.BedrockFinderModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
 
 import autismclient.api.ApiVersion;
@@ -28,6 +30,8 @@ public final class SeedcrackerAddon extends AutismAddon {
         this.color = 0xFF50C878;
 
         AutismAddons.modules().register(new SeedcrackerModule());
+        AutismAddons.modules().register(new BedrockFinderModule());
+        AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.hud().register(new SeedHud());
     }
 
