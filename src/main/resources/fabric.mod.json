@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "autism-seedcracker",
   "version": "${version}",
-  "name": "AUTISM SeedCracker",
-  "description": "SeedCrackerX engine packaged as an AUTISM Client addon: finds the seed of multiplayer or singleplayer worlds.",
+  "name": "Seed Based Tools",
+  "description": "A suite of seed-based tools for AUTISM Client: crack the world seed from structures/biomes, and locate your coordinates from a bedrock pattern.",
   "authors": [
     "KaptainWutax",
     "19MisterX98",
