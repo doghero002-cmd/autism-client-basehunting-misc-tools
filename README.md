@@ -90,6 +90,7 @@ Both DonutSMP modules write to `bases.txt` in the AUTISM config folder.
 - [Fabric Loader](https://fabricmc.net/) `0.19.3+` and Fabric API
 - AUTISM Client (any version — the addon declares `autism: "*"` and relies on the client's
   `apiVersion()` handshake for real compatibility)
+-meteor baritone (autism client kinda uses this so the name and stuff have to be compatable)
 
 The seedfinding, latticg and cloth-config libraries are bundled jar-in-jar, so no extra mods
 are required beyond AUTISM Client + Fabric.
