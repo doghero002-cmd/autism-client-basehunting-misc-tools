@@ -4,6 +4,8 @@ import com.autism.seedcracker.commands.BedrockFinderCommand;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.modules.BedrockFinderModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
+import com.autism.seedcracker.rtp.DonutRTPStashFinderModule;
+import com.autism.seedcracker.rtp.RelogLoaderModule;
 
 import autismclient.api.ApiVersion;
 import autismclient.api.AutismAddon;
@@ -31,6 +33,8 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
+        AutismAddons.modules().register(new DonutRTPStashFinderModule());
+        AutismAddons.modules().register(new RelogLoaderModule());
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.hud().register(new SeedHud());
     }
