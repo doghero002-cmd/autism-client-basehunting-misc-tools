@@ -65,6 +65,18 @@ blocks for a while.
   (chests, hoppers, shulker boxes, ... — configurable list) for a configurable duration
   (default 15 min). Requires Baritone (baritone-meteor / upstream); detection still works
   without it.
+- **Cluster-based detection** — a base only counts when a configurable number of stash blocks
+  (default 3) sit near each other, so a lone chest/hopper in the wild never triggers a save.
+- **Y-level gating** — only stash blocks between a configurable Min/Max Y (default −64 to 16,
+  deepslate levels) are detected or pathed to.
+- **Structure filter** — ignores stash blocks inside SeedCracker-detected structures (dungeons,
+  trial chambers, ...) within a configurable exclusion radius, so they aren't flagged as bases.
+- **Throttled scanning** — detection runs every N ticks (default 20) instead of every frame,
+  so it doesn't tank your FPS, and finds are deduplicated.
+- **Baritone settings submenu** — a full panel of Baritone options in the module settings,
+  grouped into Core, Movement, Avoidance, Falling, Render, and Elytra (break/place/sprint,
+  auto-eat/tool, parkour, diagonals, mob avoidance, fall heights, path/goal render, elytra
+  auto-jump/swap, and more) — all applied via `#set` when the search starts.
 - **Save & RTP mode** — logs any detected base's coords + dimension + timestamp to `bases.txt`
   and RTPs away instead of searching. Optional auto-disable after a find.
 
