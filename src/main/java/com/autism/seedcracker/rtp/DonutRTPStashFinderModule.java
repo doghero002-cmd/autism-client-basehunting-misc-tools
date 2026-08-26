@@ -19,8 +19,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Donut RTP Stash Finder.
@@ -86,7 +88,29 @@ public final class DonutRTPStashFinderModule extends Module {
         .description("Block ids (| separated) that count as a stash/base.")
         .group("Behaviour"));
     private final IntSetting searchRadius = add(new IntSetting("search-radius", "Search radius", 48, 8, 5000, 8)
-        .description("Block radius scanned for stash blocks when detecting (up to the search time limit).")
+        .description("Horizontal block radius scanned for stash blocks when detecting.")
+        .group("Behaviour"));
+    private final IntSetting scanHeight = add(new IntSetting("scan-height", "Scan height", 16, 4, 384, 4)
+        .description("Vertical blocks scanned above/below the player (keeps detection fast).")
+        .group("Behaviour"));
+    private final IntSetting minCluster = add(new IntSetting("min-cluster", "Min cluster size", 3, 1, 64, 1)
+        .description("How many stash blocks must be near each other to count as a base (filters lone blocks).")
+        .group("Behaviour"));
+    private final IntSetting minY = add(new IntSetting("min-y", "Min Y (detection)", -64, -64, 320, 1)
+        .description("Only count stash blocks at or above this Y.")
+        .group("Behaviour"));
+    private final IntSetting maxY = add(new IntSetting("max-y", "Max Y (detection)", 16, -64, 320, 1)
+        .description("Only count stash blocks at or below this Y (default 16 = deepslate levels). Blocks above are ignored and not pathed to.")
+        .group("Behaviour"));
+    private final BoolSetting skipStructures = add(new BoolSetting("skip-structures", "Skip structures", true)
+        .description("Ignore stash blocks that lie inside SeedCracker-detected structures (dungeons, trial chambers, etc.) so they aren't flagged as bases.")
+        .group("Behaviour"));
+    private final IntSetting structureExclusionRadius = add(new IntSetting("structure-exclusion-radius", "Structure exclusion radius", 24, 4, 128, 4)
+        .description("Blocks within this distance of a detected structure are ignored.")
+        .group("Behaviour")
+        .visibleWhen(() -> skipStructures.get()));
+    private final IntSetting scanInterval = add(new IntSetting("scan-interval", "Scan interval (ticks)", 20, 1, 200, 1)
+        .description("Ticks between detection scans (higher = less lag).")
         .group("Behaviour"));
     private final IntSetting searchDuration = add(new IntSetting("search-duration", "Search duration (s)", 900, 10, 7200, 10)
         .description("How long to search before RTPing again (default 15 min).")
@@ -97,6 +121,80 @@ public final class DonutRTPStashFinderModule extends Module {
     private final BoolSetting autoDisableOnFind = add(new BoolSetting("auto-disable-on-find", "Stop after find", false)
         .description("Disable the module once a base is logged (Save & RTP mode).")
         .group("Behaviour"));
+
+    // ---- Baritone: core toggles ----
+    private final BoolSetting allowBreak = add(new BoolSetting("b-allow-break", "Allow break", true)
+        .description("Let Baritone break blocks.").group("Baritone"));
+    private final BoolSetting allowPlace = add(new BoolSetting("b-allow-place", "Allow place", true)
+        .description("Let Baritone place blocks.").group("Baritone"));
+    private final BoolSetting allowSprint = add(new BoolSetting("b-allow-sprint", "Allow sprint", true)
+        .description("Let Baritone sprint.").group("Baritone"));
+    private final BoolSetting autoEat = add(new BoolSetting("b-auto-eat", "Auto eat", true)
+        .description("Let Baritone eat automatically.").group("Baritone"));
+    private final BoolSetting autoTool = add(new BoolSetting("b-auto-tool", "Auto tool", true)
+        .description("Automatically select the best tool.").group("Baritone"));
+    private final BoolSetting allowInventory = add(new BoolSetting("b-allow-inventory", "Allow inventory moves", false)
+        .description("Let Baritone move items to the hotbar.").group("Baritone"));
+
+    // ---- Baritone: movement ----
+    private final BoolSetting allowParkour = add(new BoolSetting("b-allow-parkour", "Allow parkour", false)
+        .description("Allow parkour jumps (can be unreliable).").group("Baritone Movement"));
+    private final BoolSetting allowParkourPlace = add(new BoolSetting("b-allow-parkour-place", "Allow parkour place", false)
+        .description("Allow placing blocks mid-parkour.").group("Baritone Movement"));
+    private final BoolSetting allowDiagonalAscend = add(new BoolSetting("b-allow-diagonal-ascend", "Allow diagonal ascend", false)
+        .description("Allow ascending diagonally.").group("Baritone Movement"));
+    private final BoolSetting allowDiagonalDescend = add(new BoolSetting("b-allow-diagonal-descend", "Allow diagonal descend", false)
+        .description("Allow descending diagonally (unsafe in the nether).").group("Baritone Movement"));
+    private final BoolSetting allowDownward = add(new BoolSetting("b-allow-downward", "Allow downward mining", true)
+        .description("Allow mining the block directly beneath its feet.").group("Baritone Movement"));
+    private final BoolSetting allowVines = add(new BoolSetting("b-allow-vines", "Allow vines", false)
+        .description("Enable vine pathing (gimmicky, can trap Baritone).").group("Baritone Movement"));
+    private final BoolSetting assumeStep = add(new BoolSetting("b-assume-step", "Assume step", false)
+        .description("Assume step functionality (don't jump on ascend).").group("Baritone Movement"));
+    private final BoolSetting sprintAscends = add(new BoolSetting("b-sprint-ascends", "Sprint ascends", true)
+        .description("Sprint and jump a block early on ascends.").group("Baritone Movement"));
+    private final BoolSetting freeLook = add(new BoolSetting("b-free-look", "Free look", true)
+        .description("Move without forcing client-sided rotations.").group("Baritone Movement"));
+    private final BoolSetting antiCheat = add(new BoolSetting("b-anti-cheat", "Anti-cheat compatibility", true)
+        .description("Adjust behavior to work better on anti-cheats.").group("Baritone Movement"));
+
+    // ---- Baritone: blocks / avoidance ----
+    private final BoolSetting avoidUpdatingFalling = add(new BoolSetting("b-avoid-updating-falling", "Avoid updating falling blocks", true)
+        .description("Never trigger cascading sand/gravel falls (helps avoid lava too).").group("Baritone Avoidance"));
+    private final BoolSetting pauseMiningForFalling = add(new BoolSetting("b-pause-mining-falling", "Pause mining for falling blocks", true)
+        .description("Wait until falling blocks settle before continuing.").group("Baritone Avoidance"));
+    private final BoolSetting avoidance = add(new BoolSetting("b-avoidance", "Mob avoidance", false)
+        .description("Avoid mobs and spawners (small performance cost).").group("Baritone Avoidance"));
+    private final IntSetting mobAvoidanceRadius = add(new IntSetting("b-mob-avoid-radius", "Mob avoid radius", 8, 0, 32, 1)
+        .description("Distance to avoid mobs.").group("Baritone Avoidance").visibleWhen(() -> avoidance.get()));
+    private final IntSetting spawnerAvoidanceRadius = add(new IntSetting("b-spawner-avoid-radius", "Spawner avoid radius", 16, 0, 48, 1)
+        .description("Distance to avoid mob spawners.").group("Baritone Avoidance").visibleWhen(() -> avoidance.get()));
+
+    // ---- Baritone: falling ----
+    private final IntSetting maxFallNoWater = add(new IntSetting("b-max-fall-no-water", "Max fall (no water)", 3, 0, 20, 1)
+        .description("How far Baritone may fall onto solid ground without a water bucket.").group("Baritone Falling"));
+    private final BoolSetting allowWaterBucketFall = add(new BoolSetting("b-allow-water-bucket-fall", "Allow water bucket fall", true)
+        .description("Allow falling arbitrary distances with a water bucket (unreliable).").group("Baritone Falling"));
+    private final IntSetting maxFallBucket = add(new IntSetting("b-max-fall-bucket", "Max fall (bucket)", 20, 0, 60, 1)
+        .description("How far Baritone may fall with a water bucket.").group("Baritone Falling").visibleWhen(() -> allowWaterBucketFall.get()));
+
+    // ---- Baritone: render ----
+    private final BoolSetting renderPath = add(new BoolSetting("b-render-path", "Render path", true)
+        .description("Render the current path.").group("Baritone Render"));
+    private final BoolSetting renderGoal = add(new BoolSetting("b-render-goal", "Render goal", true)
+        .description("Render the current goal.").group("Baritone Render"));
+    private final BoolSetting renderCachedChunks = add(new BoolSetting("b-render-cached-chunks", "Render cached chunks", false)
+        .description("Render cached chunks semi-transparently (can hurt FPS).").group("Baritone Render"));
+
+    // ---- Baritone: elytra ----
+    private final BoolSetting elytraAutoJump = add(new BoolSetting("b-elytra-auto-jump", "Elytra auto jump", false)
+        .description("Automatically path to and jump off ledges to start flying.").group("Baritone Elytra"));
+    private final BoolSetting elytraAutoSwap = add(new BoolSetting("b-elytra-auto-swap", "Elytra auto swap", true)
+        .description("Swap to a fresh elytra when durability is low.").group("Baritone Elytra"));
+    private final BoolSetting elytraConserveFireworks = add(new BoolSetting("b-elytra-conserve-fireworks", "Conserve fireworks", false)
+        .description("Avoid using fireworks while descending.").group("Baritone Elytra"));
+    private final IntSetting elytraMinDurability = add(new IntSetting("b-elytra-min-durability", "Elytra min durability", 5, 1, 100, 1)
+        .description("Minimum elytra durability before swapping/landing.").group("Baritone Elytra"));
 
     public DonutRTPStashFinderModule() {
         super(SeedcrackerAddon.ID + ":donut-rtp", "Donut RTP Stash Finder",
@@ -220,32 +318,143 @@ public final class DonutRTPStashFinderModule extends Module {
     }
 
     /** Scans loaded chunks around the player for any target block; returns its position or null. */
-    private BlockPos scanForBase(Minecraft mc) {
-        if (mc.level == null || mc.player == null) return null;
+    // Dedupe: bases already logged this session (block position keys), so we don't re-log every tick.
+    private final Set<Long> loggedBases = new HashSet<>();
+    private int ticksUntilScan = 0;
+
+    /** True if pos lies within the structure exclusion radius of a SeedCracker-detected structure. */
+    private boolean insideStructure(BlockPos pos) {
+        if (!skipStructures.get()) return false;
+        try {
+            kaptainwutax.seedcrackerX.SeedCracker sc = kaptainwutax.seedcrackerX.SeedCracker.get();
+            if (sc == null) return false;
+            kaptainwutax.seedcrackerX.finder.FinderQueue fq = kaptainwutax.seedcrackerX.finder.FinderQueue.get();
+            if (fq == null) return false;
+            double rSq = (double) structureExclusionRadius.get() * structureExclusionRadius.get();
+            for (kaptainwutax.seedcrackerX.finder.Finder finder : fq.finderControl.getActiveFinders()) {
+                for (BlockPos sp : safeFindPositions(finder)) {
+                    if (sp.distSqr(pos) <= rSq) return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private static List<BlockPos> safeFindPositions(kaptainwutax.seedcrackerX.finder.Finder finder) {
+        try {
+            List<BlockPos> out = finder.findInChunk();
+            return out == null ? List.of() : out;
+        } catch (Throwable t) {
+            return List.of();
+        }
+    }
+
+    /** Collects target-block positions near the player, height-gated and structure-filtered. */
+    private List<BlockPos> collectStashBlocks(Minecraft mc) {
+        List<BlockPos> found = new ArrayList<>();
+        if (mc.level == null || mc.player == null) return found;
         List<String> targets = targetBlockIds();
-        if (targets.isEmpty()) return null;
+        if (targets.isEmpty()) return found;
         int r = searchRadius.get();
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int loY = minY.get();
+        int hiY = maxY.get();
         int px = (int) mc.player.getX();
         int pz = (int) mc.player.getZ();
-        int minY = mc.level.getMinY();
-        int maxY = mc.level.getMaxY();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = px - r; x <= px + r; x++) {
             for (int z = pz - r; z <= pz + r; z++) {
                 if (!mc.level.hasChunk(x >> 4, z >> 4)) continue;
-                for (int y = minY; y < maxY; y++) {
+                for (int y = loY; y <= hiY; y++) {
                     pos.set(x, y, z);
                     BlockState st = mc.level.getBlockState(pos);
                     if (st.isAir()) continue;
                     String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
-                    if (targets.contains(id)) return pos.immutable();
+                    if (!targets.contains(id)) continue;
+                    if (insideStructure(pos)) continue;
+                    found.add(pos.immutable());
                 }
             }
+        }
+        return found;
+    }
+
+    /** Returns the centre of a cluster of >= minCluster stash blocks, or null. A base needs a cluster, not a lone block. */
+    private BlockPos scanForBase(Minecraft mc) {
+        List<BlockPos> blocks = collectStashBlocks(mc);
+        if (blocks.isEmpty()) return null;
+        int need = Math.max(1, minCluster.get());
+        double clusterRangeSq = 8.0 * 8.0; // blocks within 8 blocks of each other count as one cluster
+        for (BlockPos candidate : blocks) {
+            if (loggedBases.contains(candidate.asLong())) continue;
+            int near = 0;
+            for (BlockPos other : blocks) {
+                if (candidate.distSqr(other) <= clusterRangeSq) near++;
+            }
+            if (near >= need) return candidate;
         }
         return null;
     }
 
+    /** Throttles detection scans to every N ticks (keeps the render thread responsive). */
+    private boolean shouldScanNow() {
+        if (ticksUntilScan > 0) { ticksUntilScan--; return false; }
+        ticksUntilScan = Math.max(1, scanInterval.get());
+        return true;
+    }
+
+    /** Pushes all configured Baritone settings via #set commands. */
+    private void applyBaritoneSettings() {
+        if (!AutismCompatManager.isBaritoneAvailable()) return;
+        Minecraft mc = Minecraft.getInstance();
+        // Core
+        set(mc, "allowBreak", allowBreak.get());
+        set(mc, "allowPlace", allowPlace.get());
+        set(mc, "allowSprint", allowSprint.get());
+        set(mc, "allowEat", autoEat.get());
+        set(mc, "autoTool", autoTool.get());
+        set(mc, "allowInventory", allowInventory.get());
+        // Movement
+        set(mc, "allowParkour", allowParkour.get());
+        set(mc, "allowParkourPlace", allowParkourPlace.get());
+        set(mc, "allowDiagonalAscend", allowDiagonalAscend.get());
+        set(mc, "allowDiagonalDescend", allowDiagonalDescend.get());
+        set(mc, "allowDownward", allowDownward.get());
+        set(mc, "allowVines", allowVines.get());
+        set(mc, "assumeStep", assumeStep.get());
+        set(mc, "sprintAscends", sprintAscends.get());
+        set(mc, "freeLook", freeLook.get());
+        set(mc, "antiCheatCompatibility", antiCheat.get());
+        // Avoidance
+        set(mc, "avoidance", avoidance.get());
+        set(mc, "avoidUpdatingFallingBlocks", avoidUpdatingFalling.get());
+        set(mc, "pauseMiningForFallingBlocks", pauseMiningForFalling.get());
+        set(mc, "mobAvoidanceRadius", mobAvoidanceRadius.get());
+        set(mc, "mobSpawnerAvoidanceRadius", spawnerAvoidanceRadius.get());
+        // Falling
+        set(mc, "maxFallHeightNoWater", maxFallNoWater.get());
+        set(mc, "allowWaterBucketFall", allowWaterBucketFall.get());
+        set(mc, "maxFallHeightBucket", maxFallBucket.get());
+        // Render
+        set(mc, "renderPath", renderPath.get());
+        set(mc, "renderGoal", renderGoal.get());
+        set(mc, "renderCachedChunks", renderCachedChunks.get());
+        // Elytra
+        set(mc, "elytraAutoJump", elytraAutoJump.get());
+        set(mc, "elytraAutoSwap", elytraAutoSwap.get());
+        set(mc, "elytraConserveFireworks", elytraConserveFireworks.get());
+        set(mc, "elytraMinimumDurability", elytraMinDurability.get());
+    }
+
+    private static void set(Minecraft mc, String name, boolean value) {
+        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+    }
+
+    private static void set(Minecraft mc, String name, int value) {
+        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+    }
+
     private void logBase(Minecraft mc, BlockPos found) {
+        loggedBases.add(found.asLong());
         String dim = mc.level != null ? mc.level.dimension().identifier().toString() : "unknown";
         String line = String.format(Locale.ROOT, "%d %d %d  %s  %s%n",
             found.getX(), found.getY(), found.getZ(), dim,
@@ -325,22 +534,27 @@ public final class DonutRTPStashFinderModule extends Module {
                     List<String> bare = new ArrayList<>();
                     for (String id : ids) bare.add(id.startsWith("minecraft:") ? id.substring(10) : id);
                     if (scanMode.get() == ScanMode.BARITONE_MINE && !bare.isEmpty()) {
+                        applyBaritoneSettings();
                         AutismCompatManager.startBaritoneMine(mc, bare);
                         AutismClientMessaging.sendPrefixed("§7Searching for: " + String.join(", ", bare));
                     }
                 }
-                // Fallthrough: also check detection while digging.
-                BlockPos found = scanForBase(mc);
-                if (found != null) {
-                    logBase(mc, found);
-                    if (autoDisableOnFind.get()) { setEnabled(false); return; }
+                // Fallthrough: also check detection while digging (throttled).
+                if (shouldScanNow()) {
+                    BlockPos found = scanForBase(mc);
+                    if (found != null) {
+                        logBase(mc, found);
+                        if (autoDisableOnFind.get()) { setEnabled(false); return; }
+                    }
                 }
             }
             case SEARCHING -> {
-                BlockPos found = scanForBase(mc);
-                if (found != null) {
-                    logBase(mc, found);
-                    if (autoDisableOnFind.get()) { setEnabled(false); return; }
+                if (shouldScanNow()) {
+                    BlockPos found = scanForBase(mc);
+                    if (found != null) {
+                        logBase(mc, found);
+                        if (autoDisableOnFind.get()) { setEnabled(false); return; }
+                    }
                 }
                 if (System.currentTimeMillis() >= searchEndMs) {
                     stopBaritone();
