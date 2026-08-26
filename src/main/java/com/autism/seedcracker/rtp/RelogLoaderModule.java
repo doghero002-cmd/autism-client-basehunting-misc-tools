@@ -4,12 +4,26 @@ import com.autism.seedcracker.SeedcrackerAddon;
 
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.IntSetting;
+import autismclient.api.module.StringListSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
 import autismclient.util.AutismCompatManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.state.BlockState;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Relog Loader.
