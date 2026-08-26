@@ -7,6 +7,7 @@ client itself and not a Meteor addon.
 
 > **⚠ Anti-cheat warning:** the Donut RTP Stash Finder and Relog Loader modules use automated
 > RTP / Baritone / elytra movement that server anti-cheats may flag. Use them at your own risk.
+> While either is active, a flashing on-screen warning banner stays up so you don't forget.
 
 ## Tools
 
@@ -53,6 +54,11 @@ configurable distance of 0,0 (default 50k), digs down with Baritone and searches
 blocks for a while.
 
 - **RTP loop** — configurable command (default `/rtp`) and cooldown.
+- **Region rotation** — each RTP picks a random DonutSMP region (`west`, `eu central`,
+  `eu west`, `asia`, `oceania`) and never repeats the one just used, so TP spots don't cluster.
+  `/rtp east` is available as an opt-in toggle (warning: often full and can break RTPing).
+- **Stuck-RTP recovery** — if your coords haven't changed within a configurable timeout
+  (default 10s, up to 60s) after an RTP, it relogs and tries a different region automatically.
 - **Distance threshold** — base search only activates when closer than this to 0,0
   (default 50000, configurable).
 - **Baritone base search** — digs down to a configurable Y then mines toward the target blocks
