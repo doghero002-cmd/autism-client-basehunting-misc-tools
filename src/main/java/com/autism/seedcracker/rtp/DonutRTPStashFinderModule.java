@@ -47,13 +47,19 @@ public final class DonutRTPStashFinderModule extends Module {
 
     // ---- RTP ----
     private final StringSetting rtpCommand = add(new StringSetting("rtp-command", "RTP command", "/rtp")
-        .description("Command sent to random-teleport.")
+        .description("Base RTP command. With region rotation on, the region argument is appended.")
         .group("RTP"));
     private final IntSetting rtpCooldown = add(new IntSetting("rtp-cooldown", "RTP cooldown (s)", 5, 1, 600, 1)
         .description("Seconds to wait after an RTP before checking position / re-RTPing.")
         .group("RTP"));
     private final IntSetting threshold = add(new IntSetting("threshold", "Distance threshold", 50000, 0, 30000000, 1000)
         .description("Run the base search when closer than this to 0,0 (uses max of |x|,|z|).")
+        .group("RTP"));
+    private final BoolSetting rotateRegions = add(new BoolSetting("rotate-regions", "Rotate RTP regions", true)
+        .description("Pick a random DonutSMP region each RTP, never repeating the one just used, so TP spots don't cluster.")
+        .group("RTP"));
+    private final BoolSetting allowEast = add(new BoolSetting("allow-east", "Allow /rtp east", false)
+        .description("WARNING: east is often full and can break RTPing. Enable to include it in the rotation.")
         .group("RTP"));
 
     // ---- Mode / behaviour ----
@@ -82,7 +88,7 @@ public final class DonutRTPStashFinderModule extends Module {
 
     public DonutRTPStashFinderModule() {
         super(SeedcrackerAddon.ID + ":donut-rtp", "Donut RTP Stash Finder",
-            "RTPs around DonutSMP and searches for stashes near 0,0.");
+            "RTPs around DonutSMP and searches for stashes near 0,0. WARNING: automated movement may flag anti-cheats.");
     }
 
     @Override
@@ -90,16 +96,23 @@ public final class DonutRTPStashFinderModule extends Module {
         logFile = autismclient.AutismClientAddon.FOLDER.toPath().resolve("bases.txt");
         state = State.RTP_WAIT;
         stateTicks = 0;
+        ACTIVE = true;
+        AutismClientMessaging.sendPrefixed("§c§l[Warning] §cDonut RTP Stash Finder uses automated RTP/Baritone movement that anti-cheats may flag. Use at your own risk.");
+        autismclient.util.AutismNotifications.warning("RTP Stash Finder: may flag anti-cheat");
         AutismClientMessaging.sendPrefixed("§aDonut RTP Stash Finder enabled. Mode: " + mode.get());
         if (!AutismCompatManager.isBaritoneAvailable()) {
             AutismClientMessaging.sendPrefixed("§eBaritone not detected - base-search (dig/mine) disabled; detection still works.");
         }
     }
 
+    /** True while the module is enabled (drives the on-screen warning HUD). */
+    public static volatile boolean ACTIVE = false;
+
     @Override
     public void onDisable() {
         stopBaritone();
         state = State.IDLE;
+        ACTIVE = false;
     }
 
     @Override
@@ -113,12 +126,44 @@ public final class DonutRTPStashFinderModule extends Module {
 
     private void sendRtp(Minecraft mc) {
         if (mc.getConnection() == null) return;
-        String cmd = rtpCommand.get().trim();
-        if (cmd.isEmpty()) return;
+        String base = rtpCommand.get().trim();
+        if (base.isEmpty()) base = "/rtp";
+        if (rotateRegions.get()) {
+            base = base + " " + pickRegion();
+        }
+        String cmd = base;
         if (cmd.startsWith("/")) mc.getConnection().sendCommand(cmd.substring(1));
         else mc.getConnection().sendChat(cmd);
         state = State.RTP_WAIT;
         stateTicks = rtpCooldown.get() * 20;
+    }
+
+    // DonutSMP RTP regions. "east" is excluded by default (often full / can break RTP).
+    private static final String[] REGIONS = { "west", "eu central", "eu west", "asia", "oceania" };
+    private static final String EAST = "east";
+    private static final java.util.Random RNG = new java.util.Random();
+    private int lastRegionIndex = -1;
+    private boolean lastWasEast = false;
+
+    /** Picks a random region, never repeating the one used last time. */
+    private String pickRegion() {
+        boolean includeEast = allowEast.get();
+        int pool = REGIONS.length + (includeEast ? 1 : 0);
+        if (pool <= 1) return includeEast ? EAST : REGIONS[0];
+
+        int idx;
+        do {
+            idx = RNG.nextInt(pool);
+        } while (isSameAsLast(idx, includeEast));
+        lastRegionIndex = idx;
+        lastWasEast = includeEast && idx == REGIONS.length;
+        return lastWasEast ? EAST : REGIONS[idx];
+    }
+
+    private boolean isSameAsLast(int idx, boolean includeEast) {
+        boolean isEast = includeEast && idx == REGIONS.length;
+        if (isEast != lastWasEast) return false;
+        return !isEast && idx == lastRegionIndex;
     }
 
     private void stopBaritone() {

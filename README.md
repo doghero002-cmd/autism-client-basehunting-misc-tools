@@ -1,8 +1,12 @@
 # Seed Based Tools
 
-A standalone [AUTISM Client](https://github.com/) addon bundling two seed-based tools into one
-package: a world **seed cracker** and a **bedrock coordinate finder**. Built as a normal AUTISM
-addon (its own jar) — not part of the client itself and not a Meteor addon.
+A standalone [AUTISM Client](https://github.com/) addon bundling seed-based and coordinate tools
+into one package: a world **seed cracker**, a **bedrock coordinate finder**, and **DonutSMP
+stash-hunting automation**. Built as a normal AUTISM addon (its own jar) — not part of the
+client itself and not a Meteor addon.
+
+> **⚠ Anti-cheat warning:** the Donut RTP Stash Finder and Relog Loader modules use automated
+> RTP / Baritone / elytra movement that server anti-cheats may flag. Use them at your own risk.
 
 ## Tools
 
@@ -42,6 +46,36 @@ your location.
   configured command prefix automatically.
 - **Seed auto-fill** — pulls the cracked seed from the SeedCracker tool when the GUI opens
   (or enter it manually). Searches all 4 rotations multi-threaded around your position.
+
+### 3. Donut RTP Stash Finder
+Automates stash hunting on DonutSMP. RTPs around the map and, when you land within a
+configurable distance of 0,0 (default 50k), digs down with Baritone and searches for stash
+blocks for a while.
+
+- **RTP loop** — configurable command (default `/rtp`) and cooldown.
+- **Distance threshold** — base search only activates when closer than this to 0,0
+  (default 50000, configurable).
+- **Baritone base search** — digs down to a configurable Y then mines toward the target blocks
+  (chests, hoppers, shulker boxes, ... — configurable list) for a configurable duration
+  (default 15 min). Requires Baritone (baritone-meteor / upstream); detection still works
+  without it.
+- **Save & RTP mode** — logs any detected base's coords + dimension + timestamp to `bases.txt`
+  and RTPs away instead of searching. Optional auto-disable after a find.
+
+### 4. Relog Loader
+One-shot chunk-loading module (the "relog loading" trick). Digs down to a configurable Y,
+disconnects and rejoins so the server resends chunks, then flies out with the **elytra**
+(Baritone's ElytraProcess) so ESP can read the loaded bedrock/deepslate region — including
+signatures normal chunk loading hides.
+
+- **Elytra flight** — uses Baritone's auto-elytra process (falls back to Baritone walking if
+  no elytra/native lib). Configurable fly radius and duration. Requires an elytra or riptide
+  trident (setting-gated).
+- **Logs ESP detections** — while flying it scans the freshly-loaded chunks for base blocks
+  (configurable list/radius) and appends new finds to `bases.txt`.
+- Separate from the stash finder so you can run a load cycle on demand.
+
+Both DonutSMP modules write to `bases.txt` in the AUTISM config folder.
 
 ## Requirements
 
