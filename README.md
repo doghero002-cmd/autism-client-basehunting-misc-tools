@@ -94,8 +94,7 @@ The jar is produced at `build/libs/autism-seedcracker-<version>.jar`.
 
 ## Credits
 
-- **SeedCrackerX** by KaptainWutax and 19MisterX98 (MIT License) — the seed-cracking engine.
-- Bedrock pattern matching adapted from BedrockPatternFinder (v26.11).
+- **SeedCrackerX** — the seed-cracking engine.
 - The original engines are kept under their own packages so they stay close to upstream.
 
 ## License
