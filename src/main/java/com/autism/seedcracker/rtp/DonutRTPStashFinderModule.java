@@ -65,10 +65,10 @@ public final class DonutRTPStashFinderModule extends Module {
         .description("Run the base search when closer than this to 0,0 (uses max of |x|,|z|).")
         .group("RTP"));
     private final BoolSetting rotateRegions = add(new BoolSetting("rotate-regions", "Rotate RTP regions", true)
-        .description("Pick a random DonutSMP region each RTP, never repeating the one just used, so TP spots don't cluster.")
+        .description("Pick a random DonutSMP region each RTP from all 6, never repeating the one just used, so TP spots don't cluster.")
         .group("RTP"));
-    private final BoolSetting allowEast = add(new BoolSetting("allow-east", "Allow /rtp east", false)
-        .description("WARNING: east is often full and can break RTPing. Enable to include it in the rotation.")
+    private final BoolSetting allowEast = add(new BoolSetting("allow-east", "Allow /rtp east", true)
+        .description("Include east in the rotation. NOTE: east is often full and can break RTPing - the stuck-RTP recovery handles that.")
         .group("RTP"));
     private final IntSetting stuckTimeout = add(new IntSetting("stuck-timeout", "Stuck RTP timeout (s)", 10, 1, 60, 1)
         .description("If your coords don't change this long after an RTP, relog and try another region.")
@@ -85,8 +85,8 @@ public final class DonutRTPStashFinderModule extends Module {
             "minecraft:chest|minecraft:barrel|minecraft:shulker_box|minecraft:hopper|minecraft:trapped_chest|minecraft:ender_chest")
         .description("Block ids (| separated) that count as a stash/base.")
         .group("Behaviour"));
-    private final IntSetting searchRadius = add(new IntSetting("search-radius", "Search radius", 48, 8, 256, 8)
-        .description("Block radius scanned for stash blocks when detecting.")
+    private final IntSetting searchRadius = add(new IntSetting("search-radius", "Search radius", 48, 8, 5000, 8)
+        .description("Block radius scanned for stash blocks when detecting (up to the search time limit).")
         .group("Behaviour"));
     private final IntSetting searchDuration = add(new IntSetting("search-duration", "Search duration (s)", 900, 10, 7200, 10)
         .description("How long to search before RTPing again (default 15 min).")
@@ -184,32 +184,24 @@ public final class DonutRTPStashFinderModule extends Module {
         }
     }
 
-    // DonutSMP RTP regions. "east" is excluded by default (often full / can break RTP).
-    private static final String[] REGIONS = { "west", "eu central", "eu west", "asia", "oceania" };
-    private static final String EAST = "east";
+    // DonutSMP RTP regions.
+    private static final String[] REGIONS = { "west", "east", "eu central", "eu west", "asia", "oceania" };
     private static final java.util.Random RNG = new java.util.Random();
-    private int lastRegionIndex = -1;
-    private boolean lastWasEast = false;
+    private String lastRegion = null;
 
-    /** Picks a random region, never repeating the one used last time. */
+    /** Picks a random region from the allowed set, never repeating the one used last time. */
     private String pickRegion() {
-        boolean includeEast = allowEast.get();
-        int pool = REGIONS.length + (includeEast ? 1 : 0);
-        if (pool <= 1) return includeEast ? EAST : REGIONS[0];
+        java.util.List<String> pool = new java.util.ArrayList<>();
+        for (String r : REGIONS) {
+            if (!allowEast.get() && r.equals("east")) continue;
+            pool.add(r);
+        }
+        if (pool.isEmpty()) pool.add("west");
+        if (pool.size() > 1 && lastRegion != null) pool.remove(lastRegion);
 
-        int idx;
-        do {
-            idx = RNG.nextInt(pool);
-        } while (isSameAsLast(idx, includeEast));
-        lastRegionIndex = idx;
-        lastWasEast = includeEast && idx == REGIONS.length;
-        return lastWasEast ? EAST : REGIONS[idx];
-    }
-
-    private boolean isSameAsLast(int idx, boolean includeEast) {
-        boolean isEast = includeEast && idx == REGIONS.length;
-        if (isEast != lastWasEast) return false;
-        return !isEast && idx == lastRegionIndex;
+        String picked = pool.get(RNG.nextInt(pool.size()));
+        lastRegion = picked;
+        return picked;
     }
 
     private void stopBaritone() {
