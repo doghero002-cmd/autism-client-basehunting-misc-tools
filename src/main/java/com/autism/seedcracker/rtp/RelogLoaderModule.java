@@ -262,6 +262,7 @@ public final class RelogLoaderModule extends Module {
                 }
             }
             case DISCONNECT_WAIT -> {
+                // We are worldless here: count down regardless so the reconnect actually fires.
                 if (phaseTicks > 0) { phaseTicks--; return; }
                 RelogHelper.reconnect(server);
                 phase = Phase.RECONNECT_WAIT;
