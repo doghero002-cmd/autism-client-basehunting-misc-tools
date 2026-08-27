@@ -323,8 +323,8 @@ public final class DonutRTPStashFinderModule extends Module {
             for (String id : targetBlockIds()) bare.add(id.startsWith("minecraft:") ? id.substring(10) : id);
             if (!bare.isEmpty()) {
                 applyBaritoneSettings();
-                // Dig down to the target Y first (honours dig-depth), then mine toward stash blocks.
-                AutismCompatManager.startBaritoneGoTo(mc, (int) mc.player.getX(), digDepth.get(), (int) mc.player.getZ());
+                // Mine toward stash blocks. Detection already Y-gates (deepslate levels), so no separate
+                // dig-down goto is needed - a goto here would cancel the mine and stall the search.
                 AutismCompatManager.startBaritoneMine(mc, bare);
                 AutismClientMessaging.sendPrefixed("§7Searching for: " + String.join(", ", bare));
             }
