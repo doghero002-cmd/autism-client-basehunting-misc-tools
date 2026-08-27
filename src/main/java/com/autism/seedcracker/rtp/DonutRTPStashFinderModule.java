@@ -1,18 +1,5 @@
 package com.autism.seedcracker.rtp;
 
-import autismclient.api.module.BoolSetting;
-import autismclient.api.module.EnumSetting;
-import autismclient.api.module.IntSetting;
-import autismclient.api.module.StringListSetting;
-import autismclient.api.module.StringSetting;
-import autismclient.modules.Module;
-import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismCompatManager;
-import com.autism.seedcracker.SeedcrackerAddon;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,6 +10,28 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+
+import com.autism.seedcracker.SeedcrackerAddon;
+import com.donutsmp.rtpmapper.automation.PositionObservation;
+import com.donutsmp.rtpmapper.automation.RtpAttemptSettings;
+import com.donutsmp.rtpmapper.automation.RtpClock;
+import com.donutsmp.rtpmapper.automation.RtpController;
+import com.donutsmp.rtpmapper.automation.RtpEnvironmentSnapshot;
+import com.donutsmp.rtpmapper.automation.RtpSampleResult;
+import com.donutsmp.rtpmapper.region.RtpRegion;
+import com.donutsmp.rtpmapper.region.RtpRegionCycle;
+
+import autismclient.api.module.BoolSetting;
+import autismclient.api.module.EnumSetting;
+import autismclient.api.module.IntSetting;
+import autismclient.api.module.StringListSetting;
+import autismclient.api.module.StringSetting;
+import autismclient.modules.Module;
+import autismclient.util.AutismClientMessaging;
+import autismclient.util.AutismCompatManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Donut RTP Stash Finder.
@@ -40,21 +49,17 @@ public final class DonutRTPStashFinderModule extends Module {
     public enum Mode { SEARCH, SAVE_AND_RTP }
     public enum ScanMode { DETECT_ONLY, BARITONE_MINE }
 
-    private enum State { IDLE, RTP_WAIT, DIGGING, SEARCHING }
+    // Post-teleport search phase, driven from the engine's sample hook.
+    private enum Phase { RTP, SEARCHING }
 
-    private State state = State.IDLE;
-    private int stateTicks = 0;
+    private Phase phase = Phase.RTP;
     private long searchEndMs = 0L;
+    private boolean loggedThisLanding = false;
     private Path logFile;
 
-    // Stuck-RTP tracking: if our coords don't change after an RTP, relog and try a new region.
-    private double rtpFromX = 0.0;
-    private double rtpFromZ = 0.0;
-    private long rtpDeadlineMs = 0L;
-    private boolean stuckRelogPending = false;
-    private long stuckRelogDeadlineMs = 0L;
-    private net.minecraft.client.multiplayer.ServerData server;
-    private static final double MOVED_EPSILON = 4.0;
+    // The imported DonutSMP-Bot RTP engine.
+    private RtpController controller;
+    private RtpRegionCycle regionCycle;
 
     // ---- RTP ----
     private final StringSetting rtpCommand = add(new StringSetting("rtp-command", "RTP command", "/rtp")
@@ -63,8 +68,8 @@ public final class DonutRTPStashFinderModule extends Module {
     private final IntSetting rtpCooldown = add(new IntSetting("rtp-cooldown", "RTP cooldown (s)", 5, 1, 600, 1)
         .description("Seconds to wait after an RTP before checking position / re-RTPing.")
         .group("RTP"));
-    private final IntSetting threshold = add(new IntSetting("threshold", "Distance threshold", 50000, 0, 30000000, 1000)
-        .description("Run the base search when closer than this to 0,0 (uses max of |x|,|z|).")
+    private final IntSetting threshold = add(new IntSetting("threshold", "Distance threshold", 50000, 0, 300000, 1000)
+        .description("Run the base search when closer than this to 0,0 (uses max of |x|,|z|). DonutSMP world border is 300000.")
         .group("RTP"));
     private final BoolSetting rotateRegions = add(new BoolSetting("rotate-regions", "Rotate RTP regions", true)
         .description("Pick a random DonutSMP region each RTP from all 6, never repeating the one just used, so TP spots don't cluster.")
@@ -89,9 +94,6 @@ public final class DonutRTPStashFinderModule extends Module {
         .group("Behaviour"));
     private final IntSetting searchRadius = add(new IntSetting("search-radius", "Search radius", 48, 8, 5000, 8)
         .description("Horizontal block radius scanned for stash blocks when detecting.")
-        .group("Behaviour"));
-    private final IntSetting scanHeight = add(new IntSetting("scan-height", "Scan height", 16, 4, 384, 4)
-        .description("Vertical blocks scanned above/below the player (keeps detection fast).")
         .group("Behaviour"));
     private final IntSetting minCluster = add(new IntSetting("min-cluster", "Min cluster size", 3, 1, 64, 1)
         .description("How many stash blocks must be near each other to count as a base (filters lone blocks).")
@@ -203,14 +205,16 @@ public final class DonutRTPStashFinderModule extends Module {
 
     @Override
     public void onEnable() {
-        Minecraft mc = Minecraft.getInstance();
-        server = mc.getCurrentServer();
         logFile = autismclient.AutismClientAddon.FOLDER.toPath().resolve("bases.txt");
-        state = State.RTP_WAIT;
-        stateTicks = 0;
-        stuckRelogPending = false;
-        stuckRelogDeadlineMs = 0L;
-        rtpDeadlineMs = 0L;
+        regionCycle = new RtpRegionCycle();
+        controller = new RtpController(
+            RtpClock.system(),
+            this::attemptSettings,          // RtpSettingsProvider
+            this::sendRtpCommand,           // RtpCommandSender
+            this::onTeleportConfirmed       // RtpSampleSink
+        );
+        phase = Phase.RTP;
+        loggedThisLanding = false;
         ACTIVE = true;
         AutismClientMessaging.sendPrefixed("§c§l[Warning] §cDonut RTP Stash Finder uses automated RTP/Baritone movement that anti-cheats may flag. Use at your own risk.");
         autismclient.util.AutismNotifications.warning("RTP Stash Finder: may flag anti-cheat");
@@ -218,6 +222,9 @@ public final class DonutRTPStashFinderModule extends Module {
         if (!AutismCompatManager.isBaritoneAvailable()) {
             AutismClientMessaging.sendPrefixed("§eBaritone not detected - base-search (dig/mine) disabled; detection still works.");
         }
+        Minecraft mc = Minecraft.getInstance();
+        RtpEnvironmentSnapshot env = buildSnapshot(mc);
+        if (env != null) controller.start(env);
     }
 
     /** True while the module is enabled (drives the on-screen warning HUD). */
@@ -225,8 +232,9 @@ public final class DonutRTPStashFinderModule extends Module {
 
     @Override
     public void onDisable() {
+        if (controller != null) controller.stop();
         stopBaritone();
-        state = State.IDLE;
+        phase = Phase.RTP;
         ACTIVE = false;
     }
 
@@ -235,71 +243,111 @@ public final class DonutRTPStashFinderModule extends Module {
         setEnabledSilently(false);
     }
 
-    private static int distFromSpawn(Minecraft mc) {
-        return Math.max(Math.abs((int) mc.player.getX()), Math.abs((int) mc.player.getZ()));
+    // ------------------------------------------------------------------
+    // Engine wiring
+    // ------------------------------------------------------------------
+
+    /** Builds the per-attempt settings the engine asks for: rotating region + center-stop gate + timeouts. */
+    private RtpAttemptSettings attemptSettings() {
+        RtpAttemptSettings d = RtpAttemptSettings.defaults();
+        return new RtpAttemptSettings(
+            java.time.Duration.ofSeconds(Math.max(1, rtpCooldown.get())).toNanos(), // cooldownNanos
+            d.teleportThresholdBlocks(),
+            java.time.Duration.ofSeconds(Math.max(1, stuckTimeout.get())).toNanos(), // teleportTimeoutNanos (replaces checkStuckRtp)
+            d.minimumStabilizationTicks(),
+            d.requiredStableTicks(),
+            d.maximumStabilizationNanos(),
+            d.stabilityToleranceBlocks(),
+            d.storeYCoordinate(),
+            nextRegion(),                                                            // requestedRegion
+            mode.get() == Mode.SEARCH,                                               // stopNearCenter
+            threshold.get(),                                                         // centerStopRadiusBlocks
+            false,                                                                   // stopNearWorldBorder (world border is 300000)
+            d.worldBorderMarginBlocks()
+        );
     }
 
-    private void sendRtp(Minecraft mc) {
+    /** Round-robin across the selectable regions, honoring the east toggle (engine never repeats the last region). */
+    private RtpRegion nextRegion() {
+        if (!rotateRegions.get()) {
+            return allowEast.get() ? RtpRegion.NA_EAST : RtpRegion.NA_WEST;
+        }
+        List<RtpRegion> selected = new ArrayList<>();
+        for (RtpRegion r : RtpRegion.selectableValues()) {
+            if (!allowEast.get() && r == RtpRegion.NA_EAST) continue;
+            selected.add(r);
+        }
+        if (selected.isEmpty()) selected.add(RtpRegion.NA_WEST);
+        return regionCycle.next(selected);
+    }
+
+    /** RtpCommandSender: fire the region-scoped /rtp command at the server. */
+    private void sendRtpCommand(long requestNumber, RtpRegion region) {
+        Minecraft mc = Minecraft.getInstance();
         if (mc.getConnection() == null) return;
         String base = rtpCommand.get().trim();
         if (base.isEmpty()) base = "/rtp";
-        if (rotateRegions.get()) {
-            base = base + " " + pickRegion();
-        }
-        String cmd = base;
-        // Record where we are and start the stuck-detection timer.
-        if (mc.player != null) {
-            rtpFromX = mc.player.getX();
-            rtpFromZ = mc.player.getZ();
-        }
-        rtpDeadlineMs = System.currentTimeMillis() + stuckTimeout.get() * 1000L;
+        String cmd = rotateRegions.get() ? base + " " + region.commandArgument() : base;
         if (cmd.startsWith("/")) mc.getConnection().sendCommand(cmd.substring(1));
         else mc.getConnection().sendChat(cmd);
-        state = State.RTP_WAIT;
-        stateTicks = rtpCooldown.get() * 20;
     }
 
-    /** If the RTP didn't move us within the timeout, relog and try another region. */
-    private void checkStuckRtp(Minecraft mc) {
-        if (mc.player == null || rtpDeadlineMs == 0L) return;
-        double dx = mc.player.getX() - rtpFromX;
-        double dz = mc.player.getZ() - rtpFromZ;
-        boolean moved = (dx * dx + dz * dz) > (MOVED_EPSILON * MOVED_EPSILON);
-        if (moved) {
-            rtpDeadlineMs = 0L;
+    /**
+     * RtpSampleSink: a teleport was confirmed and stabilized. This replaces the old
+     * RTP_WAIT -> DIGGING/SEARCHING transition. Run base detection / Baritone search here.
+     */
+    private void onTeleportConfirmed(RtpSampleResult result) {
+        Minecraft mc = Minecraft.getInstance();
+        loggedThisLanding = false;
+        if (mc.player == null || mc.level == null) return;
+
+        // SAVE_AND_RTP never lingers: log if a base is here, then let the engine RTP again.
+        if (mode.get() == Mode.SAVE_AND_RTP) {
+            if (distFromSpawn(mc) < threshold.get()) {
+                BlockPos found = scanForBase(mc);
+                if (found != null) {
+                    logBase(mc, found);
+                    if (autoDisableOnFind.get()) { setEnabled(false); return; }
+                }
+            }
             return;
         }
-        if (System.currentTimeMillis() < rtpDeadlineMs) return;
-        // Stuck: coords unchanged past the timeout. Relog and pick a fresh region.
-        rtpDeadlineMs = 0L;
-        AutismClientMessaging.sendPrefixed("§eDonut RTP: teleport didn't move us; relogging and trying another region.");
-        stopBaritone();
-        stuckRelogPending = true;
-        if (RelogHelper.disconnect()) {
-            stuckRelogDeadlineMs = System.currentTimeMillis() + 3000L;
+
+        // SEARCH mode: only search when we landed within the center-stop radius.
+        if (distFromSpawn(mc) >= threshold.get()) return;
+
+        if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
+            phase = Phase.SEARCHING;
+            searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
+            List<String> bare = new ArrayList<>();
+            for (String id : targetBlockIds()) bare.add(id.startsWith("minecraft:") ? id.substring(10) : id);
+            if (!bare.isEmpty()) {
+                applyBaritoneSettings();
+                // Dig down to the target Y first (honours dig-depth), then mine toward stash blocks.
+                AutismCompatManager.startBaritoneGoTo(mc, (int) mc.player.getX(), digDepth.get(), (int) mc.player.getZ());
+                AutismCompatManager.startBaritoneMine(mc, bare);
+                AutismClientMessaging.sendPrefixed("§7Searching for: " + String.join(", ", bare));
+            }
         } else {
-            stuckRelogPending = false;
+            phase = Phase.SEARCHING;
+            searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
         }
     }
 
-    // DonutSMP RTP regions.
-    private static final String[] REGIONS = { "west", "east", "eu central", "eu west", "asia", "oceania" };
-    private static final java.util.Random RNG = new java.util.Random();
-    private String lastRegion = null;
-
-    /** Picks a random region from the allowed set, never repeating the one used last time. */
-    private String pickRegion() {
-        java.util.List<String> pool = new java.util.ArrayList<>();
-        for (String r : REGIONS) {
-            if (!allowEast.get() && r.equals("east")) continue;
-            pool.add(r);
+    /** Builds the engine's per-tick environment observation from Minecraft, or null when not ready. */
+    private RtpEnvironmentSnapshot buildSnapshot(Minecraft mc) {
+        if (mc.getConnection() == null || mc.player == null || mc.level == null) {
+            return RtpEnvironmentSnapshot.disconnected();
         }
-        if (pool.isEmpty()) pool.add("west");
-        if (pool.size() > 1 && lastRegion != null) pool.remove(lastRegion);
+        PositionObservation pos = new PositionObservation(
+            mc.player.getX(), mc.player.getY(), mc.player.getZ(),
+            mc.level.dimension().identifier().toString()
+        );
+        return RtpEnvironmentSnapshot.ready(mc.getConnection(), pos);
+    }
 
-        String picked = pool.get(RNG.nextInt(pool.size()));
-        lastRegion = picked;
-        return picked;
+    private static int distFromSpawn(Minecraft mc) {
+        return Math.max(Math.abs((int) mc.player.getX()), Math.abs((int) mc.player.getZ()));
     }
 
     private void stopBaritone() {
@@ -472,106 +520,55 @@ public final class DonutRTPStashFinderModule extends Module {
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
+        if (controller == null) return;
 
-        // Handle a pending stuck-RTP relog: reconnect once the wait elapses, then RTP to a new region.
-        if (stuckRelogPending) {
-            if (System.currentTimeMillis() < stuckRelogDeadlineMs) return;
-            if (mc.player == null) {
-                // Still at the menu/disconnected: reconnect now.
-                RelogHelper.reconnect(server);
+        // Keep scanning while searching after a confirmed teleport (throttled).
+        if (phase == Phase.SEARCHING) {
+            if (shouldScanNow()) {
+                BlockPos found = scanForBase(mc);
+                if (found != null) {
+                    logBase(mc, found);
+                    if (autoDisableOnFind.get()) { setEnabled(false); return; }
+                }
+            }
+            if (System.currentTimeMillis() >= searchEndMs) {
+                stopBaritone();
+                phase = Phase.RTP;
+                AutismClientMessaging.sendPrefixed("§7Search time up, RTPing again.");
+            } else {
+                // Still searching: park the engine so it doesn't RTP away mid-search.
                 return;
             }
-            // Back in the world: re-RTP to a different region.
-            stuckRelogPending = false;
-            sendRtp(mc);
-            return;
         }
 
-        if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
-
-        switch (state) {
-            case IDLE -> {
-                sendRtp(mc);
-            }
-            case RTP_WAIT -> {
-                // Watch for a failed teleport and relog if our coords never change.
-                checkStuckRtp(mc);
-                if (stuckRelogPending || state != State.RTP_WAIT) return;
-                if (stateTicks > 0) { stateTicks--; return; }
-                int dist = distFromSpawn(mc);
-                if (dist >= threshold.get()) {
-                    sendRtp(mc);
-                    return;
-                }
-                // Within threshold.
-                if (mode.get() == Mode.SAVE_AND_RTP) {
-                    BlockPos found = scanForBase(mc);
-                    if (found != null) {
-                        logBase(mc, found);
-                        if (autoDisableOnFind.get()) { setEnabled(false); return; }
-                    }
-                    sendRtp(mc);
-                    return;
-                }
-                // SEARCH mode.
-                if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
-                    state = State.DIGGING;
-                    stateTicks = 0;
-                    AutismCompatManager.startBaritoneGoTo(mc, (int) mc.player.getX(), digDepth.get(), (int) mc.player.getZ());
-                    AutismClientMessaging.sendPrefixed("§7Digging down to Y=" + digDepth.get() + "...");
-                } else {
-                    state = State.SEARCHING;
-                    stateTicks = 0;
-                    searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
-                }
-            }
-            case DIGGING -> {
-                // Wait until Baritone stops digging (reached depth / gave up), then start searching.
-                if (!AutismCompatManager.isBaritoneBusy()) {
-                    state = State.SEARCHING;
-                    searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
-                    List<String> ids = targetBlockIds();
-                    List<String> bare = new ArrayList<>();
-                    for (String id : ids) bare.add(id.startsWith("minecraft:") ? id.substring(10) : id);
-                    if (scanMode.get() == ScanMode.BARITONE_MINE && !bare.isEmpty()) {
-                        applyBaritoneSettings();
-                        AutismCompatManager.startBaritoneMine(mc, bare);
-                        AutismClientMessaging.sendPrefixed("§7Searching for: " + String.join(", ", bare));
-                    }
-                }
-                // Fallthrough: also check detection while digging (throttled).
-                if (shouldScanNow()) {
-                    BlockPos found = scanForBase(mc);
-                    if (found != null) {
-                        logBase(mc, found);
-                        if (autoDisableOnFind.get()) { setEnabled(false); return; }
-                    }
-                }
-            }
-            case SEARCHING -> {
-                if (shouldScanNow()) {
-                    BlockPos found = scanForBase(mc);
-                    if (found != null) {
-                        logBase(mc, found);
-                        if (autoDisableOnFind.get()) { setEnabled(false); return; }
-                    }
-                }
-                if (System.currentTimeMillis() >= searchEndMs) {
-                    stopBaritone();
-                    AutismClientMessaging.sendPrefixed("§7Search time up, RTPing again.");
-                    sendRtp(mc);
-                }
+        // While RTPing (not in a post-teleport search), keep detection running too
+        // so SAVE_AND_RTP can log a base the moment we land within range.
+        if (phase == Phase.RTP && mode.get() == Mode.SAVE_AND_RTP && !loggedThisLanding
+                && distFromSpawn(mc) < threshold.get() && shouldScanNow()) {
+            BlockPos found = scanForBase(mc);
+            if (found != null) {
+                loggedThisLanding = true;
+                logBase(mc, found);
+                if (autoDisableOnFind.get()) { setEnabled(false); return; }
             }
         }
+
+        // Drive the engine. The controller handles send/cooldown/teleport-timeout/stabilization.
+        RtpEnvironmentSnapshot env = buildSnapshot(mc);
+        if (env != null) controller.tick(env);
     }
 
     @Override
     public String info() {
-        return switch (state) {
+        if (phase == Phase.SEARCHING) return "searching";
+        if (controller == null || !controller.isRunning()) return "idle";
+        return switch (controller.state()) {
             case IDLE -> "idle";
-            case RTP_WAIT -> "rtp";
-            case DIGGING -> "digging";
-            case SEARCHING -> "searching";
+            case WAITING_TO_SEND, COOLDOWN -> "cooldown";
+            case WAITING_FOR_TELEPORT -> "rtp";
+            case WAITING_FOR_STABILIZATION -> "stabilizing";
+            case RECORDING -> "recording";
         };
     }
 }
