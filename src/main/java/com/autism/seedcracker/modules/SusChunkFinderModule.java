@@ -86,8 +86,8 @@ public final class SusChunkFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public SusChunkFinderModule() {
-        super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder",
+    public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
+        super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
             "Flags chunks dense with suspicious blocks (kelp, vines, amethyst, bamboo, ...) - likely player activity.");
     }
 

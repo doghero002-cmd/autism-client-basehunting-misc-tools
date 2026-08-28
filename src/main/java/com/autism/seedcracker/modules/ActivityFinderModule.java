@@ -61,8 +61,8 @@ public final class ActivityFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public ActivityFinderModule() {
-        super(SeedcrackerAddon.ID + ":z-activity-finder", "Activity Finder",
+    public ActivityFinderModule(autismclient.modules.ModuleCategory category) {
+        super(SeedcrackerAddon.ID + ":z-activity-finder", "Activity Finder", category,
             "Flags chunks with block-entity activity at or below a Y level - signs of a worked area.");
     }
 
