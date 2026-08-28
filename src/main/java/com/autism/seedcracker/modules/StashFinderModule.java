@@ -78,8 +78,8 @@ public final class StashFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public StashFinderModule() {
-        super(SeedcrackerAddon.ID + ":z-stash-finder", "Stash Finder",
+    public StashFinderModule(autismclient.modules.ModuleCategory category) {
+        super(SeedcrackerAddon.ID + ":z-stash-finder", "Stash Finder", category,
             "Flags chunks dense with chests/hoppers/shulkers - likely hidden player stashes.");
     }
 
