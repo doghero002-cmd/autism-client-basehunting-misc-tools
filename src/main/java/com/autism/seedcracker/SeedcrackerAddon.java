@@ -2,16 +2,19 @@ package com.autism.seedcracker;
 
 import com.autism.seedcracker.commands.BedrockFinderCommand;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
+import com.autism.seedcracker.hud.RegionMapHud;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.StashWarningHud;
 import com.autism.seedcracker.modules.ActivityFinderModule;
 import com.autism.seedcracker.modules.AntiTrapModule;
 import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
+import com.autism.seedcracker.modules.BoneDropperModule;
 import com.autism.seedcracker.modules.ChunkFinderModule;
 import com.autism.seedcracker.modules.EntityScannerModule;
 import com.autism.seedcracker.modules.FakePayModule;
 import com.autism.seedcracker.modules.FakePaymentsModule;
+import com.autism.seedcracker.modules.FlightPlusModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
@@ -49,6 +52,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         autismclient.modules.ModuleCategory catEntity = AutismAddons.modules().registerCategory("Entity");
         autismclient.modules.ModuleCategory catFake = AutismAddons.modules().registerCategory("Fake");
         autismclient.modules.ModuleCategory catRender = AutismAddons.modules().registerCategory("Render");
+        autismclient.modules.ModuleCategory catMovement = AutismAddons.modules().registerCategory("Movement");
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
@@ -68,13 +72,18 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Zelith entity / fake modules (ported), each under its own tab.
         AutismAddons.modules().register(new EntityScannerModule(catEntity));
         AutismAddons.modules().register(new AntiTrapModule(catEntity));
+        AutismAddons.modules().register(new BoneDropperModule(catEntity));
         AutismAddons.modules().register(new AutoRenderModule(catRender));
         AutismAddons.modules().register(new FakePayModule(catFake));
         AutismAddons.modules().register(new FakePaymentsModule(catFake));
 
+        // Movement.
+        AutismAddons.modules().register(new FlightPlusModule(catMovement));
+
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());
+        AutismAddons.hud().register(new RegionMapHud());
     }
 
     @Override
