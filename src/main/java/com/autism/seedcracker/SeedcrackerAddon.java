@@ -2,6 +2,7 @@ package com.autism.seedcracker;
 
 import com.autism.seedcracker.commands.BedrockFinderCommand;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
+import com.autism.seedcracker.hud.FakeScoreboardHud;
 import com.autism.seedcracker.hud.RegionMapHud;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.StashWarningHud;
@@ -14,10 +15,13 @@ import com.autism.seedcracker.modules.ChunkFinderModule;
 import com.autism.seedcracker.modules.EntityScannerModule;
 import com.autism.seedcracker.modules.FakePayModule;
 import com.autism.seedcracker.modules.FakePaymentsModule;
+import com.autism.seedcracker.modules.FakeRolesModule;
 import com.autism.seedcracker.modules.FlightPlusModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
+import com.autism.seedcracker.modules.PaperRigModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
+import com.autism.seedcracker.modules.SpawnerProtectModule;
 import com.autism.seedcracker.modules.StashFinderModule;
 import com.autism.seedcracker.modules.SusChunkFinderModule;
 import com.autism.seedcracker.rtp.DonutRTPStashFinderModule;
@@ -73,9 +77,12 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new EntityScannerModule(catEntity));
         AutismAddons.modules().register(new AntiTrapModule(catEntity));
         AutismAddons.modules().register(new BoneDropperModule(catEntity));
+        AutismAddons.modules().register(new SpawnerProtectModule(catEntity));
         AutismAddons.modules().register(new AutoRenderModule(catRender));
+        AutismAddons.modules().register(new PaperRigModule(catRender));
         AutismAddons.modules().register(new FakePayModule(catFake));
         AutismAddons.modules().register(new FakePaymentsModule(catFake));
+        AutismAddons.modules().register(new FakeRolesModule(catFake));
 
         // Movement.
         AutismAddons.modules().register(new FlightPlusModule(catMovement));
@@ -84,6 +91,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());
         AutismAddons.hud().register(new RegionMapHud());
+        AutismAddons.hud().register(new FakeScoreboardHud());
     }
 
     @Override
