@@ -5,8 +5,13 @@ import com.autism.seedcracker.finder.ChunkFlagRenderer;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.StashWarningHud;
 import com.autism.seedcracker.modules.ActivityFinderModule;
+import com.autism.seedcracker.modules.AntiTrapModule;
+import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
 import com.autism.seedcracker.modules.ChunkFinderModule;
+import com.autism.seedcracker.modules.EntityScannerModule;
+import com.autism.seedcracker.modules.FakePayModule;
+import com.autism.seedcracker.modules.FakePaymentsModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
@@ -39,6 +44,12 @@ public final class SeedcrackerAddon extends AutismAddon {
         this.authors = "KaptainWutax, 19MisterX98";
         this.color = 0xFF50C878;
 
+        // Category tabs for the Zelith modules (each type gets its own tab in the module menu).
+        autismclient.modules.ModuleCategory catFinders = AutismAddons.modules().registerCategory("Finders");
+        autismclient.modules.ModuleCategory catEntity = AutismAddons.modules().registerCategory("Entity");
+        autismclient.modules.ModuleCategory catFake = AutismAddons.modules().registerCategory("Fake");
+        autismclient.modules.ModuleCategory catRender = AutismAddons.modules().registerCategory("Render");
+
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
         AutismAddons.modules().register(new DonutRTPStashFinderModule());
@@ -47,12 +58,19 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Zelith chunk-scanner finder modules (ported). The shared renderer self-registers a
         // LevelRenderEvents collector that all six feed their flagged chunks into.
         ChunkFlagRenderer.init();
-        AutismAddons.modules().register(new StashFinderModule());
-        AutismAddons.modules().register(new ChunkFinderModule());
-        AutismAddons.modules().register(new SpawnerFinderModule());
-        AutismAddons.modules().register(new SusChunkFinderModule());
-        AutismAddons.modules().register(new ActivityFinderModule());
-        AutismAddons.modules().register(new GrowthFinderModule());
+        AutismAddons.modules().register(new StashFinderModule(catFinders));
+        AutismAddons.modules().register(new ChunkFinderModule(catFinders));
+        AutismAddons.modules().register(new SpawnerFinderModule(catFinders));
+        AutismAddons.modules().register(new SusChunkFinderModule(catFinders));
+        AutismAddons.modules().register(new ActivityFinderModule(catFinders));
+        AutismAddons.modules().register(new GrowthFinderModule(catFinders));
+
+        // Zelith entity / fake modules (ported), each under its own tab.
+        AutismAddons.modules().register(new EntityScannerModule(catEntity));
+        AutismAddons.modules().register(new AntiTrapModule(catEntity));
+        AutismAddons.modules().register(new AutoRenderModule(catRender));
+        AutismAddons.modules().register(new FakePayModule(catFake));
+        AutismAddons.modules().register(new FakePaymentsModule(catFake));
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.hud().register(new SeedHud());

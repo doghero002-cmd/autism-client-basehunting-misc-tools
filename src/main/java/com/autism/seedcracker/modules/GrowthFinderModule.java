@@ -71,8 +71,8 @@ public final class GrowthFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public GrowthFinderModule() {
-        super(SeedcrackerAddon.ID + ":z-growth-finder", "Growth Finder",
+    public GrowthFinderModule(autismclient.modules.ModuleCategory category) {
+        super(SeedcrackerAddon.ID + ":z-growth-finder", "Growth Finder", category,
             "Flags chunks dense with vegetation/growth (vines, berries, dripstone) - overgrown, long-loaded areas.");
     }
 

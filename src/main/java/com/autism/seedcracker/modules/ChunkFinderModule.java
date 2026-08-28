@@ -63,8 +63,8 @@ public final class ChunkFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public ChunkFinderModule() {
-        super(SeedcrackerAddon.ID + ":z-chunk-finder", "Chunk Finder",
+    public ChunkFinderModule(autismclient.modules.ModuleCategory category) {
+        super(SeedcrackerAddon.ID + ":z-chunk-finder", "Chunk Finder", category,
             "Flags chunks with a full bee nest/hive (honey level 5) - a sign of tended bases.");
     }
 
