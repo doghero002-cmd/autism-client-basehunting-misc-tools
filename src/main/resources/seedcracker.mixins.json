@@ -8,6 +8,7 @@
   "client": [
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
+    "FakeRolesChatMixin",
     "LocalPlayerMixin"
   ],
   "injectors": {
