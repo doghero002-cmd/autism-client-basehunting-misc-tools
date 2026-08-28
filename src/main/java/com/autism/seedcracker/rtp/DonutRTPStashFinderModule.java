@@ -72,10 +72,12 @@ public final class DonutRTPStashFinderModule extends Module {
     private boolean loggedThisLanding = false;
     private Path logFile;
 
-    // Wander state while searching: Baritone roams within wanderRadius of the landing point.
+    // Wander state while searching: Baritone descends to the dig depth, then roams underground
+    // within wanderRadius of the landing point.
     private double wanderCenterX = 0.0;
     private double wanderCenterZ = 0.0;
     private boolean wandering = false;
+    private boolean reachedDepth = false;
     private static final java.util.Random WANDER_RNG = new java.util.Random();
 
     // The imported DonutSMP-Bot RTP engine.
@@ -352,16 +354,21 @@ public final class DonutRTPStashFinderModule extends Module {
         // SEARCH mode: only search when we landed within the center-stop radius.
         if (distFromSpawn(mc) >= threshold.get()) return;
 
-        // Begin the search window: wander around the landing point and scan a small bubble.
+        // Begin the search window: descend to the dig depth, then wander underground scanning.
         phase = Phase.SEARCHING;
         searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
         wanderCenterX = mc.player.getX();
         wanderCenterZ = mc.player.getZ();
         wandering = false;
+        reachedDepth = false;
         if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
             applyBaritoneSettings();
+            // Dig down to the deepslate level first; tickWander handles the descent until reachedDepth.
+            AutismCompatManager.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
+            AutismClientMessaging.sendPrefixed("§7Digging down to Y=" + digDepth.get() + ", then wandering underground (r=" + wanderRadius.get() + ")...");
+        } else {
+            AutismClientMessaging.sendPrefixed("§7Searching around " + (int) wanderCenterX + ", " + (int) wanderCenterZ + "...");
         }
-        AutismClientMessaging.sendPrefixed("§7Searching around " + (int) wanderCenterX + ", " + (int) wanderCenterZ + " (wander r=" + wanderRadius.get() + ")...");
     }
 
     /** Builds the engine's per-tick environment observation from Minecraft, or null when not ready. */
@@ -386,10 +393,21 @@ public final class DonutRTPStashFinderModule extends Module {
         } catch (Throwable ignored) {}
     }
 
-    /** Roam to random points inside the wander bubble so Baritone moves us and streams chunks for detection. */
+    /** Descend to the dig depth, then roam random points underground so Baritone mines/covers ground. */
     private void tickWander(Minecraft mc) {
         if (!AutismCompatManager.isBaritoneAvailable()) return;
-        // If we drifted out of the bubble (e.g. server moved us), head back toward centre instead of wandering further.
+
+        // Phase 1: get underground first (auto-mine down to the dig depth).
+        if (!reachedDepth) {
+            if ((int) mc.player.getY() <= digDepth.get()) {
+                reachedDepth = true;
+            } else if (!AutismCompatManager.isBaritoneBusy()) {
+                AutismCompatManager.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
+            }
+            return;
+        }
+
+        // Phase 2: wander underground at the dig depth within the bubble.
         double dx = mc.player.getX() - wanderCenterX;
         double dz = mc.player.getZ() - wanderCenterZ;
         double maxR = wanderRadius.get();
@@ -405,7 +423,8 @@ public final class DonutRTPStashFinderModule extends Module {
                 tx = wanderCenterX + Math.cos(ang) * rad;
                 tz = wanderCenterZ + Math.sin(ang) * rad;
             }
-            int ty = Math.max(minY.get(), Math.min(maxY.get(), (int) mc.player.getY()));
+            // Stay underground at the dig depth (clamped to the detection Y range).
+            int ty = Math.max(minY.get(), Math.min(maxY.get(), digDepth.get()));
             wandering = AutismCompatManager.startBaritoneGoTo(mc, (int) tx, ty, (int) tz);
         }
     }
