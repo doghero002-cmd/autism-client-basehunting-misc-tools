@@ -54,8 +54,8 @@ public final class SpawnerFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public SpawnerFinderModule() {
-        super(SeedcrackerAddon.ID + ":z-spawner-finder", "Spawner Finder",
+    public SpawnerFinderModule(autismclient.modules.ModuleCategory category) {
+        super(SeedcrackerAddon.ID + ":z-spawner-finder", "Spawner Finder", category,
             "Flags chunks containing a monster spawner block entity (dungeons / spawner farms).");
     }
 
