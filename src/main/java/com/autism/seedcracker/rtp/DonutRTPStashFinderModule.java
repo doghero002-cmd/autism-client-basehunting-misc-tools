@@ -48,6 +48,21 @@ public final class DonutRTPStashFinderModule extends Module {
 
     public enum Mode { SEARCH, SAVE_AND_RTP }
     public enum ScanMode { DETECT_ONLY, BARITONE_MINE }
+    public enum RegionMode { ROTATE_ALL, SPECIFIC }
+
+    /** Maps a friendly region choice to the engine's RtpRegion. */
+    public enum RegionChoice {
+        NA_EAST(RtpRegion.NA_EAST),
+        NA_WEST(RtpRegion.NA_WEST),
+        EU_CENTRAL(RtpRegion.EU_CENTRAL),
+        EU_WEST(RtpRegion.EU_WEST),
+        ASIA(RtpRegion.ASIA),
+        OCEANIA(RtpRegion.OCEANIA);
+
+        private final RtpRegion region;
+        RegionChoice(RtpRegion region) { this.region = region; }
+        public RtpRegion region() { return region; }
+    }
 
     // Post-teleport search phase, driven from the engine's sample hook.
     private enum Phase { RTP, SEARCHING }
@@ -57,13 +72,19 @@ public final class DonutRTPStashFinderModule extends Module {
     private boolean loggedThisLanding = false;
     private Path logFile;
 
+    // Wander state while searching: Baritone roams within wanderRadius of the landing point.
+    private double wanderCenterX = 0.0;
+    private double wanderCenterZ = 0.0;
+    private boolean wandering = false;
+    private static final java.util.Random WANDER_RNG = new java.util.Random();
+
     // The imported DonutSMP-Bot RTP engine.
     private RtpController controller;
     private RtpRegionCycle regionCycle;
 
     // ---- RTP ----
     private final StringSetting rtpCommand = add(new StringSetting("rtp-command", "RTP command", "/rtp")
-        .description("Base RTP command. With region rotation on, the region argument is appended.")
+        .description("Base RTP command. The region argument is appended based on the Region settings.")
         .group("RTP"));
     private final IntSetting rtpCooldown = add(new IntSetting("rtp-cooldown", "RTP cooldown (s)", 5, 1, 600, 1)
         .description("Seconds to wait after an RTP before checking position / re-RTPing.")
@@ -71,15 +92,22 @@ public final class DonutRTPStashFinderModule extends Module {
     private final IntSetting threshold = add(new IntSetting("threshold", "Distance threshold", 50000, 0, 300000, 1000)
         .description("Run the base search when closer than this to 0,0 (uses max of |x|,|z|). DonutSMP world border is 300000.")
         .group("RTP"));
-    private final BoolSetting rotateRegions = add(new BoolSetting("rotate-regions", "Rotate RTP regions", true)
-        .description("Pick a random DonutSMP region each RTP from all 6, never repeating the one just used, so TP spots don't cluster.")
-        .group("RTP"));
-    private final BoolSetting allowEast = add(new BoolSetting("allow-east", "Allow /rtp east", true)
-        .description("Include east in the rotation. NOTE: east is often full and can break RTPing - the stuck-RTP recovery handles that.")
-        .group("RTP"));
     private final IntSetting stuckTimeout = add(new IntSetting("stuck-timeout", "Stuck RTP timeout (s)", 10, 1, 60, 1)
         .description("If your coords don't change this long after an RTP, relog and try another region.")
         .group("RTP"));
+
+    // ---- Region selection ----
+    private final EnumSetting<RegionMode> regionMode = add(new EnumSetting<>("region-mode", "Region selection", RegionMode.ROTATE_ALL, RegionMode.values())
+        .description("ROTATE_ALL cycles through every region (never repeating the last). SPECIFIC only RTPs to one region.")
+        .group("Region"));
+    private final EnumSetting<RegionChoice> specificRegion = add(new EnumSetting<>("specific-region", "Specific region", RegionChoice.NA_WEST, RegionChoice.values())
+        .description("The only region to RTP to when Region selection is SPECIFIC.")
+        .group("Region")
+        .visibleWhen(() -> regionMode.get() == RegionMode.SPECIFIC));
+    private final BoolSetting allowEast = add(new BoolSetting("allow-east", "Allow east in rotation", true)
+        .description("Include east when rotating. NOTE: east is often full and can break RTPing - the stuck-RTP recovery handles that.")
+        .group("Region")
+        .visibleWhen(() -> regionMode.get() == RegionMode.ROTATE_ALL));
 
     // ---- Mode / behaviour ----
     private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Mode", Mode.SEARCH, Mode.values())
@@ -92,8 +120,11 @@ public final class DonutRTPStashFinderModule extends Module {
             "minecraft:chest|minecraft:barrel|minecraft:shulker_box|minecraft:hopper|minecraft:trapped_chest|minecraft:ender_chest")
         .description("Block ids (| separated) that count as a stash/base.")
         .group("Behaviour"));
-    private final IntSetting searchRadius = add(new IntSetting("search-radius", "Search radius", 48, 8, 5000, 8)
-        .description("Horizontal block radius scanned for stash blocks when detecting.")
+    private final IntSetting scanRange = add(new IntSetting("scan-range", "Scan range (blocks)", 80, 8, 512, 8)
+        .description("Small bubble around the player scanned for stash blocks (default ~5 chunks at deepslate level). Kept small so it never lags; Baritone moves you to cover ground.")
+        .group("Behaviour"));
+    private final IntSetting wanderRadius = add(new IntSetting("wander-radius", "Wander radius", 5000, 16, 300000, 16)
+        .description("How far Baritone roams from the landing point while searching (not straight - it wanders inside this bubble).")
         .group("Behaviour"));
     private final IntSetting minCluster = add(new IntSetting("min-cluster", "Min cluster size", 3, 1, 64, 1)
         .description("How many stash blocks must be near each other to count as a base (filters lone blocks).")
@@ -234,6 +265,7 @@ public final class DonutRTPStashFinderModule extends Module {
     public void onDisable() {
         if (controller != null) controller.stop();
         stopBaritone();
+        wandering = false;
         phase = Phase.RTP;
         ACTIVE = false;
     }
@@ -267,10 +299,10 @@ public final class DonutRTPStashFinderModule extends Module {
         );
     }
 
-    /** Round-robin across the selectable regions, honoring the east toggle (engine never repeats the last region). */
+    /** The region to RTP to next: either the chosen specific region, or round-robin across the allowed set. */
     private RtpRegion nextRegion() {
-        if (!rotateRegions.get()) {
-            return allowEast.get() ? RtpRegion.NA_EAST : RtpRegion.NA_WEST;
+        if (regionMode.get() == RegionMode.SPECIFIC) {
+            return specificRegion.get().region();
         }
         List<RtpRegion> selected = new ArrayList<>();
         for (RtpRegion r : RtpRegion.selectableValues()) {
@@ -285,9 +317,13 @@ public final class DonutRTPStashFinderModule extends Module {
     private void sendRtpCommand(long requestNumber, RtpRegion region) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.getConnection() == null) return;
+        // Stop any in-progress wander so pathing never overrides the RTP.
+        wandering = false;
+        stopBaritone();
         String base = rtpCommand.get().trim();
         if (base.isEmpty()) base = "/rtp";
-        String cmd = rotateRegions.get() ? base + " " + region.commandArgument() : base;
+        // Always append the resolved region's argument (rotation or specific).
+        String cmd = base + " " + region.commandArgument();
         if (cmd.startsWith("/")) mc.getConnection().sendCommand(cmd.substring(1));
         else mc.getConnection().sendChat(cmd);
     }
@@ -316,22 +352,16 @@ public final class DonutRTPStashFinderModule extends Module {
         // SEARCH mode: only search when we landed within the center-stop radius.
         if (distFromSpawn(mc) >= threshold.get()) return;
 
+        // Begin the search window: wander around the landing point and scan a small bubble.
+        phase = Phase.SEARCHING;
+        searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
+        wanderCenterX = mc.player.getX();
+        wanderCenterZ = mc.player.getZ();
+        wandering = false;
         if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
-            phase = Phase.SEARCHING;
-            searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
-            List<String> bare = new ArrayList<>();
-            for (String id : targetBlockIds()) bare.add(id.startsWith("minecraft:") ? id.substring(10) : id);
-            if (!bare.isEmpty()) {
-                applyBaritoneSettings();
-                // Mine toward stash blocks. Detection already Y-gates (deepslate levels), so no separate
-                // dig-down goto is needed - a goto here would cancel the mine and stall the search.
-                AutismCompatManager.startBaritoneMine(mc, bare);
-                AutismClientMessaging.sendPrefixed("§7Searching for: " + String.join(", ", bare));
-            }
-        } else {
-            phase = Phase.SEARCHING;
-            searchEndMs = System.currentTimeMillis() + searchDuration.get() * 1000L;
+            applyBaritoneSettings();
         }
+        AutismClientMessaging.sendPrefixed("§7Searching around " + (int) wanderCenterX + ", " + (int) wanderCenterZ + " (wander r=" + wanderRadius.get() + ")...");
     }
 
     /** Builds the engine's per-tick environment observation from Minecraft, or null when not ready. */
@@ -354,6 +384,30 @@ public final class DonutRTPStashFinderModule extends Module {
         try {
             if (AutismCompatManager.isBaritoneAvailable()) AutismCompatManager.stopBaritone(Minecraft.getInstance());
         } catch (Throwable ignored) {}
+    }
+
+    /** Roam to random points inside the wander bubble so Baritone moves us and streams chunks for detection. */
+    private void tickWander(Minecraft mc) {
+        if (!AutismCompatManager.isBaritoneAvailable()) return;
+        // If we drifted out of the bubble (e.g. server moved us), head back toward centre instead of wandering further.
+        double dx = mc.player.getX() - wanderCenterX;
+        double dz = mc.player.getZ() - wanderCenterZ;
+        double maxR = wanderRadius.get();
+        if (!AutismCompatManager.isBaritoneBusy()) {
+            double tx, tz;
+            if (dx * dx + dz * dz > maxR * maxR) {
+                tx = wanderCenterX;
+                tz = wanderCenterZ;
+            } else {
+                // Random target within the bubble (not straight - uniform in a disc).
+                double ang = WANDER_RNG.nextDouble() * Math.PI * 2.0;
+                double rad = Math.sqrt(WANDER_RNG.nextDouble()) * maxR;
+                tx = wanderCenterX + Math.cos(ang) * rad;
+                tz = wanderCenterZ + Math.sin(ang) * rad;
+            }
+            int ty = Math.max(minY.get(), Math.min(maxY.get(), (int) mc.player.getY()));
+            wandering = AutismCompatManager.startBaritoneGoTo(mc, (int) tx, ty, (int) tz);
+        }
     }
 
     private List<String> targetBlockIds() {
@@ -403,7 +457,7 @@ public final class DonutRTPStashFinderModule extends Module {
         if (mc.level == null || mc.player == null) return found;
         List<String> targets = targetBlockIds();
         if (targets.isEmpty()) return found;
-        int r = searchRadius.get();
+        int r = scanRange.get();
         int loY = minY.get();
         int hiY = maxY.get();
         int px = (int) mc.player.getX();
@@ -523,7 +577,7 @@ public final class DonutRTPStashFinderModule extends Module {
         if (mc.player == null || mc.level == null || mc.getConnection() == null) return;
         if (controller == null) return;
 
-        // Keep scanning while searching after a confirmed teleport (throttled).
+        // Keep scanning + wandering while searching after a confirmed teleport (throttled).
         if (phase == Phase.SEARCHING) {
             if (shouldScanNow()) {
                 BlockPos found = scanForBase(mc);
@@ -534,9 +588,12 @@ public final class DonutRTPStashFinderModule extends Module {
             }
             if (System.currentTimeMillis() >= searchEndMs) {
                 stopBaritone();
+                wandering = false;
                 phase = Phase.RTP;
                 AutismClientMessaging.sendPrefixed("§7Search time up, RTPing again.");
             } else {
+                // Wander within the bubble while searching (Baritone moves us to cover ground).
+                if (scanMode.get() == ScanMode.BARITONE_MINE) tickWander(mc);
                 // Still searching: park the engine so it doesn't RTP away mid-search.
                 return;
             }
