@@ -1,4 +1,4 @@
-# Seed Based Tools
+# Seed based/base finder tools
 
 A standalone [AUTISM Client](https://github.com/) addon bundling seed-based and coordinate tools
 into one package: a world **seed cracker**, a **bedrock coordinate finder**, and **DonutSMP
