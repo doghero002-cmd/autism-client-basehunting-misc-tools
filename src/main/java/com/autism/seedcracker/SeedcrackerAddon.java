@@ -47,7 +47,7 @@ public final class SeedcrackerAddon extends AutismAddon {
 
     @Override
     public void onInitialize() {
-        this.name = "Seed Based Tools";
+        this.name = "DonutSMP Base Hunting Tools";
         this.authors = "KaptainWutax, 19MisterX98";
         this.color = 0xFF50C878;
 
