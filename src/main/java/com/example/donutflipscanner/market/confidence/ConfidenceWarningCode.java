@@ -1,0 +1,16 @@
+package com.example.donutflipscanner.market.confidence;
+
+public enum ConfidenceWarningCode {
+    LOW_SAMPLE,
+    PARTICIPANT_DATA_MISSING,
+    SELLER_CONCENTRATION,
+    PRICE_DATA_MISSING,
+    HIGH_VOLATILITY,
+    TREND_DATA_MISSING,
+    APPROXIMATE_ITEM_MATCH,
+    UNSUPPORTED_ITEM,
+    LOW_LIQUIDITY,
+    HIGH_ACTIVE_SUPPLY,
+    STALE_MARKET,
+    EXTERNAL_RISK
+}

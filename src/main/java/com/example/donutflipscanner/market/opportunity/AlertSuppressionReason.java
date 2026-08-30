@@ -1,0 +1,12 @@
+package com.example.donutflipscanner.market.opportunity;
+
+public enum AlertSuppressionReason {
+    EVALUATION_REJECTED,
+    RISK_ABOVE_ALERT_MAXIMUM,
+    RISK_REQUIRES_SILENT_DISPLAY,
+    ALERT_COOLDOWN_ACTIVE,
+    OPPORTUNITY_DISMISSED,
+    OPPORTUNITY_EXPIRED,
+    OPPORTUNITY_NO_LONGER_AVAILABLE,
+    OPPORTUNITY_FINAL_STATE
+}

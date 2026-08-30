@@ -7,6 +7,7 @@ import com.autism.seedcracker.hud.RegionMapHud;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.StashWarningHud;
 import com.autism.seedcracker.modules.ActivityFinderModule;
+import com.autism.seedcracker.modules.AHFlipperModule;
 import com.autism.seedcracker.modules.AntiTrapModule;
 import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
@@ -57,6 +58,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         autismclient.modules.ModuleCategory catFake = AutismAddons.modules().registerCategory("Fake");
         autismclient.modules.ModuleCategory catRender = AutismAddons.modules().registerCategory("Render");
         autismclient.modules.ModuleCategory catMovement = AutismAddons.modules().registerCategory("Movement");
+        autismclient.modules.ModuleCategory catTrading = AutismAddons.modules().registerCategory("Trading");
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
@@ -86,6 +88,9 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         // Movement.
         AutismAddons.modules().register(new FlightPlusModule(catMovement));
+
+        // Trading.
+        AutismAddons.modules().register(new AHFlipperModule(catTrading));
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.hud().register(new SeedHud());
