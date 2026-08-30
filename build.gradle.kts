@@ -60,6 +60,11 @@ dependencies {
         include(dep) { isTransitive = false }
     }
 
+    // SQLite (DonutSMP AH flipper market/trade persistence).
+    val sqlite = "org.xerial:sqlite-jdbc:3.53.1.0"
+    implementation(sqlite)
+    include(sqlite)
+
     // latticg (Java Random reversal)
     val latticg = "com.seedfinding:latticg:${property("latticg_version")}"
     implementation(latticg)
