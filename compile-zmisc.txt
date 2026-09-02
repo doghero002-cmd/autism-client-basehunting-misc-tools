@@ -1,0 +1,52 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.5.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Fabric Loom: 1.17.11
+
+> Task :compileJava
+C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\FastPlaceModule.java:52: error: cannot find symbol
+        if (mc.screen != null) return;
+              ^
+  symbol:   variable screen
+  location: variable mc of type Minecraft
+C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\FastPlaceModule.java:59: error: incompatible types: Double cannot be converted to int
+        int target = Math.max(0, (int) delay.get());
+                                                ^
+C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\SwingSpeedModule.java:32: error: incompatible types: Double cannot be converted to float
+        float value = (float) swingSpeed.get();
+                                            ^
+Note: C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\AutoToolModule.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+3 errors
+
+> Task :compileJava FAILED
+
+[Incubating] Problems report is available at: file:///C:/Users/seanz/Downloads/autism%20client%20seedcracker%20addon/autism-seedcracker/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava' (registered by plugin class 'org.gradle.api.plugins.JavaBasePlugin').
+> Compilation failed; see the compiler output below.
+  Note: C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\AutoToolModule.java uses or overrides a deprecated API.
+  Note: Recompile with -Xlint:deprecation for details.
+  C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\FastPlaceModule.java:59: error: incompatible types: Double cannot be converted to int
+          int target = Math.max(0, (int) delay.get());
+                                                  ^
+  C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\SwingSpeedModule.java:32: error: incompatible types: Double cannot be converted to float
+          float value = (float) swingSpeed.get();
+                                              ^
+  C:\Users\seanz\Downloads\autism client seedcracker addon\autism-seedcracker\src\main\java\com\autism\seedcracker\modules\FastPlaceModule.java:52: error: cannot find symbol
+          if (mc.screen != null) return;
+                ^
+    symbol:   variable screen
+    location: variable mc of type Minecraft
+  3 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 21s
+1 actionable task: 1 executed
