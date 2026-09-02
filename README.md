@@ -58,8 +58,7 @@ The jar is produced at `build/libs/`.
 ## Credits
 
 - **SeedCrackerX** by KaptainWutax and 19MisterX98 (MIT) — seed-cracking engine.
-- DonutSMP-Bot, Zelith, donut-ah, MeteorPlus — module sources adapted/ported.
-- Bedrock pattern matching adapted from BedrockPatternFinder.
+
 
 ## License
 
