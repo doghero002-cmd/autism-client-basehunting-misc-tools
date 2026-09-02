@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "autism-seedcracker",
   "version": "${version}",
-  "name": "DonutSMP Base Hunting Tools",
+  "name": "Dogs BaseHunting/QQL Tools",
   "description": "A suite of seed-based tools for AUTISM Client: crack the world seed from structures/biomes, and locate your coordinates from a bedrock pattern.",
   "authors": [
     "KaptainWutax",

@@ -8,23 +8,38 @@ import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.StashWarningHud;
 import com.autism.seedcracker.modules.ActivityFinderModule;
 import com.autism.seedcracker.modules.AHFlipperModule;
+import com.autism.seedcracker.modules.AntiAFKModule;
 import com.autism.seedcracker.modules.AntiTrapModule;
+import com.autism.seedcracker.modules.AutoEatModule;
+import com.autism.seedcracker.modules.AutoLogModule;
 import com.autism.seedcracker.modules.AutoRenderModule;
+import com.autism.seedcracker.modules.AutoToolModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
 import com.autism.seedcracker.modules.BoneDropperModule;
 import com.autism.seedcracker.modules.ChunkFinderModule;
+import com.autism.seedcracker.modules.CoordSnapperModule;
 import com.autism.seedcracker.modules.EntityScannerModule;
 import com.autism.seedcracker.modules.FakePayModule;
 import com.autism.seedcracker.modules.FakePaymentsModule;
+import com.autism.seedcracker.modules.FakePlayerModule;
 import com.autism.seedcracker.modules.FakeRolesModule;
+import com.autism.seedcracker.modules.FastPlaceModule;
 import com.autism.seedcracker.modules.FlightPlusModule;
+import com.autism.seedcracker.modules.FreeLookModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
+import com.autism.seedcracker.modules.HomeSetterModule;
 import com.autism.seedcracker.modules.PaperRigModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
+import com.autism.seedcracker.modules.SkinChangerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
 import com.autism.seedcracker.modules.SpawnerProtectModule;
+import com.autism.seedcracker.modules.SprintModule;
 import com.autism.seedcracker.modules.StashFinderModule;
 import com.autism.seedcracker.modules.SusChunkFinderModule;
+import com.autism.seedcracker.modules.SwingSpeedModule;
+import com.autism.seedcracker.modules.TabDetectorModule;
+import com.autism.seedcracker.modules.TPASpammerModule;
+import com.autism.seedcracker.modules.WeatherNotifierModule;
 import com.autism.seedcracker.rtp.DonutRTPStashFinderModule;
 import com.autism.seedcracker.rtp.RelogLoaderModule;
 
@@ -48,7 +63,7 @@ public final class SeedcrackerAddon extends AutismAddon {
 
     @Override
     public void onInitialize() {
-        this.name = "DonutSMP Base Hunting Tools";
+        this.name = "Dogs BaseHunting/QQL Tools";
         this.authors = "KaptainWutax, 19MisterX98";
         this.color = 0xFF50C878;
 
@@ -59,6 +74,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         autismclient.modules.ModuleCategory catRender = AutismAddons.modules().registerCategory("Render");
         autismclient.modules.ModuleCategory catMovement = AutismAddons.modules().registerCategory("Movement");
         autismclient.modules.ModuleCategory catTrading = AutismAddons.modules().registerCategory("Trading");
+        autismclient.modules.ModuleCategory catDogsMisc = AutismAddons.modules().registerCategory("Dogs Misc Tools");
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
@@ -91,6 +107,23 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         // Trading.
         AutismAddons.modules().register(new AHFlipperModule(catTrading));
+
+        // Dogs Misc Tools (Zelith misc modules, ported).
+        AutismAddons.modules().register(new SprintModule(catDogsMisc));
+        AutismAddons.modules().register(new AntiAFKModule(catDogsMisc));
+        AutismAddons.modules().register(new FastPlaceModule(catDogsMisc));
+        AutismAddons.modules().register(new FreeLookModule(catDogsMisc));
+        AutismAddons.modules().register(new AutoEatModule(catDogsMisc));
+        AutismAddons.modules().register(new SwingSpeedModule(catDogsMisc));
+        AutismAddons.modules().register(new CoordSnapperModule(catDogsMisc));
+        AutismAddons.modules().register(new FakePlayerModule(catDogsMisc));
+        AutismAddons.modules().register(new AutoLogModule(catDogsMisc));
+        AutismAddons.modules().register(new AutoToolModule(catDogsMisc));
+        AutismAddons.modules().register(new TPASpammerModule(catDogsMisc));
+        AutismAddons.modules().register(new TabDetectorModule(catDogsMisc));
+        AutismAddons.modules().register(new WeatherNotifierModule(catDogsMisc));
+        AutismAddons.modules().register(new HomeSetterModule(catDogsMisc));
+        AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.hud().register(new SeedHud());
