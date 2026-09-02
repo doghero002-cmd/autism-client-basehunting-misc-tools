@@ -68,13 +68,17 @@ public final class SeedcrackerAddon extends AutismAddon {
         this.color = 0xFF50C878;
 
         // Category tabs for the Zelith modules (each type gets its own tab in the module menu).
-        autismclient.modules.ModuleCategory catFinders = AutismAddons.modules().registerCategory("Finders");
-        autismclient.modules.ModuleCategory catEntity = AutismAddons.modules().registerCategory("Entity");
-        autismclient.modules.ModuleCategory catFake = AutismAddons.modules().registerCategory("Fake");
-        autismclient.modules.ModuleCategory catRender = AutismAddons.modules().registerCategory("Render");
-        autismclient.modules.ModuleCategory catMovement = AutismAddons.modules().registerCategory("Movement");
-        autismclient.modules.ModuleCategory catTrading = AutismAddons.modules().registerCategory("Trading");
-        autismclient.modules.ModuleCategory catDogsMisc = AutismAddons.modules().registerCategory("Dogs Misc Tools");
+        // NOTE: AutismAddons.modules().registerCategory(label) collapses every call for the same
+        // addon into ONE shared addon category (the API keys addon categories by addon id only and
+        // ignores the label). To get genuinely separate tabs we register plain (non-addon) categories
+        // keyed by their label, the same way the client's builtin modules do.
+        autismclient.modules.ModuleCategory catFinders = autismclient.modules.ModuleCategory.register("Finders");
+        autismclient.modules.ModuleCategory catEntity = autismclient.modules.ModuleCategory.register("Entity");
+        autismclient.modules.ModuleCategory catFake = autismclient.modules.ModuleCategory.register("Fake");
+        autismclient.modules.ModuleCategory catRender = autismclient.modules.ModuleCategory.register("Render");
+        autismclient.modules.ModuleCategory catMovement = autismclient.modules.ModuleCategory.register("Movement");
+        autismclient.modules.ModuleCategory catTrading = autismclient.modules.ModuleCategory.register("Trading");
+        autismclient.modules.ModuleCategory catDogsMisc = autismclient.modules.ModuleCategory.register("Dogs Misc Tools");
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
