@@ -1,5 +1,6 @@
 package com.autism.seedcracker;
 
+import com.autism.seedcracker.commands.BaseLogCommand;
 import com.autism.seedcracker.commands.BedrockFinderCommand;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
 import com.autism.seedcracker.hud.FakeScoreboardHud;
@@ -14,6 +15,7 @@ import com.autism.seedcracker.modules.AutoEatModule;
 import com.autism.seedcracker.modules.AutoLogModule;
 import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.AutoToolModule;
+import com.autism.seedcracker.modules.BaseLogBrowserModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
 import com.autism.seedcracker.modules.BoneDropperModule;
 import com.autism.seedcracker.modules.ChunkFinderModule;
@@ -94,6 +96,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new SusChunkFinderModule(catFinders));
         AutismAddons.modules().register(new ActivityFinderModule(catFinders));
         AutismAddons.modules().register(new GrowthFinderModule(catFinders));
+        AutismAddons.modules().register(new BaseLogBrowserModule(catFinders));
 
         // Zelith entity / fake modules (ported), each under its own tab.
         AutismAddons.modules().register(new EntityScannerModule(catEntity));
@@ -130,6 +133,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
 
         AutismAddons.commands().register(new BedrockFinderCommand());
+        AutismAddons.commands().register(new BaseLogCommand());
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());
         AutismAddons.hud().register(new RegionMapHud());
