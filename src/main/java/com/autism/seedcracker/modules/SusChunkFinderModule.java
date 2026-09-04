@@ -3,7 +3,6 @@ package com.autism.seedcracker.modules;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Predicate;
 
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
@@ -53,6 +52,10 @@ public final class SusChunkFinderModule extends Module {
             "sensitivity", "Sensitivity", 3, 1, 20, 1)
         .description("Suspicious blocks needed in a chunk to flag it.")
         .group("General"));
+    private final IntSetting scanInterval = add(new IntSetting(
+            "scan-interval", "Scan interval (ticks)", 8, 2, 40, 1)
+        .description("Ticks between scan steps. Higher = less CPU, slower detection.")
+        .group("General"));
     private final ColorSetting color = add(new ColorSetting(
             "alpha", "Marker colour", 0x50FF5050)
         .description("Colour (with alpha) of the flagged chunk marker.")
@@ -84,7 +87,16 @@ public final class SusChunkFinderModule extends Module {
 
     private final Set<ChunkPos> flagged = new HashSet<>();
     private final Set<ChunkPos> notified = new HashSet<>();
+    /** Rolling queue of chunks left to scan this pass (spread across ticks to avoid frame spikes). */
+    private final java.util.ArrayDeque<LevelChunk> scanQueue = new java.util.ArrayDeque<>();
+    /** Chunks that were queued this pass (so we don't queue the same chunk twice). */
+    private final Set<ChunkPos> queued = new HashSet<>();
+    /** Toggles snapshotted once per pass so the hot predicate reads plain booleans, not settings. */
+    private boolean fKelp, fCaveVines, fVines, fAmethyst, fBamboo, fBeeNest, fRotatedDeepslate;
+    private int scanIntervalCached = 8;
     private int tickCounter = 0;
+    /** How many chunks to scan per scan tick. Small = smooth FPS, slower full pass. */
+    private static final int CHUNKS_PER_TICK = 1;
 
     public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
@@ -95,13 +107,16 @@ public final class SusChunkFinderModule extends Module {
     public void onEnable() {
         flagged.clear();
         notified.clear();
-        tickCounter = 0;
+        scanQueue.clear();
+        queued.clear();
     }
 
     @Override
     public void onDisable() {
         flagged.clear();
         notified.clear();
+        scanQueue.clear();
+        queued.clear();
         ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
     }
 
@@ -116,46 +131,74 @@ public final class SusChunkFinderModule extends Module {
         if (mc.level == null || mc.player == null) return;
 
         tickCounter++;
-        if (tickCounter % 8 == 0) {
-            scan(mc);
+        if (tickCounter % scanIntervalCached == 0) {
+            scanStep(mc);
         }
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-sus-chunk-finder", flagged, color.get(), tracer.get());
     }
 
-    private void scan(Minecraft mc) {
-        List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
-        ChunkPos playerChunk = mc.player.chunkPosition();
-        int radius = scanRadius.get();
+    /**
+     * Incremental scan: refills the queue when empty (snapshotting toggles + rebuilding the chunk
+     * bubble), then scans only {@link #CHUNKS_PER_TICK} chunk(s). This spreads the expensive block
+     * scan across many ticks so a single frame never does a whole-bubble scan (the cause of the
+     * 1 FPS drops). Already-flagged chunks are skipped (no need to re-scan a known match).
+     */
+    private void scanStep(Minecraft mc) {
+        if (scanQueue.isEmpty()) {
+            // New pass: snapshot toggles + scan interval, then queue the chunks around the player.
+            fKelp = kelp.get();
+            fCaveVines = caveVines.get();
+            fVines = vines.get();
+            fAmethyst = amethyst.get();
+            fBamboo = bamboo.get();
+            fBeeNest = beeNest.get();
+            fRotatedDeepslate = rotatedDeepslate.get();
+            scanIntervalCached = Math.max(2, scanInterval.get());
 
-        Predicate<BlockState> suspicious = this::isSuspicious;
-        for (LevelChunk chunk : chunks) {
+            List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
+            for (LevelChunk c : chunks) {
+                ChunkPos p = c.getPos();
+                if (flagged.contains(p)) continue;   // already a known match; skip re-scan
+                if (queued.add(p)) scanQueue.add(c);
+            }
+            pruneFar(mc);
+            if (scanQueue.isEmpty()) return; // nothing new to scan this pass
+        }
+
+        int threshold = sensitivity.get();
+        for (int i = 0; i < CHUNKS_PER_TICK && !scanQueue.isEmpty(); i++) {
+            LevelChunk chunk = scanQueue.poll();
+            if (chunk == null) continue;
             ChunkPos pos = chunk.getPos();
-            int count = ChunkScanHelper.countBlocksInChunk(chunk, suspicious);
-            if (count >= sensitivity.get()) {
+            queued.remove(pos);
+            int count = ChunkScanHelper.countBlocksInChunk(chunk, this::isSuspicious, threshold);
+            if (count >= threshold) {
                 flagged.add(pos);
-                if (notified.add(pos)) {
-                    onNewFlag(pos, count);
-                }
+                if (notified.add(pos)) onNewFlag(pos, count);
             } else {
                 flagged.remove(pos);
             }
         }
-        int r = radius + 2;
+    }
+
+    /** Drop flags/notifications that scrolled out of range. */
+    private void pruneFar(Minecraft mc) {
+        ChunkPos playerChunk = mc.player.chunkPosition();
+        int r = scanRadius.get() + 2;
         flagged.removeIf(p -> tooFar(p, playerChunk, r));
         notified.removeIf(p -> tooFar(p, playerChunk, r));
     }
 
-    /** Combined predicate honouring each per-type toggle. */
+    /** Combined predicate honouring each per-type toggle (reads snapshotted booleans). */
     private boolean isSuspicious(BlockState state) {
         if (state.isAir()) return false;
-
-        if (kelp.get() && (state.is(Blocks.KELP) || state.is(Blocks.KELP_PLANT))) return true;
-        if (caveVines.get() && (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT))) return true;
-        if (vines.get() && state.is(Blocks.VINE)) return true;
-        if (amethyst.get() && state.is(Blocks.AMETHYST_CLUSTER)) return true;
-        if (bamboo.get() && (state.is(Blocks.BAMBOO) || state.is(Blocks.BAMBOO_SAPLING))) return true;
-        if (beeNest.get() && isFullHive(state)) return true;
-        if (rotatedDeepslate.get() && isRotatedDeepslate(state)) return true;
+        if (fKelp && (state.is(Blocks.KELP) || state.is(Blocks.KELP_PLANT))) return true;
+        if (fCaveVines && (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT))) return true;
+        if (fVines && state.is(Blocks.VINE)) return true;
+        if (fAmethyst && state.is(Blocks.AMETHYST_CLUSTER)) return true;
+        if (fBamboo && (state.is(Blocks.BAMBOO) || state.is(Blocks.BAMBOO_SAPLING))) return true;
+        if (fBeeNest && isFullHive(state)) return true;
+        if (fRotatedDeepslate && isRotatedDeepslate(state)) return true;
         return false;
     }
 
