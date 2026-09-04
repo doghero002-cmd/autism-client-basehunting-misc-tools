@@ -56,6 +56,33 @@ public final class ChunkScanHelper {
     }
 
     /**
+     * Counts blockstates matching {@code predicate} across the whole chunk, stopping as soon as
+     * the count reaches {@code limit}. Use this when the caller only needs to know whether the
+     * count meets a threshold - it avoids scanning the rest of the chunk once the answer is known.
+     *
+     * @return the number of matching blockstates, capped at {@code limit}
+     */
+    public static int countBlocksInChunk(LevelChunk chunk, Predicate<BlockState> predicate, int limit) {
+        if (chunk == null || predicate == null) return 0;
+        if (limit <= 0) return countBlocksInChunk(chunk, predicate);
+        int count = 0;
+        LevelChunkSection[] sections = chunk.getSections();
+        for (LevelChunkSection section : sections) {
+            if (section == null || section.hasOnlyAir()) continue;
+            if (!section.maybeHas(predicate)) continue;
+            for (int y = 0; y < 16; y++) {
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        BlockState state = section.getBlockState(x, y, z);
+                        if (predicate.test(state) && ++count >= limit) return count;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
      * Returns true when any block entity in the chunk matches {@code predicate}.
      *
      * Iterates {@link LevelChunk#getBlockEntities()} values (a pos -> blockEntity map) and stops at
