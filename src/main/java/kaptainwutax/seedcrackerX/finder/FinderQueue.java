@@ -32,6 +32,9 @@ public class FinderQueue {
 
     public FinderControl finderControl = new FinderControl();
 
+    /** Chunks already queued for finder scans (dedupe so re-sent chunks don't re-flood the pool). */
+    private final java.util.Set<Long> queuedChunks = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private FinderQueue() {
         this.clear();
     }
@@ -47,6 +50,11 @@ public class FinderQueue {
 
     public void onChunkData(Level world, ChunkPos chunkPos) {
         if (!Config.get().active) return;
+
+        // Throttle: skip chunks we already queued/scanned this session so a render-distance reload
+        // or chunk re-send doesn't re-flood the finder pool. This is the main chunk-loading lag fix.
+        long key = ((long) chunkPos.x() << 32) | (chunkPos.z() & 0xffffffffL);
+        if (!queuedChunks.add(key)) return;
 
         getActiveFinderTypes().forEach(type -> {
             SERVICE.submit(() -> {
@@ -96,5 +104,6 @@ public class FinderQueue {
 
     public void clear() {
         this.finderControl = new FinderControl();
+        this.queuedChunks.clear();
     }
 }

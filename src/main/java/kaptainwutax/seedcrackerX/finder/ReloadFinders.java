@@ -38,10 +38,26 @@ public class ReloadFinders {
 
         int playerChunkX = (int) (Math.round(client.player.getX()) >> 4);
         int playerChunkZ = (int) (Math.round(client.player.getZ()) >> 4);
+
+        // Queue the render-distance bubble on a background thread in small batches so joining a
+        // world / changing dimension doesn't flood the finder pool and stall chunk loading.
+        java.util.List<ChunkPos> positions = new java.util.ArrayList<>();
         for (int i = playerChunkX - renderdistance; i < playerChunkX + renderdistance; i++) {
             for (int j = playerChunkZ - renderdistance; j < playerChunkZ + renderdistance; j++) {
-                FinderQueue.get().onChunkData(client.level, new ChunkPos(i, j));
+                positions.add(new ChunkPos(i, j));
             }
         }
+        net.minecraft.world.level.Level level = client.level;
+        new Thread(() -> {
+            for (ChunkPos pos : positions) {
+                FinderQueue.get().onChunkData(level, pos);
+                try {
+                    Thread.sleep(5); // ~200 chunks/sec, spreads the load instead of one burst
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }, "SeedCracker-ReloadFinders").start();
     }
 }

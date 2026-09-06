@@ -56,6 +56,10 @@ public final class SusChunkFinderModule extends Module {
             "scan-interval", "Scan interval (ticks)", 8, 2, 40, 1)
         .description("Ticks between scan steps. Higher = less CPU, slower detection.")
         .group("General"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per scan", 6, 1, 32, 1)
+        .description("Chunks scanned per scan step. Higher = faster full sweep, more CPU per step.")
+        .group("General"));
     private final ColorSetting color = add(new ColorSetting(
             "alpha", "Marker colour", 0x50FF5050)
         .description("Colour (with alpha) of the flagged chunk marker.")
@@ -94,9 +98,8 @@ public final class SusChunkFinderModule extends Module {
     /** Toggles snapshotted once per pass so the hot predicate reads plain booleans, not settings. */
     private boolean fKelp, fCaveVines, fVines, fAmethyst, fBamboo, fBeeNest, fRotatedDeepslate;
     private int scanIntervalCached = 8;
+    private int chunksPerTickCached = 6;
     private int tickCounter = 0;
-    /** How many chunks to scan per scan tick. Small = smooth FPS, slower full pass. */
-    private static final int CHUNKS_PER_TICK = 1;
 
     public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
@@ -154,6 +157,7 @@ public final class SusChunkFinderModule extends Module {
             fBeeNest = beeNest.get();
             fRotatedDeepslate = rotatedDeepslate.get();
             scanIntervalCached = Math.max(2, scanInterval.get());
+            chunksPerTickCached = Math.max(1, chunksPerTick.get());
 
             List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
             for (LevelChunk c : chunks) {
@@ -166,7 +170,7 @@ public final class SusChunkFinderModule extends Module {
         }
 
         int threshold = sensitivity.get();
-        for (int i = 0; i < CHUNKS_PER_TICK && !scanQueue.isEmpty(); i++) {
+        for (int i = 0; i < chunksPerTickCached && !scanQueue.isEmpty(); i++) {
             LevelChunk chunk = scanQueue.poll();
             if (chunk == null) continue;
             ChunkPos pos = chunk.getPos();
