@@ -31,7 +31,7 @@ public final class GrimTridentFlyModule extends Module {
     private int currentTick = 0;
 
     public GrimTridentFlyModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":grim-trident-fly", "Grim Trident Fly", category,
+        super(SeedcrackerAddon.ID + ":grim-trident-fly", "Grim Trident Fly [Patched]", category,
             "Fly by spamming Riptide trident boosts. Use together with Grim Trident Disabler. WARNING: likely patched / detectable.");
     }
 

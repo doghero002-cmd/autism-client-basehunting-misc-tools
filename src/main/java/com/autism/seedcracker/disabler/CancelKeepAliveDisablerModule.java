@@ -19,7 +19,7 @@ import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
 public final class CancelKeepAliveDisablerModule extends Module {
 
     public CancelKeepAliveDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":cancel-keepalive-disabler", "Cancel KeepAlive", category,
+        super(SeedcrackerAddon.ID + ":cancel-keepalive-disabler", "Cancel KeepAlive [Patched]", category,
             "Cancels outgoing keep-alive packets. WARNING: many servers kick for missing keep-alives.");
     }
 

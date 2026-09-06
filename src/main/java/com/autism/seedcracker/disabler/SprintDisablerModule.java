@@ -20,7 +20,7 @@ import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 public final class SprintDisablerModule extends Module {
 
     public SprintDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":sprint-disabler", "Sprint Disabler", category,
+        super(SeedcrackerAddon.ID + ":sprint-disabler", "Sprint Disabler [Patched]", category,
             "Never report sprinting to the server (cancels sprint packets + clears sprint).");
     }
 

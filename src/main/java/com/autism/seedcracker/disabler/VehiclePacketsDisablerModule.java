@@ -19,7 +19,7 @@ import net.minecraft.world.entity.player.Input;
 public final class VehiclePacketsDisablerModule extends Module {
 
     public VehiclePacketsDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":vehicle-packets-disabler", "Vehicle Packets", category,
+        super(SeedcrackerAddon.ID + ":vehicle-packets-disabler", "Vehicle Packets [Patched]", category,
             "Spams empty input packets every tick. WARNING: detectable.");
     }
 

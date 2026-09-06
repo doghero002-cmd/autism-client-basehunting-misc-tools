@@ -40,7 +40,7 @@ public final class GrimTridentDisablerModule extends Module {
     private int currentTick = 0;
 
     public GrimTridentDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":grim-trident-disabler", "Grim Trident Disabler", category,
+        super(SeedcrackerAddon.ID + ":grim-trident-disabler", "Grim Trident Disabler [Patched]", category,
             "Disables GrimAC move checks via Riptide trident packet spam (needs a trident). WARNING: likely patched / detectable.");
     }
 
