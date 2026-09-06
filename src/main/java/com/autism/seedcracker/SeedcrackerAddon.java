@@ -2,13 +2,31 @@ package com.autism.seedcracker;
 
 import com.autism.seedcracker.commands.BaseLogCommand;
 import com.autism.seedcracker.commands.BedrockFinderCommand;
+import com.autism.seedcracker.disabler.AbilitiesDisablerModule;
+import com.autism.seedcracker.disabler.CancelKeepAliveDisablerModule;
+import com.autism.seedcracker.disabler.ConvertMovingPacketsDisablerModule;
+import com.autism.seedcracker.disabler.GrimInventoryMoveDisablerModule;
+import com.autism.seedcracker.disabler.GrimTridentDisablerModule;
+import com.autism.seedcracker.disabler.GrimTridentFlyModule;
+import com.autism.seedcracker.disabler.InputDisablerModule;
+import com.autism.seedcracker.disabler.SprintDisablerModule;
+import com.autism.seedcracker.disabler.TransactionDisablerModule;
+import com.autism.seedcracker.disabler.VehiclePacketsDisablerModule;
+import com.autism.seedcracker.disabler.VulcanBoatFlyModule;
+import com.autism.seedcracker.disabler.VulcanBoatJumpModule;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
+import com.autism.seedcracker.krypton.AutoFireworkModule;
+import com.autism.seedcracker.krypton.AutoTPAModule;
+import com.autism.seedcracker.krypton.KeyPearlModule;
+import com.autism.seedcracker.krypton.NameProtectModule;
+import com.autism.seedcracker.krypton.QuickMacroModule;
 import com.autism.seedcracker.hud.FakeScoreboardHud;
 import com.autism.seedcracker.hud.RegionMapHud;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.StashWarningHud;
 import com.autism.seedcracker.modules.ActivityFinderModule;
 import com.autism.seedcracker.modules.AHFlipperModule;
+import com.autism.seedcracker.modules.AHSniperModule;
 import com.autism.seedcracker.modules.AntiAFKModule;
 import com.autism.seedcracker.modules.AntiTrapModule;
 import com.autism.seedcracker.modules.AutoEatModule;
@@ -41,6 +59,7 @@ import com.autism.seedcracker.modules.SusChunkFinderModule;
 import com.autism.seedcracker.modules.SwingSpeedModule;
 import com.autism.seedcracker.modules.TabDetectorModule;
 import com.autism.seedcracker.modules.TPASpammerModule;
+import com.autism.seedcracker.modules.TunnelBaseFinderModule;
 import com.autism.seedcracker.modules.WeatherNotifierModule;
 import com.autism.seedcracker.rtp.DonutRTPStashFinderModule;
 import com.autism.seedcracker.rtp.RelogLoaderModule;
@@ -81,6 +100,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         autismclient.modules.ModuleCategory catMovement = autismclient.modules.ModuleCategory.register("Movement");
         autismclient.modules.ModuleCategory catTrading = autismclient.modules.ModuleCategory.register("Trading");
         autismclient.modules.ModuleCategory catDogsMisc = autismclient.modules.ModuleCategory.register("Dogs Misc Tools");
+        autismclient.modules.ModuleCategory catDisabler = autismclient.modules.ModuleCategory.register("Disabler");
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
@@ -97,6 +117,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new ActivityFinderModule(catFinders));
         AutismAddons.modules().register(new GrowthFinderModule(catFinders));
         AutismAddons.modules().register(new BaseLogBrowserModule(catFinders));
+        AutismAddons.modules().register(new TunnelBaseFinderModule(catFinders));
 
         // Zelith entity / fake modules (ported), each under its own tab.
         AutismAddons.modules().register(new EntityScannerModule(catEntity));
@@ -114,6 +135,23 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         // Trading.
         AutismAddons.modules().register(new AHFlipperModule(catTrading));
+        AutismAddons.modules().register(new AHSniperModule(catTrading));
+
+        // Disabler / bypass (ported from Selena/Acid, 1.21.1 -> Mojang 26.2).
+        AutismAddons.modules().register(new GrimTridentDisablerModule(catDisabler));
+        AutismAddons.modules().register(new GrimTridentFlyModule(catDisabler));
+        AutismAddons.modules().register(new VulcanBoatFlyModule(catDisabler));
+        AutismAddons.modules().register(new VulcanBoatJumpModule(catDisabler));
+
+        // Disabler / bypass (ported from Rise 6.9.5, 1.8.9 -> Mojang 26.2).
+        AutismAddons.modules().register(new AbilitiesDisablerModule(catDisabler));
+        AutismAddons.modules().register(new CancelKeepAliveDisablerModule(catDisabler));
+        AutismAddons.modules().register(new TransactionDisablerModule(catDisabler));
+        AutismAddons.modules().register(new ConvertMovingPacketsDisablerModule(catDisabler));
+        AutismAddons.modules().register(new SprintDisablerModule(catDisabler));
+        AutismAddons.modules().register(new InputDisablerModule(catDisabler));
+        AutismAddons.modules().register(new VehiclePacketsDisablerModule(catDisabler));
+        AutismAddons.modules().register(new GrimInventoryMoveDisablerModule(catDisabler));
 
         // Dogs Misc Tools (Zelith misc modules, ported).
         AutismAddons.modules().register(new SprintModule(catDogsMisc));
@@ -131,6 +169,13 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new WeatherNotifierModule(catDogsMisc));
         AutismAddons.modules().register(new HomeSetterModule(catDogsMisc));
         AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
+
+        // Krypton misc modules (ported).
+        AutismAddons.modules().register(new KeyPearlModule(catDogsMisc));
+        AutismAddons.modules().register(new AutoFireworkModule(catDogsMisc));
+        AutismAddons.modules().register(new AutoTPAModule(catDogsMisc));
+        AutismAddons.modules().register(new QuickMacroModule(catDogsMisc));
+        AutismAddons.modules().register(new NameProtectModule(catDogsMisc));
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());

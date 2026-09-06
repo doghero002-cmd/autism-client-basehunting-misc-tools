@@ -192,6 +192,9 @@ public final class DonutRTPStashFinderModule extends Module {
         .description("Move without forcing client-sided rotations.").group("Baritone Movement"));
     private final BoolSetting antiCheat = add(new BoolSetting("b-anti-cheat", "Anti-cheat compatibility", true)
         .description("Adjust behavior to work better on anti-cheats.").group("Baritone Movement"));
+    private final BoolSetting legitMode = add(new BoolSetting("b-legit-mode", "Legit / smooth movement", true)
+        .description("Force a human-looking Baritone profile (free look, clamped reach, slowed/randomized rotations, no render) so it doesn't head-flick. Overrides the render settings above.")
+        .group("Baritone Movement"));
 
     // ---- Baritone: blocks / avoidance ----
     private final BoolSetting avoidUpdatingFalling = add(new BoolSetting("b-avoid-updating-falling", "Avoid updating falling blocks", true)
@@ -564,6 +567,10 @@ public final class DonutRTPStashFinderModule extends Module {
         set(mc, "elytraAutoSwap", elytraAutoSwap.get());
         set(mc, "elytraConserveFireworks", elytraConserveFireworks.get());
         set(mc, "elytraMinimumDurability", elytraMinDurability.get());
+        // Legit mode: apply last so its human-looking values override the render/rotation settings above.
+        if (legitMode.get()) {
+            com.autism.seedcracker.util.LegitBaritone.apply(mc);
+        }
     }
 
     private static void set(Minecraft mc, String name, boolean value) {

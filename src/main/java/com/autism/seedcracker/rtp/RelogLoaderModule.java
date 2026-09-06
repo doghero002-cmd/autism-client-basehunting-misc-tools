@@ -101,6 +101,7 @@ public final class RelogLoaderModule extends Module {
         phase = Phase.DIG;
         phaseTicks = 0;
         ACTIVE = true;
+        com.autism.seedcracker.util.LegitBaritone.apply(mc);
         AutismClientMessaging.sendPrefixed("§c§l[Warning] §cRelog Loader uses automated dig/fly movement that anti-cheats may flag. Use at your own risk.");
         autismclient.util.AutismNotifications.warning("Relog Loader: may flag anti-cheat");
         AutismClientMessaging.sendPrefixed("§aRelog Loader: digging to Y=" + digY.get() + "...");
