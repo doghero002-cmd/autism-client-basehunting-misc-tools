@@ -23,7 +23,7 @@ public final class ConvertMovingPacketsDisablerModule extends Module {
     private boolean resending = false;
 
     public ConvertMovingPacketsDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":convert-moving-packets-disabler", "Convert Move Packets", category,
+        super(SeedcrackerAddon.ID + ":convert-moving-packets-disabler", "Convert Move Packets [Patched]", category,
             "Strips rotation from move packets (PosRot -> Pos). WARNING: detectable / may desync rotations.");
     }
 

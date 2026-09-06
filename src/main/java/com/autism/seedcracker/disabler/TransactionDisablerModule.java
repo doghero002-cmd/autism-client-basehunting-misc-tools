@@ -20,7 +20,7 @@ import net.minecraft.network.protocol.common.ServerboundPongPacket;
 public final class TransactionDisablerModule extends Module {
 
     public TransactionDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":transaction-disabler", "Transaction Disabler", category,
+        super(SeedcrackerAddon.ID + ":transaction-disabler", "Transaction Disabler [Patched]", category,
             "Cancels outgoing pong (transaction) replies. WARNING: some servers kick for missing pongs.");
     }
 

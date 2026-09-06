@@ -25,7 +25,7 @@ public final class AbilitiesDisablerModule extends Module {
         .group("General"));
 
     public AbilitiesDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":abilities-disabler", "Abilities Disabler", category,
+        super(SeedcrackerAddon.ID + ":abilities-disabler", "Abilities Disabler [Patched]", category,
             "Sends flying=true ability packets on an interval to confuse fly checks. WARNING: detectable.");
     }
 

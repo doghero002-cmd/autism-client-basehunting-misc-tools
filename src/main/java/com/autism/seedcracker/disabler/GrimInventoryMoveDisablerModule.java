@@ -27,7 +27,7 @@ public final class GrimInventoryMoveDisablerModule extends Module {
     private boolean sprintStateKnown = false;
 
     public GrimInventoryMoveDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":grim-inventory-move-disabler", "Grim Inventory Move", category,
+        super(SeedcrackerAddon.ID + ":grim-inventory-move-disabler", "Grim Inventory Move [Patched]", category,
             "Move in inventories without Grim flags by spoofing sprint state around clicks.");
     }
 

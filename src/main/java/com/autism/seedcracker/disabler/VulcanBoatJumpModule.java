@@ -35,7 +35,7 @@ public final class VulcanBoatJumpModule extends Module {
     private boolean start = true;
 
     public VulcanBoatJumpModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":vulcan-boat-jump", "Vulcan Boat Jump", category,
+        super(SeedcrackerAddon.ID + ":vulcan-boat-jump", "Vulcan Boat Jump [Patched]", category,
             "Launch yourself by dismounting a boat (Vulcan bypass). One-shot. WARNING: detectable.");
     }
 

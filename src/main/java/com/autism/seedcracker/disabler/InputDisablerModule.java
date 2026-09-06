@@ -19,7 +19,7 @@ import net.minecraft.world.entity.player.Input;
 public final class InputDisablerModule extends Module {
 
     public InputDisablerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":input-disabler", "Input Disabler", category,
+        super(SeedcrackerAddon.ID + ":input-disabler", "Input Disabler [Patched]", category,
             "Sends forged input packets every tick. WARNING: detectable.");
     }
 

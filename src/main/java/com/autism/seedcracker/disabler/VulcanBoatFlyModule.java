@@ -44,7 +44,7 @@ public final class VulcanBoatFlyModule extends Module {
     private int verticalMoveCooldown = 0;
 
     public VulcanBoatFlyModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":vulcan-boat-fly", "Vulcan Boat Fly", category,
+        super(SeedcrackerAddon.ID + ":vulcan-boat-fly", "Vulcan Boat Fly [Patched]", category,
             "Fly a boat at high speed (Vulcan bypass). Jump = up, sprint = down. WARNING: very detectable.");
     }
 
