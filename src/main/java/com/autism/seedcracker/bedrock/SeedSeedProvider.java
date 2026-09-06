@@ -5,11 +5,16 @@ import java.util.Set;
 import kaptainwutax.seedcrackerX.SeedCracker;
 
 /** Reads the cracked world seed from the SeedCracker engine, if it has been found. */
-final class SeedSeedProvider {
+public final class SeedSeedProvider {
     private SeedSeedProvider() {}
 
     /** Returns the single cracked world seed, or null if not yet cracked. */
     static Long crackedSeed() {
+        return crackedSeedPublic();
+    }
+
+    /** Public accessor for other modules (e.g. OreSim). */
+    public static Long crackedSeedPublic() {
         try {
             SeedCracker sc = SeedCracker.get();
             if (sc == null || sc.getDataStorage() == null) return null;
