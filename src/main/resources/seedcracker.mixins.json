@@ -4,9 +4,6 @@
   "package": "kaptainwutax.seedcrackerX.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
-    "accessor.CountPlacementAccessor",
-    "accessor.HeightRangePlacementAccessor",
-    "accessor.RarityFilterAccessor"
   ],
   "client": [
     "ClientLevelMixin",
