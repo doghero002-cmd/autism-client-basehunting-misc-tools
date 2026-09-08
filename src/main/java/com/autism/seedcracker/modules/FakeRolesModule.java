@@ -94,7 +94,12 @@ public final class FakeRolesModule extends Module {
             case DEV -> net.minecraft.ChatFormatting.AQUA;
             default -> net.minecraft.ChatFormatting.WHITE;
         };
-        String icon = r == Role.MEDIA ? "\uD83D\uDCF9" : "★";
+        String roleLabel = switch (r) {
+            case SRMOD -> "SRMOD";
+            case SRADMIN -> "SRADMIN";
+            case DEV -> "DEV";
+            default -> "";
+        };
         String tagStr = switch (t) {
             case PLUS -> "+";
             case PLUS_PLUS -> "++";
@@ -102,11 +107,16 @@ public final class FakeRolesModule extends Module {
             default -> "";
         };
         MutableComponent out = Component.empty();
-        if (r != Role.NONE) {
-            out.append(Component.literal(icon + " ").withStyle(color));
+        if (r == Role.MEDIA) {
+            out.append(Component.literal("📹 ").withStyle(color));
+        } else if (!roleLabel.isEmpty()) {
+            out.append(Component.literal("[" + roleLabel + "] ")
+                .withStyle(style -> style.withColor(color).withBold(true)));
         }
+        // DonutSMP donator ranks: a blue "+", "++" or "+++" before the name.
         if (!tagStr.isEmpty()) {
-            out.append(Component.literal("[" + tagStr + "] ").withStyle(net.minecraft.ChatFormatting.GOLD));
+            out.append(Component.literal(tagStr + " ")
+                .withStyle(style -> style.withColor(net.minecraft.ChatFormatting.BLUE).withBold(true)));
         }
         out.append(Component.literal(name).withStyle(color));
         return out;

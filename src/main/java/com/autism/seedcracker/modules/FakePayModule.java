@@ -5,7 +5,6 @@ import com.autism.seedcracker.fake.FakeBalance;
 
 import autismclient.api.module.BoolSetting;
 import autismclient.modules.Module;
-import autismclient.util.AutismClientMessaging;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -29,8 +28,8 @@ public final class FakePayModule extends Module {
     private final BoolSetting sound = add(new BoolSetting("sound", "Sound", true)
         .description("Play a ding when faking a payment.")
         .group("General"));
-    private final BoolSetting addToFakeBalance = add(new BoolSetting("add-to-balance", "Add to fake balance", true)
-        .description("Add the faked amount to the Fake Scoreboard balance.")
+    private final BoolSetting addToFakeBalance = add(new BoolSetting("add-to-balance", "Update balance", true)
+        .description("Deduct the faked amount from the Fake Scoreboard balance (you paid it out).")
         .group("General"));
 
     public FakePayModule(autismclient.modules.ModuleCategory category) {
@@ -83,9 +82,9 @@ public final class FakePayModule extends Module {
             mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
         }
         if (addToFakeBalance.get()) {
-            FakeBalance.add(amount);
+            // Paying money out: deduct it from the fake balance.
+            FakeBalance.add(-amount);
         }
-        AutismClientMessaging.sendPrefixed("§7Faked payment of §e$" + FakeBalance.format(amount) + "§7 to §a" + player + "§7.");
         return true; // cancel the real payment
     }
 }
