@@ -16,18 +16,19 @@ Everything lives in the module menu under these tabs:
 | Tab | What it does |
 | --- | --- |
 | **SeedCracker** | Crack the world seed from structures/biomes (SeedCrackerX), with a seed + progress HUD. Fully configurable in the GUI. |
-| **Finders** | Chunk scanners that flag hidden bases: Stash, Chunk, Spawner, SusChunk, Activity, Growth finders. |
+| **Finders** | Chunk scanners that flag hidden bases: Stash, Chunk, Spawner, SusChunk, Activity, Growth finders, plus the AI **Tunnel Base Finder** (digs a hazard-aware tunnel and alerts on bases) and the **Base Log Browser** (browse/delete logged bases). |
 | **Entity** | EntityScanner, AntiTrap, BoneDropper, SpawnerProtect (silk-touch + webhook). |
-| **Fake** | FakePay, FakePayments, FakeRoles (fake nametag in chat), FakeScoreboard HUD. |
-| **Render** | AutoRender, PaperRig (dispenser RNG), RegionMap HUD. |
+| **Fake** | FakePay, FakePayments, FakeRoles (fake DonutSMP rank/nametag in chat), FakeScoreboard HUD. |
+| **Render** | AutoRender, PaperRig (dispenser RNG), Amethyst ESP, Bedrock Hole ESP, RegionMap HUD. |
 | **Movement** | Flight+ (elytra-boost fly). |
-| **Trading** | AH Flipper — scans the auction house for underpriced flips (packet mode, or live API with a key). |
+| **Trading** | AH Flipper — scans the auction house for underpriced flips (packet mode, or live API with a key). **AH Sniper** — buys a target item the instant it's listed at/under your price (manual GUI or API mode). |
+| **Disabler** | Packet/movement disablers ported from Selena + Rise (all marked `[Patched]` — they no longer work on current anti-cheats, kept for reference). |
 | **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, AutoTool, TPASpammer, TabDetector, WeatherNotifier, HomeSetter, SkinChanger. |
 
 Plus two DonutSMP stash tools:
 
 - **Donut RTP Stash Finder** — RTPs around the map; when you land near 0,0 it digs down and
-  searches for stash blocks (Baritone), logging bases to `bases.txt`.
+  searches for stash blocks (Baritone, with a "legit / smooth movement" profile), logging bases to `bases.txt`.
 - **Relog Loader** — digs down, relogs to force the server to resend chunks, then flies so
   ESP can read the region.
 
