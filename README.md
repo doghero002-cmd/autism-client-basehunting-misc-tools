@@ -6,6 +6,8 @@ misc utilities. It loads as its own jar alongside the AUTISM client.
 
 > **⚠ Anti-cheat warning:** several modules move or act automatically (RTP, Baritone, elytra,
 > auto-eat, auto-log, etc.) and may be flagged by server anti-cheats. Use at your own risk.
+>
+> PLEASE USE PRISM LAUNCHER :SOB: minecrafts default launcher can mess things up
 
 ## What's inside
 
