@@ -36,8 +36,7 @@ import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.AutoToolModule;
 import com.autism.seedcracker.modules.BaseLogBrowserModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
-import com.autism.seedcracker.modules.BedrockHoleEspModule;
-import com.autism.seedcracker.modules.BoneDropperModule;
+import com.autism.seedcracker.modules.BedrockHoleEspModule;import com.autism.seedcracker.modules.ChatGamesModule;import com.autism.seedcracker.modules.BoneDropperModule;
 import com.autism.seedcracker.modules.ChunkFinderModule;
 import com.autism.seedcracker.modules.CoordSnapperModule;
 import com.autism.seedcracker.modules.EntityScannerModule;
@@ -175,6 +174,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new WeatherNotifierModule(catDogsMisc));
         AutismAddons.modules().register(new HomeSetterModule(catDogsMisc));
         AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
+        AutismAddons.modules().register(new ChatGamesModule(catDogsMisc));
 
         // Krypton misc modules (ported).
         AutismAddons.modules().register(new KeyPearlModule(catDogsMisc));
