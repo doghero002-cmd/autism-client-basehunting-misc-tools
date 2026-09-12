@@ -40,6 +40,10 @@ public final class AmethystEspModule extends Module {
             "sim-distance", "Sim distance (chunks)", 8, 1, 32, 1)
         .description("Chunk bubble scanned for amethyst geodes.")
         .group("General"));
+    private final IntSetting rescanMs = add(new IntSetting(
+            "rescan-ms", "Rescan delay (ms)", 0, 0, 10000, 100)
+        .description("Delay after enabling before scanning starts (lets chunks load). 0 = scan immediately.")
+        .group("General"));
     private final IntSetting minCluster = add(new IntSetting(
             "min-cluster", "Min cluster size", 3, 1, 20, 1)
         .description("Amethyst blocks needed in a chunk to flag it as a geode.")
@@ -59,6 +63,7 @@ public final class AmethystEspModule extends Module {
     private final Map<Long, Set<BlockPos>> flagged = new ConcurrentHashMap<>();
     private final Set<Long> notified = ConcurrentHashMap.newKeySet();
     private int cursor = 0;
+    private long enableTimeMs = 0;
 
     public AmethystEspModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":amethyst-esp", "Amethyst ESP", category,
@@ -71,6 +76,7 @@ public final class AmethystEspModule extends Module {
         flagged.clear();
         notified.clear();
         cursor = 0;
+        enableTimeMs = System.currentTimeMillis();
     }
 
     @Override
@@ -89,6 +95,9 @@ public final class AmethystEspModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
+
+        // Respect the configurable rescan delay (lets chunks finish loading before scanning).
+        if (System.currentTimeMillis() - enableTimeMs < rescanMs.get()) return;
 
         // Spread the chunk scan across ticks (a few chunks per tick, round-robin over the bubble).
         int range = simDistance.get();
@@ -133,7 +142,9 @@ public final class AmethystEspModule extends Module {
                 for (int y = -64; y <= MAX_Y; y++) {
                     BlockPos p = new BlockPos(baseX + x, y, baseZ + z);
                     BlockState st = chunk.getBlockState(p);
-                    if (isAmethystCluster(st) && hasGeodeNearby(chunk, p)) {
+                    // Detect the amethyst blocks themselves (amethyst block / budding amethyst),
+                    // which DonutSMP still sends, not just the buds/clusters it hides at distance.
+                    if (isAmethystBlock(st) || (isAmethystCluster(st) && hasGeodeNearby(chunk, p))) {
                         found.add(p.immutable());
                     }
                 }
@@ -155,6 +166,11 @@ public final class AmethystEspModule extends Module {
             || st.is(Blocks.LARGE_AMETHYST_BUD)
             || st.is(Blocks.MEDIUM_AMETHYST_BUD)
             || st.is(Blocks.SMALL_AMETHYST_BUD);
+    }
+
+    /** The geode's amethyst blocks themselves (always sent by the server, even at distance). */
+    private static boolean isAmethystBlock(BlockState st) {
+        return st.is(Blocks.AMETHYST_BLOCK) || st.is(Blocks.BUDDING_AMETHYST);
     }
 
     /** True if any geode block (amethyst block / budding amethyst / calcite / smooth basalt) is within 1 of pos. */

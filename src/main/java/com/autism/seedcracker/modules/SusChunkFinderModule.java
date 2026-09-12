@@ -41,11 +41,7 @@ public final class SusChunkFinderModule extends Module {
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>(
             "mode", "Mode", Mode.XENON, Mode.values())
-        .description("XENON = fast below-Y15 base detection (above activation Y). TYPES = per-block-type detector.")
-        .group("General"));
-    private final IntSetting activateAboveY = add(new IntSetting(
-            "activate-above-y", "Activate above Y", 16, -60, 100, 1)
-        .description("XENON mode only scans while you're above this Y (the below-Y15 base sweet spot).")
+        .description("XENON = fast below-Y15 player-placement detection. TYPES = per-block-type detector.")
         .group("General"));
     private final IntSetting scanRadius = add(new IntSetting(
             "scan-radius", "Scan radius (chunks)", 4, 1, 16, 1)
@@ -84,6 +80,7 @@ public final class SusChunkFinderModule extends Module {
     private final Set<ChunkPos> flagged = ConcurrentHashMap.newKeySet();
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private final Map<ChunkPos, Long> lastScan = new ConcurrentHashMap<>();
+    private long typesLastScanMs = 0;
 
     public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
@@ -123,16 +120,9 @@ public final class SusChunkFinderModule extends Module {
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-sus-chunk-finder", flagged, color.get(), tracer.get());
     }
 
-    // ---- XENON mode: fast below-Y15 base detection, gated on being above the activation Y ----
+    // ---- XENON mode: fast below-Y15 player-placement detection ----
 
     private void tickXenon(Minecraft mc) {
-        // Only scan while above the activation Y (so we can see below-Y15 player placements).
-        if (mc.player.getY() <= activateAboveY.get()) {
-            flagged.clear();
-            lastScan.clear();
-            return;
-        }
-
         long now = System.currentTimeMillis();
         int radius = scanRadius.get();
         ChunkPos center = mc.player.chunkPosition();
@@ -166,7 +156,12 @@ public final class SusChunkFinderModule extends Module {
         lastScan.keySet().removeIf(p -> tooFar(p, center, pr));
     }
 
-    /** True if the chunk has any block below Y15 that isn't deepslate or bedrock (player-placed). */
+    /**
+     * True if the chunk has a player-placed block below Y15. Natural deep terrain is deepslate,
+     * bedrock, air, ore, lava, water, tuff, gravel and the usual cave blocks - so we only flag
+     * blocks that do NOT naturally generate down there (chests, hoppers, spawners, placed stone
+     * variants, torches, etc.). This avoids flagging every cave/ore vein.
+     */
     private boolean isSusBelowY15(LevelChunk chunk, int minY) {
         int startX = chunk.getPos().getMinBlockX();
         int startZ = chunk.getPos().getMinBlockZ();
@@ -175,9 +170,7 @@ public final class SusChunkFinderModule extends Module {
             for (int z = 0; z < 16; z++) {
                 for (int y = 15; y >= minY; y--) {
                     m.set(startX + x, y, startZ + z);
-                    Block b = chunk.getBlockState(m).getBlock();
-                    if (b != Blocks.DEEPSLATE && b != Blocks.BEDROCK
-                        && b != Blocks.AIR && b != Blocks.CAVE_AIR && b != Blocks.VOID_AIR) {
+                    if (isPlayerPlaced(chunk.getBlockState(m).getBlock())) {
                         return true;
                     }
                 }
@@ -186,9 +179,28 @@ public final class SusChunkFinderModule extends Module {
         return false;
     }
 
-    // ---- TYPES mode: per-block-type counter ----
+    /** True for blocks that essentially only exist below Y15 because a player put them there. */
+    private static boolean isPlayerPlaced(Block b) {
+        return b == Blocks.CHEST || b == Blocks.TRAPPED_CHEST || b == Blocks.BARREL
+            || b == Blocks.HOPPER || b == Blocks.ENDER_CHEST || b == Blocks.SHULKER_BOX
+            || b == Blocks.FURNACE || b == Blocks.BLAST_FURNACE || b == Blocks.SMOKER
+            || b == Blocks.SPAWNER || b == Blocks.BEE_NEST || b == Blocks.BEEHIVE
+            || b == Blocks.TORCH || b == Blocks.WALL_TORCH || b == Blocks.LANTERN || b == Blocks.SOUL_LANTERN
+            || b == Blocks.CRAFTING_TABLE || b == Blocks.ENCHANTING_TABLE || b == Blocks.ANVIL
+            || b == Blocks.BREWING_STAND || b == Blocks.CAULDRON || b == Blocks.WATER_CAULDRON || b == Blocks.LAVA_CAULDRON
+            || b == Blocks.RAIL || b == Blocks.POWERED_RAIL || b == Blocks.DETECTOR_RAIL || b == Blocks.ACTIVATOR_RAIL
+            || b == Blocks.NETHER_PORTAL || b == Blocks.END_PORTAL_FRAME || b == Blocks.OBSIDIAN;
+    }
+
+    // ---- TYPES mode: per-block-type counter (throttled to avoid the 1 FPS full-volume scan) ----
 
     private void tickTypes(Minecraft mc) {
+        // Use the shared rescan delay (ms) between full scans, with the early-exit count cap so
+        // we never do a full-volume scan every frame.
+        long now = System.currentTimeMillis();
+        if (now - typesLastScanMs < rescanMs.get()) return;
+        typesLastScanMs = now;
+
         int radius = scanRadius.get();
         ChunkPos center = mc.player.chunkPosition();
         int threshold = sensitivity.get();
