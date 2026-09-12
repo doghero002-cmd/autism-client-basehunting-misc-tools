@@ -66,6 +66,9 @@ public final class GrowthFinderModule extends Module {
         .description("Count sweet-berry bushes.").group("Types"));
     private final BoolSetting dripstone = add(new BoolSetting("render-dripstone", "Dripstone", true)
         .description("Count pointed dripstone / dripstone blocks.").group("Types"));
+    private final BoolSetting sourceTracking = add(new BoolSetting("source-tracking", "Source estimation", true)
+        .description("Estimate the farm/source chunk from weighted growth (Xenon logic).")
+        .group("General"));
 
     private final Set<ChunkPos> flagged = new HashSet<>();
     private final Set<ChunkPos> notified = new HashSet<>();
@@ -114,11 +117,11 @@ public final class GrowthFinderModule extends Module {
 
         for (LevelChunk chunk : chunks) {
             ChunkPos pos = chunk.getPos();
-            int count = ChunkScanHelper.countBlocksInChunk(chunk, this::isGrowth);
-            if (count >= threshold.get()) {
+            Suspicion s = analyzeChunk(mc, chunk, pos);
+            if (s.score >= threshold.get()) {
                 flagged.add(pos);
                 if (notified.add(pos)) {
-                    onNewFlag(pos, count);
+                    onNewFlag(pos, s);
                 }
             } else {
                 flagged.remove(pos);
@@ -129,26 +132,97 @@ public final class GrowthFinderModule extends Module {
         notified.removeIf(p -> tooFar(p, playerChunk, r));
     }
 
-    /** Combined vegetation/growth predicate honouring each per-type toggle. */
-    private boolean isGrowth(BlockState state) {
-        if (state.isAir()) return false;
+    /** Suspicion result for a chunk: a weighted score + the estimated farm-source position. */
+    private static final class Suspicion {
+        int score;
+        int maxVine;
+        net.minecraft.core.BlockPos source;
+    }
 
-        if (vines.get() && (state.is(Blocks.VINE)
-            || state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)
+    /**
+     * Xenon-style analysis: instead of just counting growth blocks, it weights them by how
+     * "tended" they look - long vines count heavily (a long vine = an old, loaded farm), berries
+     * and dripstone count a little - and produces a suspicion score plus a weighted centroid that
+     * points at the likely farm/source location.
+     */
+    private Suspicion analyzeChunk(Minecraft mc, LevelChunk chunk, ChunkPos pos) {
+        Suspicion out = new Suspicion();
+        int baseX = pos.getMinBlockX();
+        int baseZ = pos.getMinBlockZ();
+        int minY = mc.level.getMinY();
+        int maxY = mc.level.getMaxY() - 1;
+
+        double vineWeight = 0, dripWeight = 0, berryWeight = 0;
+        double sumX = 0, sumZ = 0, sumW = 0;
+        int maxVine = 0;
+
+        net.minecraft.core.BlockPos.MutableBlockPos m = new net.minecraft.core.BlockPos.MutableBlockPos();
+        Set<Long> vineTops = new HashSet<>();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    m.set(baseX + x, y, baseZ + z);
+                    BlockState state = chunk.getBlockState(m);
+                    if (state.isAir()) continue;
+
+                    // Long vine: weight = its length (a long vine signals an old loaded farm).
+                    if (vines.get() && isVine(state)) {
+                        long key = m.asLong();
+                        if (!vineTops.contains(key) && !isVine(chunk.getBlockState(m.above()))) {
+                            vineTops.add(key);
+                            int len = 1;
+                            net.minecraft.core.BlockPos cur = m.below();
+                            while (isVine(mc.level.getBlockState(cur))) { len++; cur = cur.below(); }
+                            if (len >= 6) {
+                                vineWeight += len;
+                                if (len > maxVine) maxVine = len;
+                                double w = len;
+                                sumX += m.getX() * w; sumZ += m.getZ() * w; sumW += w;
+                            }
+                        }
+                    }
+
+                    // Dripstone: small fixed weight.
+                    if (dripstone.get() && (state.is(Blocks.POINTED_DRIPSTONE) || state.is(Blocks.DRIPSTONE_BLOCK))) {
+                        dripWeight += 2.5;
+                        sumX += m.getX() * 2.5; sumZ += m.getZ() * 2.5; sumW += 2.5;
+                    }
+
+                    // Berries: tiny weight.
+                    if (berries.get() && state.is(Blocks.SWEET_BERRY_BUSH)) {
+                        berryWeight += 1.0;
+                        sumX += m.getX() * 1.0; sumZ += m.getZ() * 1.0; sumW += 1.0;
+                    }
+                }
+            }
+        }
+
+        out.maxVine = maxVine;
+        out.score = (int) Math.round(vineWeight * 0.5 + dripWeight * 0.75 + berryWeight);
+        if (sourceTracking.get() && sumW > 0) {
+            out.source = new net.minecraft.core.BlockPos(
+                (int) Math.round(sumX / sumW), (int) mc.player.getY(), (int) Math.round(sumZ / sumW));
+        } else {
+            out.source = new net.minecraft.core.BlockPos(pos.getMinBlockX() + 8, (int) mc.player.getY(), pos.getMinBlockZ() + 8);
+        }
+        return out;
+    }
+
+    private boolean isVine(BlockState state) {
+        return state.is(Blocks.VINE) || state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)
             || state.is(Blocks.WEEPING_VINES) || state.is(Blocks.WEEPING_VINES_PLANT)
-            || state.is(Blocks.TWISTING_VINES) || state.is(Blocks.TWISTING_VINES_PLANT))) return true;
-        if (berries.get() && state.is(Blocks.SWEET_BERRY_BUSH)) return true;
-        if (dripstone.get() && (state.is(Blocks.POINTED_DRIPSTONE) || state.is(Blocks.DRIPSTONE_BLOCK))) return true;
-        return false;
+            || state.is(Blocks.TWISTING_VINES) || state.is(Blocks.TWISTING_VINES_PLANT);
     }
 
     private static boolean tooFar(ChunkPos a, ChunkPos b, int radius) {
         return Math.abs(a.x() - b.x()) > radius || Math.abs(a.z() - b.z()) > radius;
     }
 
-    private void onNewFlag(ChunkPos pos, int count) {
+    private void onNewFlag(ChunkPos pos, Suspicion s) {
         if (!notify.get()) return;
-        String msg = "Growth chunk (" + count + " blocks) at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
+        int sx = s.source.getX(), sz = s.source.getZ();
+        String msg = "Growth (score " + s.score + (s.maxVine > 0 ? ", max vine " + s.maxVine : "") + ") near X:" + sx + " Z:" + sz;
         AutismNotifications.warning(msg);
         AutismClientMessaging.sendPrefixed("§2[GrowthFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();

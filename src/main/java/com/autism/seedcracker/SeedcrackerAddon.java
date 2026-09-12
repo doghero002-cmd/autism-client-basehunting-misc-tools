@@ -49,6 +49,7 @@ import com.autism.seedcracker.modules.FastPlaceModule;
 import com.autism.seedcracker.modules.FlightPlusModule;
 import com.autism.seedcracker.modules.FreeLookModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
+import com.autism.seedcracker.modules.HoleEspModule;
 import com.autism.seedcracker.modules.HomeSetterModule;
 import com.autism.seedcracker.modules.PaperRigModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
@@ -128,6 +129,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new SpawnerProtectModule(catEntity));
         AutismAddons.modules().register(new AutoRenderModule(catRender));
         AutismAddons.modules().register(new PaperRigModule(catRender));
+        AutismAddons.modules().register(new HoleEspModule(catRender));
         AutismAddons.modules().register(new AmethystEspModule(catRender));
         AutismAddons.modules().register(new BedrockHoleEspModule(catRender));
         AutismAddons.modules().register(new FakePayModule(catFake));
