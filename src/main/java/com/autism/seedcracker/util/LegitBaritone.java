@@ -39,8 +39,24 @@ public final class LegitBaritone {
         set(mc, "randomizeRotations", true);
         set(mc, "smoothLook", true);
 
-        // Humanise pacing a little.
+        // Human pacing: don't sprint everywhere, break blocks at a human rate, and move with a
+        // slight natural speed cap so it doesn't look like perfect bot pathing.
         set(mc, "sprintAscends", false);
+        set(mc, "allowSprint", false);
+        set(mc, "sprintInWater", false);
+        setF(mc, "blockBreakSpeed", 1.0);       // 1.0 = vanilla break speed (no insta-mine look)
+        setI(mc, "mineDropLoosenDurationMsecs", 250); // small pause between block breaks
+        set(mc, "doMineWaypoints", false);
+
+        // Human movement: don't parkour/chain perfectly, allow it to walk around hazards like a person.
+        set(mc, "allowParkour", false);
+        set(mc, "allowParkourPlace", false);
+        set(mc, "allowDiagonalAscend", false);
+        set(mc, "allowDiagonalDescend", false);
+        set(mc, "assumeStep", false);
+
+        // Eat / behave like a player when hungry (the fork handles it if available).
+        set(mc, "allowEat", true);
 
         // Hide the path / goal / cached-chunk rendering.
         set(mc, "renderPath", false);
@@ -54,6 +70,10 @@ public final class LegitBaritone {
     }
 
     private static void setF(Minecraft mc, String name, double value) {
+        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+    }
+
+    private static void setI(Minecraft mc, String name, int value) {
         AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
     }
 }
