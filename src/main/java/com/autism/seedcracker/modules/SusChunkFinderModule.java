@@ -67,13 +67,21 @@ public final class SusChunkFinderModule extends Module {
             "notification", "Notification", true)
         .description("Toast + chat ping when a suspicious chunk is found.")
         .group("General"));
+    private final BoolSetting skipStructures = add(new BoolSetting(
+            "skip-structures", "Skip natural structures", true)
+        .description("XENON: don't flag spawners/blocks inside dungeons or trial chambers (they aren't player bases).")
+        .group("General"));
 
     // TYPES-mode per-type toggles.
     private final BoolSetting kelp = add(new BoolSetting("kelp", "Kelp", true).group("Types"));
+    private final IntSetting kelpCount = add(new IntSetting("kelp-count", "Kelp min count", 3, 1, 200, 1)
+        .description("Kelp blocks in a chunk needed to count toward the flag (dense kelp = a farm).").group("Types"));
     private final BoolSetting caveVines = add(new BoolSetting("cave-vines", "Cave Vines", true).group("Types"));
     private final BoolSetting vines = add(new BoolSetting("vines", "Vines", true).group("Types"));
     private final BoolSetting amethyst = add(new BoolSetting("amethyst", "Amethyst", true).group("Types"));
     private final BoolSetting bamboo = add(new BoolSetting("bamboo", "Bamboo", true).group("Types"));
+    private final IntSetting bambooCount = add(new IntSetting("bamboo-count", "Bamboo min count", 3, 1, 200, 1)
+        .description("Bamboo blocks in a chunk needed to count toward the flag (dense bamboo = a farm).").group("Types"));
     private final BoolSetting beeNest = add(new BoolSetting("bee-nest", "Bee Nest", true).group("Types"));
     private final BoolSetting rotatedDeepslate = add(new BoolSetting("rotated-deepslate", "Rotated Deepslate", true).group("Types"));
 
@@ -141,6 +149,7 @@ public final class SusChunkFinderModule extends Module {
 
                 LevelChunk chunk = mc.level.getChunk(cx, cz);
                 boolean sus = isSusBelowY15(chunk, minY);
+                if (sus && skipStructures.get() && isNaturalStructure(mc, pos)) sus = false;
                 if (sus) {
                     if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
                 } else {
@@ -192,6 +201,27 @@ public final class SusChunkFinderModule extends Module {
             || b == Blocks.NETHER_PORTAL || b == Blocks.END_PORTAL_FRAME || b == Blocks.OBSIDIAN;
     }
 
+    /** True if the chunk is part of a natural structure (dungeon / trial chamber), not a base. */
+    private boolean isNaturalStructure(Minecraft mc, ChunkPos pos) {
+        int structureBlocks = 0;
+        int baseX = pos.getMinBlockX();
+        int baseZ = pos.getMinBlockZ();
+        for (int x = 0; x < 16; x += 2) {
+            for (int z = 0; z < 16; z += 2) {
+                for (int y = 15; y >= mc.level.getMinY(); y -= 4) {
+                    Block b = mc.level.getBlockState(new BlockPos(baseX + x, y, baseZ + z)).getBlock();
+                    if (b == Blocks.MOSSY_COBBLESTONE
+                        || b == Blocks.TUFF || b == Blocks.POLISHED_TUFF || b == Blocks.TUFF_BRICKS
+                        || b == Blocks.CHISELED_TUFF || b == Blocks.CHISELED_TUFF_BRICKS
+                        || b == Blocks.TRIAL_SPAWNER || b == Blocks.VAULT) {
+                        structureBlocks++;
+                    }
+                }
+            }
+        }
+        return structureBlocks >= 3;
+    }
+
     // ---- TYPES mode: per-block-type counter (throttled to avoid the 1 FPS full-volume scan) ----
 
     private void tickTypes(Minecraft mc) {
@@ -208,8 +238,22 @@ public final class SusChunkFinderModule extends Module {
 
         for (LevelChunk chunk : chunks) {
             ChunkPos pos = chunk.getPos();
-            int count = com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, this::isSuspiciousType, threshold);
-            if (count >= threshold) {
+            // Kelp and bamboo have their own count thresholds (dense patches = a farm), the rest
+            // use the shared sensitivity.
+            boolean sus = false;
+            if (kelp.get() && com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(
+                    chunk, s -> s.is(Blocks.KELP) || s.is(Blocks.KELP_PLANT), kelpCount.get()) >= kelpCount.get()) {
+                sus = true;
+            }
+            if (!sus && bamboo.get() && com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(
+                    chunk, s -> s.is(Blocks.BAMBOO) || s.is(Blocks.BAMBOO_SAPLING), bambooCount.get()) >= bambooCount.get()) {
+                sus = true;
+            }
+            if (!sus) {
+                int count = com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, this::isSuspiciousType, threshold);
+                if (count >= threshold) sus = true;
+            }
+            if (sus) {
                 if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
             } else {
                 flagged.remove(pos);
@@ -222,11 +266,10 @@ public final class SusChunkFinderModule extends Module {
 
     private boolean isSuspiciousType(net.minecraft.world.level.block.state.BlockState state) {
         if (state.isAir()) return false;
-        if (kelp.get() && (state.is(Blocks.KELP) || state.is(Blocks.KELP_PLANT))) return true;
+        // (kelp and bamboo use their own count sliders in tickTypes, not this shared predicate)
         if (caveVines.get() && (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT))) return true;
         if (vines.get() && state.is(Blocks.VINE)) return true;
         if (amethyst.get() && state.is(Blocks.AMETHYST_CLUSTER)) return true;
-        if (bamboo.get() && (state.is(Blocks.BAMBOO) || state.is(Blocks.BAMBOO_SAPLING))) return true;
         if (beeNest.get() && (state.is(Blocks.BEE_NEST) || state.is(Blocks.BEEHIVE))) return true;
         if (rotatedDeepslate.get() && state.is(Blocks.DEEPSLATE)
             && state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)

@@ -50,6 +50,8 @@ public final class AmethystEspModule extends Module {
         .group("General"));
     private final BoolSetting blockEsp = add(new BoolSetting("block-esp", "Block ESP", true)
         .description("Highlight each amethyst block.").group("Render"));
+    private final BoolSetting geodeBox = add(new BoolSetting("geode-box", "Geode box", false)
+        .description("Draw a single bounding box around the whole detected geode.").group("Render"));
     private final BoolSetting tracer = add(new BoolSetting("tracer", "Show tracers", true)
         .description("Draw a tracer line to the nearest amethyst block.").group("Render"));
     private final BoolSetting fill = add(new BoolSetting("fill", "Fill boxes", false)
@@ -128,6 +130,37 @@ public final class AmethystEspModule extends Module {
             for (Set<BlockPos> s : flagged.values()) all.addAll(s);
             BlockEspRenderer.feed(SeedcrackerAddon.ID + ":amethyst-esp", all, color.get(), tracer.get(), fill.get());
         }
+
+        // Geode box: a single bounding box around every flagged amethyst block.
+        if (geodeBox.get()) {
+            net.minecraft.world.phys.AABB box = computeGeodeBox();
+            if (box != null) {
+                BlockEspRenderer.feedBox(SeedcrackerAddon.ID + ":amethyst-esp", box, color.get());
+            } else {
+                BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":amethyst-esp");
+            }
+        } else {
+            BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":amethyst-esp");
+        }
+    }
+
+    /** The smallest AABB containing every flagged amethyst block, or null if none. */
+    private net.minecraft.world.phys.AABB computeGeodeBox() {
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+        boolean any = false;
+        for (Set<BlockPos> s : flagged.values()) {
+            for (BlockPos p : s) {
+                any = true;
+                if (p.getX() < minX) minX = p.getX();
+                if (p.getY() < minY) minY = p.getY();
+                if (p.getZ() < minZ) minZ = p.getZ();
+                if (p.getX() + 1 > maxX) maxX = p.getX() + 1;
+                if (p.getY() + 1 > maxY) maxY = p.getY() + 1;
+                if (p.getZ() + 1 > maxZ) maxZ = p.getZ() + 1;
+            }
+        }
+        return any ? new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX, maxY, maxZ) : null;
     }
 
     private void scanChunk(LevelChunk chunk) {

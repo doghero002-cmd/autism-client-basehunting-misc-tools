@@ -10,6 +10,7 @@ import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.finder.ChunkScanHelper;
 
 import autismclient.api.module.BoolSetting;
+import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
@@ -69,11 +70,21 @@ public final class TunnelBaseFinderModule extends Module {
         .group("Detect"));
     private final BoolSetting humanize = add(new BoolSetting(
             "humanize", "Humanize movement", true)
-        .description("Crosshair drift, micro-pauses, sneak/sprint/strafe variation, smoothed rotations.")
+        .description("Crosshair drift, micro-pauses, sneak/sprint/strafe variation, smoothed rotations. DISABLE if being flagged.")
+        .group("Tunnel"));
+    private final BoolSetting quietMovement = add(new BoolSetting(
+            "quiet-movement", "Quiet movement (anti-flag)", true)
+        .description("Go perfectly straight with no drift/sneak/sprint/strafe spam - only turn/stop for obstacles or a found base. Least flaggable.")
         .group("Tunnel"));
     private final BoolSetting defendPlayers = add(new BoolSetting(
             "defend-players", "Defend vs players", true)
         .description("Turn and hit a player that comes within 16 blocks.")
+        .group("Tunnel"));
+
+    public enum TunnelMode { XENON, WALK_2X1 }
+    private final EnumSetting<TunnelMode> tunnelMode = add(new EnumSetting<>(
+            "mode", "Tunnel mode", TunnelMode.XENON, TunnelMode.values())
+        .description("XENON = straight-line smart avoidance. WALK_2X1 = mine a plain 2x1 walkable tunnel like a normal pickaxe, with automatic human-like camera.")
         .group("Tunnel"));
 
     private static final Set<Block> STORAGE = buildStorage();
@@ -253,7 +264,7 @@ public final class TunnelBaseFinderModule extends Module {
         }
 
         totalTicks++;
-        if (humanize.get()) tickHumanization(mc);
+        if (humanize.get() && !quietMovement.get()) tickHumanization(mc);
 
         if (idleBreakTicks > 0) { idleBreakTicks--; mc.options.keyUp.setDown(false); }
         if (microPauseTicks > 0) { microPauseTicks--; mc.options.keyUp.setDown(false); }
@@ -286,50 +297,175 @@ public final class TunnelBaseFinderModule extends Module {
             isAvoiding = true;
         }
 
-        tickCrosshairDrift();
-        float driftedYaw = targetYaw + driftYawOffset;
+        if (!quietMovement.get()) tickCrosshairDrift();
+        float driftedYaw = targetYaw + (quietMovement.get() ? 0f : driftYawOffset);
         float pitchTarget = miningLookDown ? 35.0f : basePitchBias;
-        float driftedPitch = pitchTarget + driftPitchOffset;
+        float driftedPitch = pitchTarget + (quietMovement.get() ? 0f : driftPitchOffset);
 
-        if (!yawInitialized) {
-            currentSmoothedYaw = mc.player.getYRot();
-            currentSmoothedPitch = mc.player.getXRot();
-            yawInitialized = true;
-        }
-
-        if (avoidCooldown > 0) avoidCooldown--;
-
-        float yawChange = Math.abs(angleDiff(lastRawTargetYaw, targetYaw));
-        if (yawChange > 5f) {
-            turnSpeedMultiplier = yawChange > 80f
-                ? 0.06f + rng.nextFloat() * 0.08f
-                : 0.04f + rng.nextFloat() * 0.06f;
-            turnYawOvershoot = gaussian(0f, 1.0f);
-            turnOvershootDecay = 0.025f + rng.nextFloat() * 0.035f;
-            turnReactionTicks = randomRange(1, 3);
-            lastRawTargetYaw = targetYaw;
-        }
-
-        if (turnReactionTicks > 0) {
-            turnReactionTicks--;
-            mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.02f));
-            mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+        // Rotation. In quiet mode we go straight with no drift/jitter and only smooth-turn for
+        // obstacles/avoidance; in normal mode the humanization engine adds drift + micro-noise.
+        if (quietMovement.get()) {
+            if (!yawInitialized) {
+                currentSmoothedYaw = mc.player.getYRot();
+                currentSmoothedPitch = basePitchBias;
+                yawInitialized = true;
+            }
+            // Face the tunnel direction (or avoidance direction) with a gentle, jitter-free turn.
+            float rotSpeed = isAvoiding ? 0.10f : 0.08f;
+            currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw, rotSpeed);
+            currentSmoothedPitch = lerp(currentSmoothedPitch, basePitchBias, rotSpeed);
+            mc.player.setYRot(currentSmoothedYaw);
+            mc.player.setXRot(clampPitch(currentSmoothedPitch));
         } else {
-            turnYawOvershoot = lerp(turnYawOvershoot, 0f, turnOvershootDecay);
-            float rotSpeed = turnSpeedMultiplier;
-            if (isAvoiding) rotSpeed = 0.08f + rng.nextFloat() * 0.10f;
-            float finalYaw = driftedYaw + turnYawOvershoot;
-            currentSmoothedYaw = lerpAngle(currentSmoothedYaw, finalYaw, rotSpeed);
-            currentSmoothedPitch = lerp(currentSmoothedPitch, driftedPitch, rotSpeed);
-            mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.015f));
-            mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+            if (!yawInitialized) {
+                currentSmoothedYaw = mc.player.getYRot();
+                currentSmoothedPitch = mc.player.getXRot();
+                yawInitialized = true;
+            }
+            if (avoidCooldown > 0) avoidCooldown--;
+            float yawChange = Math.abs(angleDiff(lastRawTargetYaw, targetYaw));
+            if (yawChange > 5f) {
+                turnSpeedMultiplier = yawChange > 80f
+                    ? 0.06f + rng.nextFloat() * 0.08f
+                    : 0.04f + rng.nextFloat() * 0.06f;
+                turnYawOvershoot = gaussian(0f, 1.0f);
+                turnOvershootDecay = 0.025f + rng.nextFloat() * 0.035f;
+                turnReactionTicks = randomRange(1, 3);
+                lastRawTargetYaw = targetYaw;
+            }
+            if (turnReactionTicks > 0) {
+                turnReactionTicks--;
+                mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.02f));
+                mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+            } else {
+                turnYawOvershoot = lerp(turnYawOvershoot, 0f, turnOvershootDecay);
+                float rotSpeed = turnSpeedMultiplier;
+                if (isAvoiding) rotSpeed = 0.08f + rng.nextFloat() * 0.10f;
+                float finalYaw = driftedYaw + turnYawOvershoot;
+                currentSmoothedYaw = lerpAngle(currentSmoothedYaw, finalYaw, rotSpeed);
+                currentSmoothedPitch = lerp(currentSmoothedPitch, driftedPitch, rotSpeed);
+                mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.015f));
+                mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+            }
         }
 
         correctPosition(mc);
 
         // Base detection + tunneling.
         notifyFound(mc);
-        tickTunneling(mc);
+        if (tunnelMode.get() == TunnelMode.WALK_2X1) {
+            tickWalkTunnel(mc);
+        } else {
+            tickTunneling(mc);
+        }
+    }
+
+    // ---- WALK_2X1 mode: mine a plain 2-high x 1-wide walkable tunnel like a normal pickaxe ----
+
+    /**
+     * Mines a 2x1 tunnel the player can walk through, using normal pickaxe mechanics and an
+     * automatic human-like camera. Each tick it looks at the next block to break (feet, then head)
+     * with a smooth, non-snapping rotation, holds attack until it breaks, and walks forward when
+     * the 2x1 space ahead is clear. Stops at lava/water (turns 90° instead of digging through).
+     */
+    private BlockPos walkMiningTarget = null;
+
+    private void tickWalkTunnel(Minecraft mc) {
+        BlockPos playerPos = mc.player.blockPosition();
+        BlockPos aheadFeet = playerPos.relative(tunnelDirection);
+        BlockPos aheadHead = aheadFeet.above();
+
+        // Lava/water ahead (feet or head, or ground below the next step): sidestep around it
+        // instead of digging through. We shift sideways into a safe lane and keep tunneling.
+        BlockPos groundAhead = aheadFeet.below();
+        boolean lavaAhead = isLiquid(mc, aheadFeet) || isLiquid(mc, aheadHead) || isLiquid(mc, groundAhead);
+        if (lavaAhead) {
+            Direction right = tunnelDirection.getClockWise();
+            Direction left = tunnelDirection.getCounterClockWise();
+            boolean rightSafe = isLaneSafe(mc, right);
+            boolean leftSafe = isLaneSafe(mc, left);
+            Direction lane = rightSafe ? right : (leftSafe ? left : null);
+            if (lane != null) {
+                // Shift the fixed line by one lane and keep tunneling in the same direction.
+                if (fixedCoordIsX) fixedCoord += (lane == right ? 1 : -1) * (tunnelDirection == Direction.NORTH ? -1 : 1);
+                else fixedCoord += (lane == right ? 1 : -1) * (tunnelDirection == Direction.EAST ? -1 : 1);
+                walkMiningTarget = null;
+                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                mc.options.keyAttack.setDown(false);
+                // Strafe into the safe lane.
+                if (lane == right) { mc.options.keyRight.setDown(true); mc.options.keyLeft.setDown(false); }
+                else { mc.options.keyLeft.setDown(true); mc.options.keyRight.setDown(false); }
+            } else {
+                // No safe lane: turn 90°.
+                tunnelDirection = tunnelDirection.getClockWise();
+                walkMiningTarget = null;
+                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                mc.options.keyAttack.setDown(false);
+                mc.options.keyUp.setDown(false);
+            }
+            return;
+        }
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+
+        BlockState feetState = mc.level.getBlockState(aheadFeet);
+        BlockState headState = mc.level.getBlockState(aheadHead);
+        boolean feetSolid = !feetState.isAir() && feetState.getBlock() != Blocks.BEDROCK;
+        boolean headSolid = !headState.isAir() && headState.getBlock() != Blocks.BEDROCK;
+
+        // Pick what to mine: head first (so the tunnel clears top-down), else feet.
+        BlockPos target = headSolid ? aheadHead : (feetSolid ? aheadFeet : null);
+
+        if (target != null) {
+            walkMiningTarget = target;
+            // Human-like camera: look at the block being mined (smooth, small jitter, no snapping).
+            lookAtBlockHuman(mc, target);
+            mc.options.keyUp.setDown(false); // stand still while mining
+            mc.options.keyAttack.setDown(true);
+            if (mc.gameMode != null) {
+                mc.gameMode.startDestroyBlock(target, Direction.UP);
+                mc.gameMode.continueDestroyBlock(target, Direction.UP);
+            }
+            mc.player.swing(InteractionHand.MAIN_HAND);
+        } else {
+            // 2x1 space ahead is clear: stop mining and walk forward.
+            walkMiningTarget = null;
+            mc.options.keyAttack.setDown(false);
+            if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+            // Face forward (level) and walk.
+            faceForwardHuman(mc);
+            mc.options.keyUp.setDown(true);
+        }
+    }
+
+    /** True if the lane one block to the side has no lava/water at feet/head/ground. */
+    private boolean isLaneSafe(Minecraft mc, Direction sideDir) {
+        BlockPos p = mc.player.blockPosition().relative(sideDir);
+        return !isLiquid(mc, p) && !isLiquid(mc, p.above()) && !isLiquid(mc, p.below());
+    }
+
+    /** Smooth, human-like look at a block (ease + tiny jitter, no instant snapping). */
+    private void lookAtBlockHuman(Minecraft mc, BlockPos pos) {
+        double dx = pos.getX() + 0.5 - mc.player.getX();        double dy = pos.getY() + 0.5 - mc.player.getEyeY();
+        double dz = pos.getZ() + 0.5 - mc.player.getZ();
+        double dist = Math.hypot(dx, dz);
+        float targetYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
+        float speed = 0.10f + rng.nextFloat() * 0.06f;
+        currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw, speed);
+        currentSmoothedPitch = lerp(currentSmoothedPitch, targetPitch, speed);
+        mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.02f));
+        mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.015f)));
+    }
+
+    /** Smooth, human-like return to facing the tunnel direction at a level pitch. */
+    private void faceForwardHuman(Minecraft mc) {
+        float targetYaw = getDirectionYaw(tunnelDirection);
+        float speed = 0.08f + rng.nextFloat() * 0.05f;
+        currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw + driftYawOffset, speed);
+        currentSmoothedPitch = lerp(currentSmoothedPitch, basePitchBias + driftPitchOffset, speed);
+        mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.015f));
+        mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
     }
 
     // ---- main tunneling state machine ----
@@ -352,11 +488,11 @@ public final class TunnelBaseFinderModule extends Module {
             case RETURN -> tickReturn(mc);
         }
 
-        if (stuckTicks > 40 && avoidState == AvoidState.NONE) {
+        if (stuckTicks > 100 && avoidState == AvoidState.NONE) {
             mc.options.keyUp.setDown(false);
             startObstacleAvoidance(mc);
             stuckTicks = 0;
-        } else if (stuckTicks > 80) {
+        } else if (stuckTicks > 200) {
             avoidSideDirection = -avoidSideDirection;
             avoidState = AvoidState.SIDESTEP;
             avoidForwardCount = 0;
@@ -370,7 +506,7 @@ public final class TunnelBaseFinderModule extends Module {
 
         if (!isGroundSafe(mc, tunnelDirection, 2)) {
             mc.options.keyUp.setDown(false);
-            if (avoidCooldown <= 0) { startObstacleAvoidance(mc); avoidCooldown = 20; }
+            if (avoidCooldown <= 0) { startObstacleAvoidance(mc); avoidCooldown = 60; }
             return;
         }
 
@@ -553,7 +689,7 @@ public final class TunnelBaseFinderModule extends Module {
             avoidState = AvoidState.NONE;
             mc.options.keyUp.setDown(false);
             stuckTicks = 0;
-            avoidCooldown = 30;
+            avoidCooldown = 60;
             waitTicks = randomRange(3, 8);
         } else {
             Direction returnDir = getSideDirection(tunnelDirection, -avoidSideDirection);
@@ -689,6 +825,10 @@ public final class TunnelBaseFinderModule extends Module {
         for (LevelChunk chunk : chunks) {
             for (BlockEntity be : chunk.getBlockEntities().values()) {
                 if (spawners.get() && be instanceof SpawnerBlockEntity) {
+                    // Skip natural-structure spawners (dungeons / trial chambers) - they aren't
+                    // player bases. A dungeon/trial-chamber spawner sits among mossy cobblestone,
+                    // tuff/copper/grate blocks, etc.
+                    if (isNaturalStructureSpawner(mc, be.getBlockPos())) continue;
                     spawner++;
                     spawnerPos = be.getBlockPos();
                 } else if (STORAGE.contains(be.getBlockState().getBlock())) {
@@ -704,6 +844,30 @@ public final class TunnelBaseFinderModule extends Module {
         if (storage > minimumStorage.get()) {
             onBaseFound(mc, "base", (int) mc.player.getX(), (int) mc.player.getY(), (int) mc.player.getZ());
         }
+    }
+
+    /**
+     * True if a spawner is part of a natural structure (dungeon or trial chamber) rather than a
+     * player base. Checks the blocks around the spawner for structure-specific blocks: mossy
+     * cobblestone (dungeons) or tuff / copper / trial-chamber blocks (trial chambers).
+     */
+    private boolean isNaturalStructureSpawner(Minecraft mc, BlockPos spawnerPos) {
+        int structureBlocks = 0;
+        for (int dx = -3; dx <= 3; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -3; dz <= 3; dz++) {
+                    Block b = mc.level.getBlockState(spawnerPos.offset(dx, dy, dz)).getBlock();
+                    if (b == Blocks.MOSSY_COBBLESTONE
+                        || b == Blocks.TUFF || b == Blocks.POLISHED_TUFF || b == Blocks.TUFF_BRICKS
+                        || b == Blocks.CHISELED_TUFF || b == Blocks.CHISELED_TUFF_BRICKS
+                        || b == Blocks.TRIAL_SPAWNER || b == Blocks.VAULT) {
+                        structureBlocks++;
+                    }
+                }
+            }
+        }
+        // If several structure blocks surround the spawner, it's a natural structure, not a base.
+        return structureBlocks >= 3;
     }
 
     private void onBaseFound(Minecraft mc, String kind, int x, int y, int z) {

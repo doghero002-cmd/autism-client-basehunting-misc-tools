@@ -33,6 +33,7 @@ public final class BlockEspRenderer {
     private static final double INFLATE = 0.02;
 
     private static final Map<String, Feed> FEEDS = new ConcurrentHashMap<>();
+    private static final Map<String, BoxFeed> BOX_FEEDS = new ConcurrentHashMap<>();
     private static volatile boolean initialised = false;
 
     private static final class Feed {
@@ -40,6 +41,12 @@ public final class BlockEspRenderer {
         int argb;
         boolean tracer;
         boolean fill;
+        long lastFeedMs;
+    }
+
+    private static final class BoxFeed {
+        AABB box;
+        int argb;
         long lastFeedMs;
     }
 
@@ -96,6 +103,17 @@ public final class BlockEspRenderer {
                             centre.x, centre.y, centre.z, lineArgb, LINE_WIDTH));
                 }
             }
+
+            // Single bounding boxes (e.g. a geode box).
+            BOX_FEEDS.entrySet().removeIf(e -> now - e.getValue().lastFeedMs > TTL_MS);
+            for (BoxFeed bf : BOX_FEEDS.values()) {
+                if (bf.box == null) continue;
+                AABB rel = new AABB(
+                    bf.box.minX - origin.x, bf.box.minY - origin.y, bf.box.minZ - origin.z,
+                    bf.box.maxX - origin.x, bf.box.maxY - origin.y, bf.box.maxZ - origin.z).inflate(INFLATE);
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> outlineBox(pose, buffer, rel, bf.argb));
+            }
         });
     }
 
@@ -112,7 +130,24 @@ public final class BlockEspRenderer {
 
     /** Clear a module's markers (on disable). */
     public static void clear(String moduleId) {
-        if (moduleId != null) FEEDS.remove(moduleId);
+        if (moduleId != null) {
+            FEEDS.remove(moduleId);
+            BOX_FEEDS.remove(moduleId);
+        }
+    }
+
+    /** Feed a single bounding box for a module (e.g. a geode outline). Call every tick while enabled. */
+    public static void feedBox(String moduleId, AABB box, int argb) {
+        if (moduleId == null || box == null) return;
+        BoxFeed f = BOX_FEEDS.computeIfAbsent(moduleId, k -> new BoxFeed());
+        f.box = box;
+        f.argb = argb;
+        f.lastFeedMs = System.currentTimeMillis();
+    }
+
+    /** Clear a module's single bounding box. */
+    public static void clearBox(String moduleId) {
+        if (moduleId != null) BOX_FEEDS.remove(moduleId);
     }
 
     private static void outlineBox(PoseStack.Pose pose, VertexConsumer buffer, AABB box, int color) {

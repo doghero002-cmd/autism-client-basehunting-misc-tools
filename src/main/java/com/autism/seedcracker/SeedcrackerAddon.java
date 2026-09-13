@@ -128,9 +128,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new SpawnerProtectModule(catEntity));
         AutismAddons.modules().register(new AutoRenderModule(catRender));
         AutismAddons.modules().register(new PaperRigModule(catRender));
-        AutismAddons.modules().register(new HoleEspModule(catRender));
-        AutismAddons.modules().register(new AmethystEspModule(catRender));
-        AutismAddons.modules().register(new BedrockHoleEspModule(catRender));
         AutismAddons.modules().register(new FakePayModule(catFake));
         AutismAddons.modules().register(new FakePaymentsModule(catFake));
         AutismAddons.modules().register(new FakeRolesModule(catFake));
@@ -175,6 +172,11 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new HomeSetterModule(catDogsMisc));
         AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
         AutismAddons.modules().register(new ChatGamesModule(catDogsMisc));
+
+        // ESP (moved to the Dogs tab).
+        AutismAddons.modules().register(new HoleEspModule(catDogsMisc));
+        AutismAddons.modules().register(new AmethystEspModule(catDogsMisc));
+        AutismAddons.modules().register(new BedrockHoleEspModule(catDogsMisc));
 
         // Krypton misc modules (ported).
         AutismAddons.modules().register(new KeyPearlModule(catDogsMisc));
