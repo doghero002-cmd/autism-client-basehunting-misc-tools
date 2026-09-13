@@ -41,6 +41,7 @@ import com.autism.seedcracker.modules.HoleEspModule;
 import com.autism.seedcracker.modules.HomeSetterModule;
 import com.autism.seedcracker.modules.PaperRigModule;
 import com.autism.seedcracker.modules.PrimeChunkFinderModule;
+import com.autism.seedcracker.modules.RegionMapModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
 import com.autism.seedcracker.modules.SkinChangerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
@@ -147,6 +148,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new HomeSetterModule(catDogsMisc));
         AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
         AutismAddons.modules().register(new ChatGamesModule(catDogsMisc));
+        AutismAddons.modules().register(new RegionMapModule(catDogsMisc));
 
         // ESP (moved to the Dogs tab).
         AutismAddons.modules().register(new HoleEspModule(catDogsMisc));
@@ -164,7 +166,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.commands().register(new BaseLogCommand());
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());
-        AutismAddons.hud().register(new RegionMapHud());
         AutismAddons.hud().register(new FakeScoreboardHud());
     }
 
