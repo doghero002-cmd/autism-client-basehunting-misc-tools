@@ -27,7 +27,6 @@ jobs:
 
       # The AUTISM Client API jar is vendored in libs/ and resolved via flatDir (see
       # build.gradle.kts), so no extra setup is needed on a fresh runner.
->>>>>>> af56e7c (fix CI: vendor autism client 5.0 jar in libs/ with flatDir repo)
       - name: Build
         run: ./gradlew build --stacktrace
 
