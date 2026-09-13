@@ -13,8 +13,12 @@ loom {
 }
 
 repositories {
-    // AUTISM Client is consumed from your local Maven repo. In the AUTISM project run:
-    //     ./gradlew publishToMavenLocal
+    // The AUTISM Client API is vendored into libs/ so the build is self-contained (works on a
+    // fresh CI runner with an empty ~/.m2). flatDir resolves com.autismclient:autism:<ver> from
+    // libs/autism-<ver>.jar. To upgrade, drop the new jar in libs/ and bump `autism` in
+    // gradle/libs.versions.toml.
+    flatDir { dirs("libs") }
+    // Keep mavenLocal as a fallback for local dev where you may publish a newer build.
     mavenLocal()
     maven("https://maven.fabricmc.net/") { name = "Fabric" }
     mavenCentral()
