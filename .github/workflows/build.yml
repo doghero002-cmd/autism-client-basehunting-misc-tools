@@ -25,10 +25,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # NOTE: the build needs the AUTISM Client API artifact (com.autismclient:autism) to be resolvable.
-      # mavenLocal() is empty on a fresh CI runner, so make it available one of these ways:
-      #   - publish AUTISM to a maven repo your build.gradle.kts lists (GitHub Packages, a maven server), or
-      #   - commit the AUTISM jar into a `libs/` folder and add `flatDir { dirs("libs") }` to repositories.
+      # The AUTISM Client API jar is vendored in libs/ and resolved via flatDir (see
+      # build.gradle.kts), so no extra setup is needed on a fresh runner.
+>>>>>>> af56e7c (fix CI: vendor autism client 5.0 jar in libs/ with flatDir repo)
       - name: Build
         run: ./gradlew build --stacktrace
 

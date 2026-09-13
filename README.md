@@ -50,14 +50,17 @@ Plus two DonutSMP stash tools:
 ## Build
 
 ```powershell
-# 1. Publish the AUTISM Client API locally (run from the AUTISM Client project folder).
-.\gradlew.bat publishToMavenLocal --no-daemon
-
-# 2. Build this addon (run from this folder).
+# Build this addon (run from this folder).
 .\gradlew.bat build --no-daemon
 ```
 
 The jar is produced at `build/libs/`.
+
+> **AUTISM Client API:** the matching API jar is vendored in `libs/` and resolved via a
+> `flatDir` repository, so the build is self-contained — it works on a fresh machine or CI
+> runner with an empty `~/.m2` (no `publishToMavenLocal` needed). To upgrade the client,
+> drop the new `autism-<version>.jar` into `libs/` and bump `autism` in
+> `gradle/libs.versions.toml`. Currently pinned to AUTISM Client `5.0-26.2-dev`.
 
 > **AUTISM Client version:** the build resolves the API with a Maven version range (`[3.4,)`),
 > so it uses the newest client you have published to mavenLocal rather than requiring one exact
