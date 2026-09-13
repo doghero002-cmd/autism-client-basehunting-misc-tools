@@ -32,7 +32,7 @@ public final class FakeScoreboardHud implements HudElementProvider {
 
     private static String[] lines() {
         return new String[] {
-            "Money: " + FakeBalance.format(FakeBalance.get()),
+            "Money: " + FakeBalance.formatShort(FakeBalance.get()),
             "Shards: " + shards,
             "Kills: " + kills,
             "Deaths: " + deaths,

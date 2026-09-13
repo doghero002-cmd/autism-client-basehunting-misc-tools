@@ -20,6 +20,7 @@ import com.autism.seedcracker.modules.AntiAFKModule;
 import com.autism.seedcracker.modules.AntiTrapModule;
 import com.autism.seedcracker.modules.AutoEatModule;
 import com.autism.seedcracker.modules.AutoLogModule;
+import com.autism.seedcracker.modules.AutoMineModule;
 import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.AutoToolModule;
 import com.autism.seedcracker.modules.BaseLogBrowserModule;
@@ -132,6 +133,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new FastPlaceModule(catDogsMisc));
         AutismAddons.modules().register(new FreeLookModule(catDogsMisc));
         AutismAddons.modules().register(new AutoEatModule(catDogsMisc));
+        AutismAddons.modules().register(new AutoMineModule(catDogsMisc));
         AutismAddons.modules().register(new SwingSpeedModule(catDogsMisc));
         AutismAddons.modules().register(new CoordSnapperModule(catDogsMisc));
         AutismAddons.modules().register(new FakePlayerModule(catDogsMisc));
