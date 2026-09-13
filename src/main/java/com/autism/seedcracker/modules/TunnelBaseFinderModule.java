@@ -32,6 +32,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import com.autism.seedcracker.util.tunnel.LookRotation;
 
 /**
  * Tunnel Base Finder.
@@ -186,6 +187,8 @@ public final class TunnelBaseFinderModule extends Module {
         strafeDriftCooldown = 0;
         walkPauseTicks = 0;
         walkPauseCooldown = randomRange(60, 200);
+        digGapTicks = 0;
+        com.autism.seedcracker.util.tunnel.HumanPacingEngine.get().setEnabled(true);
         pickNewDriftTarget();
         initTunnelDirection(mc);
         if (tunnelDirection != null) {
@@ -207,6 +210,7 @@ public final class TunnelBaseFinderModule extends Module {
         }
         tunnelDirection = null;
         notified.clear();
+        com.autism.seedcracker.util.tunnel.HumanPacingEngine.get().setEnabled(false);
     }
 
     @Override
@@ -314,8 +318,7 @@ public final class TunnelBaseFinderModule extends Module {
             float rotSpeed = isAvoiding ? 0.10f : 0.08f;
             currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw, rotSpeed);
             currentSmoothedPitch = lerp(currentSmoothedPitch, basePitchBias, rotSpeed);
-            mc.player.setYRot(currentSmoothedYaw);
-            mc.player.setXRot(clampPitch(currentSmoothedPitch));
+            LookRotation.apply(currentSmoothedYaw, clampPitch(currentSmoothedPitch));
         } else {
             if (!yawInitialized) {
                 currentSmoothedYaw = mc.player.getYRot();
@@ -369,6 +372,7 @@ public final class TunnelBaseFinderModule extends Module {
      * the 2x1 space ahead is clear. Stops at lava/water (turns 90° instead of digging through).
      */
     private BlockPos walkMiningTarget = null;
+    private int digGapTicks = 0;
 
     private void tickWalkTunnel(Minecraft mc) {
         BlockPos playerPos = mc.player.blockPosition();
@@ -418,15 +422,22 @@ public final class TunnelBaseFinderModule extends Module {
 
         if (target != null) {
             walkMiningTarget = target;
-            // Human-like camera: look at the block being mined (smooth, small jitter, no snapping).
-            lookAtBlockHuman(mc, target);
+            // Human pacing: wait the engine's break-gap between blocks instead of digging every tick.
+            if (digGapTicks > 0) {
+                digGapTicks--;
+                mc.options.keyAttack.setDown(false);
+                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                mc.options.keyUp.setDown(false);
+                return;
+            }
+            // Xenon-style: aim directly at the block, then break whatever the crosshair
+            // ray-trace actually reports (with its real face). No custom drift/jitter.
+            aimAtBlock(mc, target);
             mc.options.keyUp.setDown(false); // stand still while mining
             mc.options.keyAttack.setDown(true);
-            if (mc.gameMode != null) {
-                mc.gameMode.startDestroyBlock(target, Direction.UP);
-                mc.gameMode.continueDestroyBlock(target, Direction.UP);
-            }
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            digCrosshair(mc);
+            // Re-arm the human-paced gap for the next block.
+            digGapTicks = com.autism.seedcracker.util.tunnel.HumanPacingEngine.get().breakGapTicks();
         } else {
             // 2x1 space ahead is clear: stop mining and walk forward.
             walkMiningTarget = null;
@@ -444,28 +455,12 @@ public final class TunnelBaseFinderModule extends Module {
         return !isLiquid(mc, p) && !isLiquid(mc, p.above()) && !isLiquid(mc, p.below());
     }
 
-    /** Smooth, human-like look at a block (ease + tiny jitter, no instant snapping). */
-    private void lookAtBlockHuman(Minecraft mc, BlockPos pos) {
-        double dx = pos.getX() + 0.5 - mc.player.getX();        double dy = pos.getY() + 0.5 - mc.player.getEyeY();
-        double dz = pos.getZ() + 0.5 - mc.player.getZ();
-        double dist = Math.hypot(dx, dz);
-        float targetYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
-        float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
-        float speed = 0.10f + rng.nextFloat() * 0.06f;
-        currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw, speed);
-        currentSmoothedPitch = lerp(currentSmoothedPitch, targetPitch, speed);
-        mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.02f));
-        mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.015f)));
-    }
-
-    /** Smooth, human-like return to facing the tunnel direction at a level pitch. */
+    /** Aim directly at the tunnel direction, level pitch (Xenon-style, no drift/jitter). */
     private void faceForwardHuman(Minecraft mc) {
         float targetYaw = getDirectionYaw(tunnelDirection);
-        float speed = 0.08f + rng.nextFloat() * 0.05f;
-        currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw + driftYawOffset, speed);
-        currentSmoothedPitch = lerp(currentSmoothedPitch, basePitchBias + driftPitchOffset, speed);
-        mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.015f));
-        mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+        currentSmoothedYaw = targetYaw;
+        currentSmoothedPitch = basePitchBias;
+        LookRotation.apply(targetYaw, clampPitch(basePitchBias));
     }
 
     // ---- main tunneling state machine ----
@@ -586,16 +581,23 @@ public final class TunnelBaseFinderModule extends Module {
         if (!didMine) handleBlockBreaking(mc, false, null);
 
         // Periodic walk pauses.
-        if (walkPauseTicks > 0) { walkPauseTicks--; mc.options.keyUp.setDown(false); return; }
+        if (walkPauseTicks > 0) { walkPauseTicks--; com.autism.seedcracker.util.tunnel.HumanMotionSim.releaseAll(); return; }
         if (walkPauseCooldown > 0) walkPauseCooldown--;
         else if (rng.nextFloat() < 0.03f) {
             walkPauseTicks = randomRange(10, 40);
             walkPauseCooldown = randomRange(60, 200);
-            mc.options.keyUp.setDown(false);
+            com.autism.seedcracker.util.tunnel.HumanMotionSim.releaseAll();
             return;
         }
 
-        mc.options.keyUp.setDown(true);
+        // Drive forward with the HumanMotionSim engine (ported from CodeEngine): it handles
+        // forward/sprint/jump and stops at edges / fall hazards instead of a raw key press.
+        net.minecraft.world.phys.Vec3 stepTarget = com.autism.seedcracker.util.tunnel.HumanMotionSim.pointAhead(1.0);
+        if (stepTarget != null) {
+            com.autism.seedcracker.util.tunnel.HumanMotionSim.step(stepTarget, 0.1, 180.0, 1, 1);
+        } else {
+            mc.options.keyUp.setDown(true);
+        }
         stuckTicks = 0;
     }
 
@@ -796,11 +798,40 @@ public final class TunnelBaseFinderModule extends Module {
     // ---- block breaking ----
 
     private void mineDirect(Minecraft mc, BlockPos pos) {
-        if (mc.gameMode != null) {
-            mc.gameMode.startDestroyBlock(pos, Direction.UP);
-            mc.gameMode.continueDestroyBlock(pos, Direction.UP);
+        aimAtBlock(mc, pos);
+        digCrosshair(mc);
+    }
+
+    /**
+     * Xenon-style dig: only break the block the client's own crosshair ray-trace is on, using
+     * the real reported face (mirrors Xenon AutoMine.processMiningAction). This is what keeps
+     * it from flagging - the dig packets are identical to a real player holding left-click on
+     * the block they are looking at.
+     */
+    private void digCrosshair(Minecraft mc) {
+        if (mc.player.isUsingItem()) return;
+        net.minecraft.world.phys.HitResult target = mc.hitResult;
+        if (target != null && target.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            net.minecraft.world.phys.BlockHitResult bhr = (net.minecraft.world.phys.BlockHitResult) target;
+            BlockPos pos = bhr.getBlockPos();
+            if (!mc.level.getBlockState(pos).isAir() && mc.gameMode != null) {
+                mc.gameMode.continueDestroyBlock(pos, bhr.getDirection());
+                mc.player.swing(InteractionHand.MAIN_HAND);
+            }
         }
-        mc.player.swing(InteractionHand.MAIN_HAND);
+    }
+
+    /** Aim the camera directly at a block's centre (Xenon setYaw/setPitch style, no drift). */
+    private void aimAtBlock(Minecraft mc, BlockPos pos) {
+        double dx = pos.getX() + 0.5 - mc.player.getX();
+        double dy = pos.getY() + 0.5 - mc.player.getEyeY();
+        double dz = pos.getZ() + 0.5 - mc.player.getZ();
+        double dist = Math.hypot(dx, dz);
+        float targetYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
+        currentSmoothedYaw = targetYaw;
+        currentSmoothedPitch = targetPitch;
+        LookRotation.apply(targetYaw, clampPitch(targetPitch));
     }
 
     private void handleBlockBreaking(Minecraft mc, boolean breaking, BlockHitResult hit) {

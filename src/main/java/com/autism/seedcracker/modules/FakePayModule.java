@@ -58,22 +58,18 @@ public final class FakePayModule extends Module {
         String[] parts = text.substring(4).trim().split("\\s+");
         if (parts.length < 2) return false;
         String player = parts[0];
-        long amount;
-        try {
-            amount = Long.parseLong(parts[1].replace(",", ""));
-        } catch (NumberFormatException e) {
-            return false;
-        }
+        // DonutSMP accepts k/m shorthand on /pay ("166.3k", "1.8m"); expand it to a long.
+        long amount = parseAmount(parts[1]);
         if (amount < 1) return false;
 
         Minecraft mc = Minecraft.getInstance();
 
-        // Build the fake "You paid <player> $X." message with the same colors as the original.
-        MutableComponent msg = Component.literal("You paid ").withStyle(ChatFormatting.GRAY)
-            .append(Component.literal(player).withStyle(ChatFormatting.GREEN))
+        // DonutSMP style: white text, green "$", space after "$", k/m shorthand.
+        MutableComponent msg = Component.literal("You paid ").withStyle(ChatFormatting.WHITE)
+            .append(Component.literal(player).withStyle(ChatFormatting.WHITE))
             .append(Component.literal(" ").withStyle(ChatFormatting.WHITE))
-            .append(Component.literal("$" + FakeBalance.format(amount)).withStyle(ChatFormatting.GOLD))
-            .append(Component.literal(".").withStyle(ChatFormatting.GRAY));
+            .append(Component.literal("$").withStyle(ChatFormatting.GREEN))
+            .append(Component.literal(" " + FakeBalance.formatShort(amount)).withStyle(ChatFormatting.WHITE));
         if (mc.gui != null) {
             mc.gui.chatListener().handleSystemMessage(msg, false);
         }
@@ -86,5 +82,20 @@ public final class FakePayModule extends Module {
             FakeBalance.add(-amount);
         }
         return true; // cancel the real payment
+    }
+
+    /** Parses a DonutSMP amount that may use k/m/b shorthand or commas ("166.3k", "1.8m", "30"). */
+    private static long parseAmount(String raw) {
+        String s = raw.replace(",", "").trim().toLowerCase(java.util.Locale.ROOT);
+        double mult = 1.0;
+        if (s.endsWith("b")) { mult = 1_000_000_000.0; s = s.substring(0, s.length() - 1); }
+        else if (s.endsWith("m")) { mult = 1_000_000.0; s = s.substring(0, s.length() - 1); }
+        else if (s.endsWith("k")) { mult = 1_000.0; s = s.substring(0, s.length() - 1); }
+        try {
+            double v = Double.parseDouble(s) * mult;
+            return (long) v;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 }

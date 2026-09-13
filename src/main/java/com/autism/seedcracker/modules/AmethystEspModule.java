@@ -131,11 +131,11 @@ public final class AmethystEspModule extends Module {
             BlockEspRenderer.feed(SeedcrackerAddon.ID + ":amethyst-esp", all, color.get(), tracer.get(), fill.get());
         }
 
-        // Geode box: a single bounding box around every flagged amethyst block.
+        // Geode boxes: one bounding box per connected amethyst cluster.
         if (geodeBox.get()) {
-            net.minecraft.world.phys.AABB box = computeGeodeBox();
-            if (box != null) {
-                BlockEspRenderer.feedBox(SeedcrackerAddon.ID + ":amethyst-esp", box, color.get());
+            java.util.List<net.minecraft.world.phys.AABB> boxes = computeGeodeBoxes();
+            if (!boxes.isEmpty()) {
+                BlockEspRenderer.feedBoxes(SeedcrackerAddon.ID + ":amethyst-esp", boxes, color.get());
             } else {
                 BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":amethyst-esp");
             }
@@ -144,14 +144,32 @@ public final class AmethystEspModule extends Module {
         }
     }
 
-    /** The smallest AABB containing every flagged amethyst block, or null if none. */
-    private net.minecraft.world.phys.AABB computeGeodeBox() {
-        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-        boolean any = false;
-        for (Set<BlockPos> s : flagged.values()) {
-            for (BlockPos p : s) {
-                any = true;
+    /** Group all flagged blocks into connected clusters, one AABB each (inflated a little). */
+    private java.util.List<net.minecraft.world.phys.AABB> computeGeodeBoxes() {
+        java.util.List<net.minecraft.world.phys.AABB> boxes = new java.util.ArrayList<>();
+        Set<BlockPos> remaining = new HashSet<>();
+        for (Set<BlockPos> s : flagged.values()) remaining.addAll(s);
+        while (!remaining.isEmpty()) {
+            // Flood-fill one cluster.
+            java.util.List<BlockPos> cluster = new java.util.ArrayList<>();
+            java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+            BlockPos seed = remaining.iterator().next();
+            remaining.remove(seed);
+            queue.add(seed);
+            cluster.add(seed);
+            while (!queue.isEmpty()) {
+                BlockPos cur = queue.poll();
+                // 26 neighbours (faces + edges + corners) so diagonally-touching geodes merge.
+                for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    BlockPos nb = cur.offset(dx, dy, dz);
+                    if (remaining.remove(nb)) { queue.add(nb); cluster.add(nb); }
+                }
+            }
+            if (cluster.size() < minCluster.get()) continue;
+            int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+            int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+            for (BlockPos p : cluster) {
                 if (p.getX() < minX) minX = p.getX();
                 if (p.getY() < minY) minY = p.getY();
                 if (p.getZ() < minZ) minZ = p.getZ();
@@ -159,8 +177,9 @@ public final class AmethystEspModule extends Module {
                 if (p.getY() + 1 > maxY) maxY = p.getY() + 1;
                 if (p.getZ() + 1 > maxZ) maxZ = p.getZ() + 1;
             }
+            boxes.add(new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX, maxY, maxZ).inflate(1.0));
         }
-        return any ? new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX, maxY, maxZ) : null;
+        return boxes;
     }
 
     private void scanChunk(LevelChunk chunk) {

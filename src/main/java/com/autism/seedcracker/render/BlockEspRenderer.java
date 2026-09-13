@@ -45,7 +45,7 @@ public final class BlockEspRenderer {
     }
 
     private static final class BoxFeed {
-        AABB box;
+        java.util.List<AABB> boxes;
         int argb;
         long lastFeedMs;
     }
@@ -104,15 +104,17 @@ public final class BlockEspRenderer {
                 }
             }
 
-            // Single bounding boxes (e.g. a geode box).
+            // Bounding boxes (e.g. per-geode outlines).
             BOX_FEEDS.entrySet().removeIf(e -> now - e.getValue().lastFeedMs > TTL_MS);
             for (BoxFeed bf : BOX_FEEDS.values()) {
-                if (bf.box == null) continue;
-                AABB rel = new AABB(
-                    bf.box.minX - origin.x, bf.box.minY - origin.y, bf.box.minZ - origin.z,
-                    bf.box.maxX - origin.x, bf.box.maxY - origin.y, bf.box.maxZ - origin.z).inflate(INFLATE);
-                context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> outlineBox(pose, buffer, rel, bf.argb));
+                if (bf.boxes == null) continue;
+                for (AABB b : bf.boxes) {
+                    AABB rel = new AABB(
+                        b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,
+                        b.maxX - origin.x, b.maxY - origin.y, b.maxZ - origin.z).inflate(INFLATE);
+                    context.submitNodeCollector().submitCustomGeometry(poseStack,
+                        AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> outlineBox(pose, buffer, rel, bf.argb));
+                }
             }
         });
     }
@@ -136,13 +138,19 @@ public final class BlockEspRenderer {
         }
     }
 
+    /** Feed a list of bounding boxes for a module (e.g. per-geode outlines). Call every tick while enabled. */
+    public static void feedBoxes(String moduleId, java.util.List<AABB> boxes, int argb) {
+        if (moduleId == null || boxes == null) return;
+        BoxFeed f = BOX_FEEDS.computeIfAbsent(moduleId, k -> new BoxFeed());
+        f.boxes = boxes;
+        f.argb = argb;
+        f.lastFeedMs = System.currentTimeMillis();
+    }
+
     /** Feed a single bounding box for a module (e.g. a geode outline). Call every tick while enabled. */
     public static void feedBox(String moduleId, AABB box, int argb) {
         if (moduleId == null || box == null) return;
-        BoxFeed f = BOX_FEEDS.computeIfAbsent(moduleId, k -> new BoxFeed());
-        f.box = box;
-        f.argb = argb;
-        f.lastFeedMs = System.currentTimeMillis();
+        feedBoxes(moduleId, java.util.List.of(box), argb);
     }
 
     /** Clear a module's single bounding box. */
