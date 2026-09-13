@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Needed so the "Release dev build" step can create/update the `dev` prerelease
+# (the default GITHUB_TOKEN is read-only in this repo without this).
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
