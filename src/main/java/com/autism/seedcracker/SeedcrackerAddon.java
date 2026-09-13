@@ -40,6 +40,7 @@ import com.autism.seedcracker.modules.GrowthFinderModule;
 import com.autism.seedcracker.modules.HoleEspModule;
 import com.autism.seedcracker.modules.HomeSetterModule;
 import com.autism.seedcracker.modules.PaperRigModule;
+import com.autism.seedcracker.modules.PrimeChunkFinderModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
 import com.autism.seedcracker.modules.SkinChangerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
@@ -104,6 +105,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new ChunkFinderModule(catFinders));
         AutismAddons.modules().register(new SpawnerFinderModule(catFinders));
         AutismAddons.modules().register(new SusChunkFinderModule(catFinders));
+        AutismAddons.modules().register(new PrimeChunkFinderModule(catFinders));
         AutismAddons.modules().register(new ActivityFinderModule(catFinders));
         AutismAddons.modules().register(new GrowthFinderModule(catFinders));
         AutismAddons.modules().register(new BaseLogBrowserModule(catFinders));

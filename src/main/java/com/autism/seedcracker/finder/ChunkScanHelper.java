@@ -56,6 +56,35 @@ public final class ChunkScanHelper {
     }
 
     /**
+     * Calls {@code consumer} with the world {@link BlockPos} of every blockstate matching
+     * {@code predicate} across the whole chunk. Same maybeHas fast-skip as the count variant.
+     */
+    public static void forEachBlockInChunk(LevelChunk chunk, Predicate<BlockState> predicate, java.util.function.Consumer<BlockPos> consumer) {
+        if (chunk == null || predicate == null || consumer == null) return;
+        ChunkPos cp = chunk.getPos();
+        int baseX = cp.getMinBlockX();
+        int baseZ = cp.getMinBlockZ();
+        int sectionMinY = chunk.getMinY();
+        LevelChunkSection[] sections = chunk.getSections();
+        for (int s = 0; s < sections.length; s++) {
+            LevelChunkSection section = sections[s];
+            if (section == null || section.hasOnlyAir()) continue;
+            if (!section.maybeHas(predicate)) continue;
+            int sectionBaseY = sectionMinY + (s << 4);
+            for (int y = 0; y < 16; y++) {
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        BlockState state = section.getBlockState(x, y, z);
+                        if (predicate.test(state)) {
+                            consumer.accept(new BlockPos(baseX + x, sectionBaseY + y, baseZ + z));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Counts blockstates matching {@code predicate} across the whole chunk, stopping as soon as
      * the count reaches {@code limit}. Use this when the caller only needs to know whether the
      * count meets a threshold - it avoids scanning the rest of the chunk once the answer is known.
