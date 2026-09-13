@@ -16,14 +16,13 @@ Everything lives in the module menu under these tabs:
 | Tab | What it does |
 | --- | --- |
 | **SeedCracker** | Crack the world seed from structures/biomes (SeedCrackerX), with a seed + progress HUD. Fully configurable in the GUI. |
-| **Finders** | Chunk scanners that flag hidden bases: Stash, Chunk, Spawner, SusChunk, Activity, Growth finders, plus the AI **Tunnel Base Finder** (digs a hazard-aware tunnel and alerts on bases) and the **Base Log Browser** (browse/delete logged bases). |
+| **Finders** | Chunk scanners that flag hidden bases: Stash (count **or** SCORING classifier), Chunk, Spawner, SusChunk, Activity, Growth, **PrimeChunk** (fluid-flow NewChunks) finders, plus the AI **Tunnel Base Finder** (digs a hazard-aware tunnel and alerts on bases) and the **Base Log Browser** (browse/delete logged bases). |
 | **Entity** | EntityScanner, AntiTrap, BoneDropper, SpawnerProtect (silk-touch + webhook). |
-| **Fake** | FakePay, FakePayments, FakeRoles (fake DonutSMP rank/nametag in chat), FakeScoreboard HUD. |
-| **Render** | AutoRender, PaperRig (dispenser RNG), Amethyst ESP, Bedrock Hole ESP, RegionMap HUD. |
+| **Fake** | FakePay, FakePayments, FakeRoles (fake DonutSMP rank/nametag in chat, incl. custom rank text + colour), FakeScoreboard HUD. |
+| **Render** | AutoRender, PaperRig (dispenser RNG), Amethyst ESP (per-geode boxes), Bedrock Hole ESP, Hole ESP, RegionMap HUD (CodeEngine 9×9 region grid). |
 | **Movement** | Flight+ (elytra-boost fly). |
 | **Trading** | AH Flipper — scans the auction house for underpriced flips (packet mode, or live API with a key). **AH Sniper** — buys a target item the instant it's listed at/under your price (manual GUI or API mode). |
-| **Disabler** | Packet/movement disablers (all marked `[Patched]` — they no longer work on current anti-cheats, kept for reference). |
-| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, AutoTool, TPASpammer, TabDetector, WeatherNotifier, HomeSetter, SkinChanger. |
+| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, **AutoMine** (Xenon), SwingSpeed, CoordSnapper, FakePlayer, AutoLog, AutoTool, TPASpammer, TabDetector, WeatherNotifier, HomeSetter, SkinChanger. |
 
 Plus two DonutSMP stash tools:
 
@@ -31,6 +30,25 @@ Plus two DonutSMP stash tools:
   searches for stash blocks (Baritone, with a "legit / smooth movement" profile), logging bases to `bases.txt`.
 - **Relog Loader** — digs down, relogs to force the server to resend chunks, then flies so
   ESP can read the region.
+
+## Recent changes (v1.8.5)
+
+- **Movement/rotation/dig logic ported from other clients** (not hand-rolled): the tunnel bot now
+  uses CodeEngine's `HumanMotionSim` step engine (edge/fall-safe walking), `AutoTunnelHelper`
+  human pacing (gamma/lognormal break gaps + session-fatigue ramp), and a shared `LookRotation`
+  look-at util. Digging is crosshair-gated like Xenon's AutoMine — it only breaks the block the
+  ray-trace actually reports, with the real face, which is what keeps it from flagging.
+- **AutoMine** — Xenon port: holds block-break on whatever your crosshair is on.
+- **Stash Finder SCORING mode** — CodeEngine classifier that clusters storage blocks and scores
+  REAL base vs FAKE/decoy stash (beds, workstations, redstone, rails, grid-decoy, round-Y, etc.).
+- **Prime Chunk Finder** — CodeEngine NewChunks port: flags chunks with stranded fluid-flow
+  signatures of past player activity.
+- **Region Map** — upgraded to CodeEngine's real 9×9 DonutSMP region grid (byte-map + 6 server
+  clusters + live cell highlight).
+- **Amethyst ESP** — per-geode bounding boxes (one box per connected cluster, not one giant box).
+- **FakePay / FakeScoreboard** — DonutSMP k/m/b shorthand + white-text/green-`$` format.
+- **FakeRoles** — custom rank text + colour option.
+- **Disabler tab removed** — the patched Selena/Rise disablers were dropped as unrelated.
 
 ## Requirements
 
@@ -57,6 +75,12 @@ Plus two DonutSMP stash tools:
 ```
 
 The jar is produced at `build/libs/`.
+
+> **AUTISM Client version:** the build resolves the API with a Maven version range (`[3.4,)`),
+> so it uses the newest client you have published to mavenLocal rather than requiring one exact
+> version, and the built jar declares `autism: "*"` (loads on any client version). Note that a
+> new major client release (e.g. 5.0) may change the API — if a build breaks after upgrading,
+> the addon source may need to be updated for the new API.
 
 ## Credits
 
