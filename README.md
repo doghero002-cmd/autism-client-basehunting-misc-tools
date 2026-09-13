@@ -22,7 +22,7 @@ Everything lives in the module menu under these tabs:
 | **Render** | AutoRender, PaperRig (dispenser RNG), Amethyst ESP, Bedrock Hole ESP, RegionMap HUD. |
 | **Movement** | Flight+ (elytra-boost fly). |
 | **Trading** | AH Flipper — scans the auction house for underpriced flips (packet mode, or live API with a key). **AH Sniper** — buys a target item the instant it's listed at/under your price (manual GUI or API mode). |
-| **Disabler** | Packet/movement disablers ported from Selena + Rise (all marked `[Patched]` — they no longer work on current anti-cheats, kept for reference). |
+| **Disabler** | Packet/movement disablers (all marked `[Patched]` — they no longer work on current anti-cheats, kept for reference). |
 | **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, AutoTool, TPASpammer, TabDetector, WeatherNotifier, HomeSetter, SkinChanger. |
 
 Plus two DonutSMP stash tools:
