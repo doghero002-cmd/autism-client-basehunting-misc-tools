@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
+import autismclient.util.AutismWorldGeometry;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.AutismRenderTypes;
@@ -14,8 +15,6 @@ import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-
-import autismclient.util.AutismWorldGeometry;
 
 /**
  * Shared per-block ESP renderer for simple "highlight these blocks" modules (Amethyst ESP,
@@ -56,7 +55,10 @@ public final class BlockEspRenderer {
         if (initialised) return;
         initialised = true;
         LevelRenderEvents.COLLECT_SUBMITS.register(context -> {
-            if (FEEDS.isEmpty()) return;
+            // Run when there is anything to draw: block-ESP feeds OR bounding boxes. Previously
+            // this early-returned when FEEDS was empty, which hid geode boxes unless block ESP
+            // was also enabled.
+            if (FEEDS.isEmpty() && BOX_FEEDS.isEmpty()) return;
             Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.level == null) return;
 
@@ -66,7 +68,7 @@ public final class BlockEspRenderer {
 
             long now = System.currentTimeMillis();
             FEEDS.entrySet().removeIf(e -> now - e.getValue().lastFeedMs > TTL_MS);
-            if (FEEDS.isEmpty()) return;
+            if (FEEDS.isEmpty() && BOX_FEEDS.isEmpty()) return;
 
             for (Feed feed : FEEDS.values()) {
                 if (feed.blocks.isEmpty()) continue;
