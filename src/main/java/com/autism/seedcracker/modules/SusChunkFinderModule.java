@@ -78,7 +78,12 @@ public final class SusChunkFinderModule extends Module {
         .description("Kelp blocks in a chunk needed to count toward the flag (dense kelp = a farm).").group("Types"));
     private final BoolSetting caveVines = add(new BoolSetting("cave-vines", "Cave Vines", true).group("Types"));
     private final BoolSetting vines = add(new BoolSetting("vines", "Vines", true).group("Types"));
-    private final BoolSetting amethyst = add(new BoolSetting("amethyst", "Amethyst", true).group("Types"));
+    private final BoolSetting amethystShards = add(new BoolSetting("amethyst-shards", "Amethyst Shards", true)
+        .description("Amethyst clusters/buds - harvested by players, so a strong base indicator.")
+        .group("Types"));
+    private final BoolSetting amethystBlocks = add(new BoolSetting("amethyst-blocks", "Amethyst Blocks", false)
+        .description("Full amethyst/budding blocks (geode structure - not player-placed).")
+        .group("Types"));
     private final BoolSetting bamboo = add(new BoolSetting("bamboo", "Bamboo", true).group("Types"));
     private final IntSetting bambooCount = add(new IntSetting("bamboo-count", "Bamboo min count", 3, 1, 200, 1)
         .description("Bamboo blocks in a chunk needed to count toward the flag (dense bamboo = a farm).").group("Types"));
@@ -269,7 +274,13 @@ public final class SusChunkFinderModule extends Module {
         // (kelp and bamboo use their own count sliders in tickTypes, not this shared predicate)
         if (caveVines.get() && (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT))) return true;
         if (vines.get() && state.is(Blocks.VINE)) return true;
-        if (amethyst.get() && state.is(Blocks.AMETHYST_CLUSTER)) return true;
+        // Amethyst shards (the bits players harvest - a base indicator), separate from the
+        // full amethyst geode blocks below.
+        if (amethystShards.get() && (state.is(Blocks.AMETHYST_CLUSTER)
+            || state.is(Blocks.LARGE_AMETHYST_BUD)
+            || state.is(Blocks.MEDIUM_AMETHYST_BUD)
+            || state.is(Blocks.SMALL_AMETHYST_BUD))) return true;
+        if (amethystBlocks.get() && (state.is(Blocks.AMETHYST_BLOCK) || state.is(Blocks.BUDDING_AMETHYST))) return true;
         if (beeNest.get() && (state.is(Blocks.BEE_NEST) || state.is(Blocks.BEEHIVE))) return true;
         if (rotatedDeepslate.get() && state.is(Blocks.DEEPSLATE)
             && state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)
