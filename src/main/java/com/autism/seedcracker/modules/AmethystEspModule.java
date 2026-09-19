@@ -89,8 +89,7 @@ public final class AmethystEspModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -116,9 +115,15 @@ public final class AmethystEspModule extends Module {
             scanChunk(mc.level.getChunk(cx, cz));
         }
 
-        // Prune out-of-range chunks.
+        // Prune out-of-range chunks (and their chat-alert keys, so re-entering range re-alerts
+        // and the set doesn't grow unbounded over a long session).
         int pr = range + 2;
         flagged.keySet().removeIf(key -> {
+            int kx = (int) (key >> 32);
+            int kz = (int) (key & 0xffffffffL);
+            return Math.abs(kx - centre.x()) > pr || Math.abs(kz - centre.z()) > pr;
+        });
+        notified.removeIf(key -> {
             int kx = (int) (key >> 32);
             int kz = (int) (key & 0xffffffffL);
             return Math.abs(kx - centre.x()) > pr || Math.abs(kz - centre.z()) > pr;

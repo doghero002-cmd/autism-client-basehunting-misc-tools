@@ -74,12 +74,14 @@ public final class HumanPacingEngine {
         this.longPauseCooldownMs = 900000L + (long) (this.rng.nextDouble() * 900000.0);
     }
 
-    /** Ticks to wait between individual block breaks (gamma-distributed, small). */
+    /** Ticks to wait between individual block breaks (gamma-distributed, TPS-scaled). */
     public int breakGapTicks() {
         if (!this.enabled) return 0;
         ensureRng();
         double g = gammaSample(2.0, 5.0);
-        return 1 + (int) Math.floor(g * 3.0);
+        // TPS sync (Boze AutoMineTpsSync): stretch gaps when the server lags so break pacing
+        // tracks real server ticks instead of client ticks.
+        return com.autism.seedcracker.util.TickRateTracker.scale(1 + (int) Math.floor(g * 3.0));
     }
 
     /** Block-break hold duration in ticks (lognormal around ~140ms, clamped 2..8). */

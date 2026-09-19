@@ -35,8 +35,8 @@ public final class AutoLogModule extends Module {
     private final BoolSetting onLowHealth = add(new BoolSetting("low-health", "Log on low health", true)
         .description("Disconnect when your health (+ absorption) falls to or below the threshold.")
         .group("Conditions"));
-    private final IntSetting health = add(new IntSetting("health", "Health threshold", 10, 1, 40, 1)
-        .description("Disconnect at or below this total health (hearts x2, includes absorption).")
+    private final IntSetting health = add(new IntSetting("health", "Health (½-hearts)", 10, 1, 40, 1)
+        .description("Disconnect at or below this total health in half-hearts (10 = 5 hearts; includes absorption).")
         .group("Conditions"));
     private final BoolSetting onDamage = add(new BoolSetting("on-damage", "Log on damage taken", false)
         .description("Disconnect the moment your health decreases.")
@@ -53,6 +53,16 @@ public final class AutoLogModule extends Module {
     private final StringSetting whitelist = add(new StringSetting("whitelist", "Whitelisted players", "")
         .description("Comma-separated player names that never trigger a logout.")
         .group("Filters"));
+    private final BoolSetting onFall = add(new BoolSetting("on-fall", "Log on big fall", false)
+        .description("Disconnect when you are falling far enough to take heavy damage (into a hole/void).")
+        .group("Conditions"));
+    private final IntSetting fallDistance = add(new IntSetting("fall-distance", "Fall distance", 12, 3, 100, 1)
+        .description("Falling this many blocks triggers the big-fall logout.")
+        .group("Conditions")
+        .visibleWhen(() -> onFall.get()));
+    private final BoolSetting onTotem = add(new BoolSetting("on-totem", "Log on totem pop", false)
+        .description("Disconnect when a Totem of Undying saves you (you nearly died).")
+        .group("Conditions"));
     private final BoolSetting notify = add(new BoolSetting("notify", "Notify before disconnect", true)
         .description("Show a toast / chat message explaining why you logged out.")
         .group("General"));
@@ -108,6 +118,17 @@ public final class AutoLogModule extends Module {
             }
         }
 
+        // Big fall (about to take heavy fall damage / fell into a hole or the void).
+        if (reason == null && onFall.get() && !mc.player.onGround()
+            && mc.player.fallDistance >= fallDistance.get()) {
+            reason = "falling " + (int) mc.player.fallDistance + " blocks";
+        }
+
+        // Totem pop: a totem just saved the player (health low + a totem was used this tick).
+        if (reason == null && onTotem.get() && usedTotem(mc)) {
+            reason = "totem popped";
+        }
+
         // Non-whitelisted player within range.
         if (reason == null && onPlayerNear.get()) {
             double rangeSq = (double) playerRange.get() * playerRange.get();
@@ -144,8 +165,27 @@ public final class AutoLogModule extends Module {
         }
     }
 
-    private boolean isWhitelisted(String name) {
-        if (name == null) return false;
+    /** True if a totem was used this tick (health dropped to ~0 then a totem restored it). */
+    private int lastTotemCount = -1;
+    private boolean usedTotem(Minecraft mc) {
+        int count = countTotems(mc);
+        if (lastTotemCount >= 0 && count < lastTotemCount) {
+            lastTotemCount = count;
+            return true;
+        }
+        lastTotemCount = count;
+        return false;
+    }
+
+    private int countTotems(Minecraft mc) {
+        int n = 0;
+        for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
+            if (mc.player.getInventory().getItem(i).is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING)) n++;
+        }
+        return n;
+    }
+
+    private boolean isWhitelisted(String name) {        if (name == null) return false;
         return whitelistNames().contains(name.toLowerCase(Locale.ROOT));
     }
 

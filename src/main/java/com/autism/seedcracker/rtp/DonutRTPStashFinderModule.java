@@ -276,8 +276,7 @@ public final class DonutRTPStashFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     // ------------------------------------------------------------------
@@ -404,6 +403,7 @@ public final class DonutRTPStashFinderModule extends Module {
         if (!reachedDepth) {
             if ((int) mc.player.getY() <= digDepth.get()) {
                 reachedDepth = true;
+                applyBaritoneSettings(); // re-enable sprint now that we're at depth
             } else if (!AutismCompatManager.isBaritoneBusy()) {
                 AutismCompatManager.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
             }
@@ -533,7 +533,9 @@ public final class DonutRTPStashFinderModule extends Module {
         // Core
         set(mc, "allowBreak", allowBreak.get());
         set(mc, "allowPlace", allowPlace.get());
-        set(mc, "allowSprint", allowSprint.get());
+        // Grim legitimacy: no sprint during the dig-down phase (sprinting while digging looks
+        // bot-like); only allow sprint once we've reached the wander depth.
+        set(mc, "allowSprint", allowSprint.get() && reachedDepth);
         set(mc, "allowEat", autoEat.get());
         set(mc, "autoTool", autoTool.get());
         set(mc, "allowInventory", allowInventory.get());

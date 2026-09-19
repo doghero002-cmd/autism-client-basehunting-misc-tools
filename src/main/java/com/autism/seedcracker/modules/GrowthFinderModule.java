@@ -42,6 +42,11 @@ public final class GrowthFinderModule extends Module {
             "scan-radius", "Scan radius (chunks)", 4, 1, 12, 1)
         .description("Chunk bubble around the player scanned for growth.")
         .group("General"));
+    private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
+        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
+            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+        .description("HIGH = flag on half the threshold (more finds, more noise). LOW = double (quiet, high confidence).")
+        .group("General"));
     private final IntSetting threshold = add(new IntSetting(
             "threshold", "Threshold", 8, 1, 100, 1)
         .description("Growth blocks needed in a chunk to flag it.")
@@ -54,6 +59,11 @@ public final class GrowthFinderModule extends Module {
             "tracer", "Tracer", false)
         .description("Draw a tracer line from the camera to each flagged chunk.")
         .group("Render"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
+        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).")
+        .group("Performance"));
+    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private final BoolSetting notify = add(new BoolSetting(
             "notification", "Notification", true)
         .description("Toast + chat ping when a growth chunk is found.")
@@ -94,8 +104,7 @@ public final class GrowthFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -103,22 +112,18 @@ public final class GrowthFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
-        tickCounter++;
-        if (tickCounter % 8 == 0) {
-            scan(mc);
-        }
+        scan(mc);
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-growth-finder", flagged, color.get(), tracer.get());
     }
 
     private void scan(Minecraft mc) {
-        List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
         ChunkPos playerChunk = mc.player.chunkPosition();
         int radius = scanRadius.get();
 
-        for (LevelChunk chunk : chunks) {
+        for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
             ChunkPos pos = chunk.getPos();
             Suspicion s = analyzeChunk(mc, chunk, pos);
-            if (s.score >= threshold.get()) {
+            if (s.score >= sensitivity.get().scale(threshold.get())) {
                 flagged.add(pos);
                 if (notified.add(pos)) {
                     onNewFlag(pos, s);

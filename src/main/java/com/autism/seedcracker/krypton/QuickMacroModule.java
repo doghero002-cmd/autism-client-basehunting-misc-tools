@@ -64,7 +64,12 @@ public final class QuickMacroModule extends Module {
         if (command == null) return;
         String c = command.trim();
         if (c.isEmpty()) return;
-        if (c.startsWith("/")) mc.getConnection().sendCommand(c.substring(1));
-        else mc.getConnection().sendChat(c);
+        // Entries are treated as commands by default (leading / optional). Prefix with "chat "
+        // to force a plain chat message instead.
+        if (c.toLowerCase(java.util.Locale.ROOT).startsWith("chat ")) {
+            mc.getConnection().sendChat(c.substring(5));
+        } else {
+            mc.getConnection().sendCommand(c.startsWith("/") ? c.substring(1) : c);
+        }
     }
 }

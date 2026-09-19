@@ -30,10 +30,16 @@ import net.minecraft.world.level.material.FluidState;
  */
 public final class PrimeChunkFinderModule extends Module {
 
+    public enum Sensitivity { HIGH, MEDIUM, LOW }
+
+    private final autismclient.api.module.EnumSetting<Sensitivity> sensitivity = add(
+        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity", Sensitivity.MEDIUM, Sensitivity.values())
+        .description("HIGH = flag on the least evidence (more false positives). MEDIUM = ignore chunk-border flows (source may just be in the next chunk). LOW = also ignore surface flows (natural waterfalls) and need 2x threshold.")
+        .group("Detect"));
     private final IntSetting minDistance = add(new IntSetting("min-distance", "Min distance from spawn", 200, 0, 10000, 50)
         .description("Ignore chunks closer than this to 0,0.").group("Detect"));
     private final IntSetting threshold = add(new IntSetting("threshold", "Flow blocks threshold", 1, 1, 64, 1)
-        .description("Stranded flowing-fluid blocks needed to flag a chunk.").group("Detect"));
+        .description("Stranded flowing-fluid blocks needed to flag a chunk (LOW sensitivity doubles this).").group("Detect"));
     private final IntSetting range = add(new IntSetting("range", "Range (chunks)", 8, 1, 16, 1)
         .description("Chunk radius around you to scan.").group("Detect"));
     private final ColorSetting color = add(new ColorSetting("color", "Colour", 0xFFFFB030)
@@ -46,6 +52,7 @@ public final class PrimeChunkFinderModule extends Module {
     private final Set<Long> flagged = ConcurrentHashMap.newKeySet();
     private final Set<Long> scanned = ConcurrentHashMap.newKeySet();
     private int cursor = 0;
+    private Sensitivity lastSensitivity = null;
 
     public PrimeChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":prime-chunk-finder", "Prime Chunk Finder", category,
@@ -68,14 +75,20 @@ public final class PrimeChunkFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
+
+        // Sensitivity changed: rescan everything under the new rules.
+        if (lastSensitivity != sensitivity.get()) {
+            lastSensitivity = sensitivity.get();
+            scanned.clear();
+            flagged.clear();
+        }
 
         int r = range.get();
         ChunkPos centre = mc.player.chunkPosition();
@@ -122,14 +135,26 @@ public final class PrimeChunkFinderModule extends Module {
         LevelChunkSection[] sections = chunk.getSections();
         if (sections == null || sections.length == 0) return;
 
-        int need = Math.max(1, threshold.get());
+        Sensitivity sens = sensitivity.get();
+        // LOW doubles the evidence needed on top of its filters.
+        int need = Math.max(1, threshold.get()) * (sens == Sensitivity.LOW ? 2 : 1);
+        // MEDIUM/LOW: skip flows at the chunk border - their source is often just in the
+        // neighbouring chunk, which this per-chunk scan can't see (classic false positive).
+        boolean skipBorder = sens != Sensitivity.HIGH;
+        // LOW: skip flows above sea level-ish - natural surface waterfalls/springs dominate there.
+        int maxSurfaceY = sens == Sensitivity.LOW ? 50 : Integer.MAX_VALUE;
+        int minSectionY = chunk.getMinSectionY();
+
         int count = 0;
         for (int s = 0; s < sections.length; s++) {
             LevelChunkSection sec = sections[s];
             if (sec == null || sec.hasOnlyAir()) continue;
+            int sectionBaseY = (minSectionY + s) << 4;
             for (int y = 0; y < 16; y++) {
+                if (sectionBaseY + y > maxSurfaceY) break;
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
+                        if (skipBorder && (x == 0 || x == 15 || z == 0 || z == 15)) continue;
                         FluidState fluid = sec.getBlockState(x, y, z).getFluidState();
                         if (!fluid.isEmpty() && !fluid.isSource() && !hasStillNeighbour(sections, s, x, y, z)) {
                             if (++count >= need) {

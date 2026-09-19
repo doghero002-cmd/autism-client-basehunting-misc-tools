@@ -75,7 +75,8 @@ public class FinderQueue {
     }
 
     private void extractCuboids(LevelRenderState state, Camera camera) {
-        if (Config.get().render == Config.RenderType.OFF) {
+        // active = the SeedCracker module toggle; boxes must disappear when the module is off.
+        if (!Config.get().active || Config.get().render == Config.RenderType.OFF) {
             state.setData(CUBOID_SET_KEY, Collections.emptySet());
             return;
         }

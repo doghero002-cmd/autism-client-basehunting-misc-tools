@@ -2,22 +2,26 @@ package com.autism.seedcracker;
 
 import com.autism.seedcracker.commands.BaseLogCommand;
 import com.autism.seedcracker.commands.BedrockFinderCommand;
+import com.autism.seedcracker.commands.HeatConfirmCommand;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
+import com.autism.seedcracker.hud.BaseTrackerHud;
+import com.autism.seedcracker.hud.FakeScoreboardHud;
+import com.autism.seedcracker.hud.SeedHud;
+import com.autism.seedcracker.hud.SessionStatsHud;
+import com.autism.seedcracker.hud.StashWarningHud;
 import com.autism.seedcracker.krypton.AutoFireworkModule;
 import com.autism.seedcracker.krypton.AutoTPAModule;
 import com.autism.seedcracker.krypton.KeyPearlModule;
 import com.autism.seedcracker.krypton.NameProtectModule;
 import com.autism.seedcracker.krypton.QuickMacroModule;
-import com.autism.seedcracker.hud.FakeScoreboardHud;
-import com.autism.seedcracker.hud.RegionMapHud;
-import com.autism.seedcracker.hud.SeedHud;
-import com.autism.seedcracker.hud.StashWarningHud;
-import com.autism.seedcracker.modules.ActivityFinderModule;
 import com.autism.seedcracker.modules.AHFlipperModule;
-import com.autism.seedcracker.modules.AmethystEspModule;
 import com.autism.seedcracker.modules.AHSniperModule;
+import com.autism.seedcracker.modules.ActivityFinderModule;
+import com.autism.seedcracker.modules.AmethystEspModule;
 import com.autism.seedcracker.modules.AntiAFKModule;
+import com.autism.seedcracker.modules.AhSellModule;
 import com.autism.seedcracker.modules.AntiTrapModule;
+
 import com.autism.seedcracker.modules.AutoEatModule;
 import com.autism.seedcracker.modules.AutoLogModule;
 import com.autism.seedcracker.modules.AutoMineModule;
@@ -25,33 +29,42 @@ import com.autism.seedcracker.modules.AutoRenderModule;
 import com.autism.seedcracker.modules.AutoToolModule;
 import com.autism.seedcracker.modules.BaseLogBrowserModule;
 import com.autism.seedcracker.modules.BedrockFinderModule;
-import com.autism.seedcracker.modules.BedrockHoleEspModule;import com.autism.seedcracker.modules.ChatGamesModule;import com.autism.seedcracker.modules.BoneDropperModule;
+import com.autism.seedcracker.modules.BedrockHoleEspModule;
+import com.autism.seedcracker.modules.BoneDropperModule;
+import com.autism.seedcracker.modules.ChatGamesModule;
 import com.autism.seedcracker.modules.ChunkFinderModule;
 import com.autism.seedcracker.modules.CoordSnapperModule;
+import com.autism.seedcracker.modules.ElytraWarnerModule;
 import com.autism.seedcracker.modules.EntityScannerModule;
 import com.autism.seedcracker.modules.FakePayModule;
 import com.autism.seedcracker.modules.FakePaymentsModule;
 import com.autism.seedcracker.modules.FakePlayerModule;
 import com.autism.seedcracker.modules.FakeRolesModule;
+import com.autism.seedcracker.modules.FlagDetectorModule;
 import com.autism.seedcracker.modules.FastPlaceModule;
-import com.autism.seedcracker.modules.FlightPlusModule;
 import com.autism.seedcracker.modules.FreeLookModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
 import com.autism.seedcracker.modules.HoleEspModule;
+import com.autism.seedcracker.modules.HoleTunnelStairsEspModule;
 import com.autism.seedcracker.modules.HomeSetterModule;
+import com.autism.seedcracker.modules.NetherTunnelFinderModule;
 import com.autism.seedcracker.modules.PaperRigModule;
 import com.autism.seedcracker.modules.PrimeChunkFinderModule;
 import com.autism.seedcracker.modules.RegionMapModule;
+import com.autism.seedcracker.modules.SchematicBuilderModule;
 import com.autism.seedcracker.modules.SeedcrackerModule;
+import com.autism.seedcracker.modules.ShopBuyerModule;
 import com.autism.seedcracker.modules.SkinChangerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
 import com.autism.seedcracker.modules.SpawnerProtectModule;
 import com.autism.seedcracker.modules.SprintModule;
 import com.autism.seedcracker.modules.StashFinderModule;
+import com.autism.seedcracker.modules.StructureDetectorModule;
 import com.autism.seedcracker.modules.SusChunkFinderModule;
+import com.autism.seedcracker.modules.TunnelBaseWaterModule;
 import com.autism.seedcracker.modules.SwingSpeedModule;
-import com.autism.seedcracker.modules.TabDetectorModule;
 import com.autism.seedcracker.modules.TPASpammerModule;
+import com.autism.seedcracker.modules.TabDetectorModule;
 import com.autism.seedcracker.modules.TunnelBaseFinderModule;
 import com.autism.seedcracker.modules.WeatherNotifierModule;
 import com.autism.seedcracker.rtp.DonutRTPStashFinderModule;
@@ -90,7 +103,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         autismclient.modules.ModuleCategory catEntity = autismclient.modules.ModuleCategory.register("Entity");
         autismclient.modules.ModuleCategory catFake = autismclient.modules.ModuleCategory.register("Fake");
         autismclient.modules.ModuleCategory catRender = autismclient.modules.ModuleCategory.register("Render");
-        autismclient.modules.ModuleCategory catMovement = autismclient.modules.ModuleCategory.register("Movement");
         autismclient.modules.ModuleCategory catTrading = autismclient.modules.ModuleCategory.register("Trading");
         autismclient.modules.ModuleCategory catDogsMisc = autismclient.modules.ModuleCategory.register("Dogs Misc Tools");
 
@@ -106,11 +118,17 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new ChunkFinderModule(catFinders));
         AutismAddons.modules().register(new SpawnerFinderModule(catFinders));
         AutismAddons.modules().register(new SusChunkFinderModule(catFinders));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.SeedRayModule(catFinders));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.ChunkWaypointsModule(catFinders));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.FinderOverlayModule(catFinders));
         AutismAddons.modules().register(new PrimeChunkFinderModule(catFinders));
         AutismAddons.modules().register(new ActivityFinderModule(catFinders));
         AutismAddons.modules().register(new GrowthFinderModule(catFinders));
         AutismAddons.modules().register(new BaseLogBrowserModule(catFinders));
         AutismAddons.modules().register(new TunnelBaseFinderModule(catFinders));
+        AutismAddons.modules().register(new TunnelBaseWaterModule(catFinders));
+        AutismAddons.modules().register(new NetherTunnelFinderModule(catFinders));
+        AutismAddons.modules().register(new StructureDetectorModule(catFinders));
 
         // Zelith entity / fake modules (ported), each under its own tab.
         AutismAddons.modules().register(new EntityScannerModule(catEntity));
@@ -123,12 +141,11 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new FakePaymentsModule(catFake));
         AutismAddons.modules().register(new FakeRolesModule(catFake));
 
-        // Movement.
-        AutismAddons.modules().register(new FlightPlusModule(catMovement));
-
         // Trading.
         AutismAddons.modules().register(new AHFlipperModule(catTrading));
         AutismAddons.modules().register(new AHSniperModule(catTrading));
+        AutismAddons.modules().register(new ShopBuyerModule(catTrading));
+        AutismAddons.modules().register(new AhSellModule(catTrading));
 
         // Dogs Misc Tools (Zelith misc modules, ported).
         AutismAddons.modules().register(new SprintModule(catDogsMisc));
@@ -141,6 +158,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new CoordSnapperModule(catDogsMisc));
         AutismAddons.modules().register(new FakePlayerModule(catDogsMisc));
         AutismAddons.modules().register(new AutoLogModule(catDogsMisc));
+        AutismAddons.modules().register(new FlagDetectorModule(catDogsMisc));
         AutismAddons.modules().register(new AutoToolModule(catDogsMisc));
         AutismAddons.modules().register(new TPASpammerModule(catDogsMisc));
         AutismAddons.modules().register(new TabDetectorModule(catDogsMisc));
@@ -149,9 +167,12 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
         AutismAddons.modules().register(new ChatGamesModule(catDogsMisc));
         AutismAddons.modules().register(new RegionMapModule(catDogsMisc));
+        AutismAddons.modules().register(new SchematicBuilderModule(catDogsMisc));
+        AutismAddons.modules().register(new ElytraWarnerModule(catDogsMisc));
 
         // ESP (moved to the Dogs tab).
         AutismAddons.modules().register(new HoleEspModule(catDogsMisc));
+        AutismAddons.modules().register(new HoleTunnelStairsEspModule(catDogsMisc));
         AutismAddons.modules().register(new AmethystEspModule(catDogsMisc));
         AutismAddons.modules().register(new BedrockHoleEspModule(catDogsMisc));
 
@@ -164,9 +185,12 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());
+        AutismAddons.commands().register(new HeatConfirmCommand());
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());
+        AutismAddons.hud().register(new SessionStatsHud());
         AutismAddons.hud().register(new FakeScoreboardHud());
+        AutismAddons.hud().register(new BaseTrackerHud());
     }
 
     @Override

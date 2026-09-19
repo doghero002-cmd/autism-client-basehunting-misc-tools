@@ -45,13 +45,23 @@ public final class SpawnerFinderModule extends Module {
             "tracer", "Tracer", true)
         .description("Draw a tracer line from the camera to each flagged chunk.")
         .group("Render"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
+        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).")
+        .group("Performance"));
+    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private final BoolSetting notify = add(new BoolSetting(
             "notification", "Notification", true)
         .description("Toast + chat ping when a spawner chunk is found.")
         .group("General"));
+    private final BoolSetting activatedDetector = add(new BoolSetting(
+            "activated-detector", "Activated detector", true)
+        .description("Also flag ACTIVATED spawners (spawn delay ticking = a player has been within 16 blocks - Shoreline). Strong evidence of a player base/farm.")
+        .group("General"));
 
     private final Set<ChunkPos> flagged = new HashSet<>();
     private final Set<ChunkPos> notified = new HashSet<>();
+    private final Set<net.minecraft.core.BlockPos> activatedNotified = new HashSet<>();
     private int tickCounter = 0;
 
     public SpawnerFinderModule(autismclient.modules.ModuleCategory category) {
@@ -63,6 +73,7 @@ public final class SpawnerFinderModule extends Module {
     public void onEnable() {
         flagged.clear();
         notified.clear();
+        activatedNotified.clear();
         tickCounter = 0;
     }
 
@@ -74,8 +85,7 @@ public final class SpawnerFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -83,21 +93,22 @@ public final class SpawnerFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
-        tickCounter++;
-        if (tickCounter % 8 == 0) {
-            scan(mc);
-        }
+        scan(mc);
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-spawner-finder", flagged, color.get(), tracer.get());
     }
 
     private void scan(Minecraft mc) {
-        List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
         ChunkPos playerChunk = mc.player.chunkPosition();
         int radius = scanRadius.get();
 
-        for (LevelChunk chunk : chunks) {
+        for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
             ChunkPos pos = chunk.getPos();
-            boolean hasSpawner = ChunkScanHelper.chunkHasBlockEntity(chunk, be -> be instanceof SpawnerBlockEntity);
+            boolean hasSpawner = false;
+            for (var be : chunk.getBlockEntities().values()) {
+                if (!(be instanceof SpawnerBlockEntity spawner)) continue;
+                hasSpawner = true;
+                if (activatedDetector.get()) checkActivated(mc, spawner);
+            }
             if (hasSpawner) {
                 flagged.add(pos);
                 if (notified.add(pos)) {
@@ -110,6 +121,33 @@ public final class SpawnerFinderModule extends Module {
         int r = radius + 2;
         flagged.removeIf(p -> tooFar(p, playerChunk, r));
         notified.removeIf(p -> tooFar(p, playerChunk, r));
+    }
+
+    /**
+     * Shoreline activated-spawner detection: an idle spawner's spawnDelay sits at 20; any other
+     * value means it's been ticking because a player stood within 16 blocks of it. Out in the
+     * wild (not dungeons someone just walked through), that's a player farm.
+     */
+    private void checkActivated(Minecraft mc, SpawnerBlockEntity spawner) {
+        int delay;
+        try {
+            delay = ((kaptainwutax.seedcrackerX.mixin.BaseSpawnerAccessor) spawner.getSpawner())
+                .seedcracker$getSpawnDelay();
+        } catch (Throwable t) {
+            return;
+        }
+        if (delay == 20) return; // idle
+        // Nether spawners tick to 0 naturally when chunk-loaded; skip that false positive (Shoreline).
+        if (mc.level.dimension() == net.minecraft.world.level.Level.NETHER && delay == 0) return;
+        net.minecraft.core.BlockPos pos = spawner.getBlockPos();
+        if (!activatedNotified.add(pos)) return;
+        if (notify.get()) {
+            String msg = "ACTIVATED spawner at " + pos.getX() + " " + pos.getY() + " " + pos.getZ()
+                + " (delay=" + delay + ") - player was nearby!";
+            AutismNotifications.warning(msg);
+            AutismClientMessaging.sendPrefixed("§d[SpawnerFinder] §f" + msg);
+            if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.6f);
+        }
     }
 
     private static boolean tooFar(ChunkPos a, ChunkPos b, int radius) {

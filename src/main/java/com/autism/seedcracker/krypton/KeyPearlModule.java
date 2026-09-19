@@ -22,8 +22,8 @@ import net.minecraft.world.item.Items;
  */
 public final class KeyPearlModule extends Module {
 
-    private final IntSetting throwDelay = add(new IntSetting("throw-delay", "Throw delay", 0, 0, 20, 1)
-        .description("Ticks to wait after swapping before throwing.").group("General"));
+    private final IntSetting throwDelay = add(new IntSetting("throw-delay", "Throw delay", 2, 1, 20, 1)
+        .description("Ticks to wait after swapping before throwing (min 1 so the carried-item packet lands first - never 0).").group("General"));
     private final BoolSetting switchBack = add(new BoolSetting("switch-back", "Switch back", true)
         .description("Swap back to the previous slot after throwing.").group("General"));
     private final IntSetting switchDelay = add(new IntSetting("switch-delay", "Switch delay", 0, 0, 20, 1)
@@ -48,13 +48,13 @@ public final class KeyPearlModule extends Module {
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.gui.screen() != null) { setEnabledSilently(false); return; }
+        if (mc.player == null || mc.gameMode == null || mc.gui.screen() != null) { setEnabledSilently(false); return; }
 
         if (stage == 0) {
             prevSlot = mc.player.getInventory().getSelectedSlot();
             int pearl = findItem(mc, Items.ENDER_PEARL);
             if (pearl == -1) { setEnabledSilently(false); return; }
-            mc.player.getInventory().setSelectedSlot(pearl);
+            com.autism.seedcracker.util.InvSync.select(mc, pearl);
             stage = 1;
             counter = 0;
         } else if (stage == 1) {
@@ -66,7 +66,7 @@ public final class KeyPearlModule extends Module {
             if (!switchBack.get()) setEnabledSilently(false);
         } else if (stage == 2) {
             if (counter++ < switchDelay.get()) return;
-            if (prevSlot >= 0) mc.player.getInventory().setSelectedSlot(prevSlot);
+            if (prevSlot >= 0) com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
             setEnabledSilently(false);
         }
     }

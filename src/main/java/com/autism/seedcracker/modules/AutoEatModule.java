@@ -52,7 +52,8 @@ public final class AutoEatModule extends Module {
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null) return; // don't swap slots while a GUI is open
 
         if (eating) {
             if (!isHungry()) {
@@ -76,7 +77,8 @@ public final class AutoEatModule extends Module {
 
     private boolean isHungry() {
         Minecraft mc = Minecraft.getInstance();
-        return mc.player != null && mc.player.getFoodData().getFoodLevel() <= hunger.get();
+        return mc.player != null && mc.player.getFoodData().getFoodLevel() <= hunger.get()
+            && mc.player.getFoodData().getFoodLevel() < 20; // never force-eat at full hunger
     }
 
     private void startEating(Minecraft mc) {
@@ -90,12 +92,12 @@ public final class AutoEatModule extends Module {
     private void selectSlot(int slot) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        mc.player.getInventory().setSelectedSlot(slot);
+        com.autism.seedcracker.util.InvSync.select(mc, slot);
         foodSlot = slot;
     }
 
     private void keepEating(Minecraft mc) {
-        if (foodSlot < 0 || foodSlot > 8) return;
+        if (foodSlot < 0 || foodSlot > 8 || mc.gameMode == null) return;
         mc.options.keyUse.setDown(true);
         if (!mc.player.isUsingItem()) {
             mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
@@ -108,7 +110,7 @@ public final class AutoEatModule extends Module {
         if (mc.player != null) {
             int selected = mc.player.getInventory().getSelectedSlot();
             if (prevSlot >= 0 && prevSlot <= 8 && prevSlot != selected) {
-                mc.player.getInventory().setSelectedSlot(prevSlot);
+                com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
             }
         }
         mc.options.keyUse.setDown(false);

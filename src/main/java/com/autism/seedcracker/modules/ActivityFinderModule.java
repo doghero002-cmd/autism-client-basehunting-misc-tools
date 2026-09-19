@@ -36,6 +36,11 @@ import net.minecraft.world.level.chunk.LevelChunk;
 public final class ActivityFinderModule extends Module {
 
     // ---- settings ----
+    private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
+        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
+            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+        .description("HIGH/MEDIUM = one block entity below Y flags. LOW = need 2+ (a single lone chest can be a dungeon).")
+        .group("General"));
     private final IntSetting yLevel = add(new IntSetting(
             "y-level", "Y level", 16, -64, 320, 1)
         .description("Only flag chunks whose block-entity activity is at or below this Y level.")
@@ -56,6 +61,12 @@ public final class ActivityFinderModule extends Module {
             "tracer", "Tracer", false)
         .description("Draw a tracer line from the camera to each flagged chunk.")
         .group("Render"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
+        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).")
+        .group("Performance"));
+
+    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     private final Set<ChunkPos> flagged = new HashSet<>();
     private final Set<ChunkPos> notified = new HashSet<>();
@@ -81,8 +92,7 @@ public final class ActivityFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -90,22 +100,19 @@ public final class ActivityFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
-        tickCounter++;
-        if (tickCounter % 8 == 0) {
-            scan(mc);
-        }
+        scan(mc);
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-activity-finder", flagged, color.get(), tracer.get());
     }
 
     private void scan(Minecraft mc) {
-        List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
         ChunkPos playerChunk = mc.player.chunkPosition();
         int radius = scanRadius.get();
         int yGate = yLevel.get();
 
-        for (LevelChunk chunk : chunks) {
+        int need = sensitivity.get().scale(1); // HIGH/MEDIUM 1, LOW 2
+        for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
             ChunkPos pos = chunk.getPos();
-            boolean active = hasActivityAtOrBelow(chunk, yGate);
+            boolean active = countActivityAtOrBelow(chunk, yGate, need) >= need;
             if (active) {
                 flagged.add(pos);
                 if (notified.add(pos)) {
@@ -120,14 +127,15 @@ public final class ActivityFinderModule extends Module {
         notified.removeIf(p -> tooFar(p, playerChunk, r));
     }
 
-    /** True when the chunk has any block entity at or below {@code yGate}. */
-    private static boolean hasActivityAtOrBelow(LevelChunk chunk, int yGate) {
+    /** Count block entities at or below {@code yGate}, stopping early at {@code enough}. */
+    private static int countActivityAtOrBelow(LevelChunk chunk, int yGate, int enough) {
+        int n = 0;
         for (BlockEntity be : chunk.getBlockEntities().values()) {
             if (be == null) continue;
             BlockPos p = be.getBlockPos();
-            if (p != null && p.getY() <= yGate) return true;
+            if (p != null && p.getY() <= yGate && ++n >= enough) return n;
         }
-        return false;
+        return n;
     }
 
     private static boolean tooFar(ChunkPos a, ChunkPos b, int radius) {

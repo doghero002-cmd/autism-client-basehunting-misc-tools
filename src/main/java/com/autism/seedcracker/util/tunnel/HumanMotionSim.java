@@ -138,13 +138,21 @@ public final class HumanMotionSim {
                     drop = i;
                 }
                 if (drop > maxFall) {
-                    fallHeight = drop;
-                    edgeDir = directionOf(nx, nz);
-                    edgePos = p.blockPosition().below();
-                    mineTarget = null;
-                    setForward(false);
-                    setSprint(false);
-                    return trackFall ? StepResult.FALL_HAZARD : StepResult.EDGE_STOP;
+                    // SimulatedPlayer: predict the ACTUAL fall damage of continuing forward (sees
+                    // overhangs/ledges the probe can't). Only treat it as a hazard if it hurts.
+                    double moveYaw = Math.atan2(-dx, dz);
+                    double dmg = SimulatedPlayer.predictFallDamage(moveYaw, 40);
+                    if (dmg < 1.0) {
+                        // survivable / lands on something: keep walking, no hazard
+                    } else {
+                        fallHeight = drop;
+                        edgeDir = directionOf(nx, nz);
+                        edgePos = p.blockPosition().below();
+                        mineTarget = null;
+                        setForward(false);
+                        setSprint(false);
+                        return trackFall ? StepResult.FALL_HAZARD : StepResult.EDGE_STOP;
+                    }
                 }
             }
 

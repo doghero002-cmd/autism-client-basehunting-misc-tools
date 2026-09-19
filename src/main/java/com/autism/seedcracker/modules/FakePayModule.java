@@ -53,9 +53,12 @@ public final class FakePayModule extends Module {
         if (raw == null) return false;
         String text = raw.trim();
         if (text.startsWith("/")) text = text.substring(1);
-        if (!text.startsWith("pay ")) return false;
+        // Case-insensitive exact "pay" command word (avoids intercepting /payday-style aliases).
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        if (!lower.equals("pay") && !lower.startsWith("pay ")) return false;
 
-        String[] parts = text.substring(4).trim().split("\\s+");
+        String[] parts = text.substring(Math.min(4, text.length())).trim().split("\\s+");
+        if (lower.equals("pay")) return false; // bare /pay with no args
         if (parts.length < 2) return false;
         String player = parts[0];
         // DonutSMP accepts k/m shorthand on /pay ("166.3k", "1.8m"); expand it to a long.

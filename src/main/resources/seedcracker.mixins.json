@@ -4,12 +4,16 @@
   "package": "kaptainwutax.seedcrackerX.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
+    "BaseSpawnerAccessor"
   ],
   "client": [
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FakeRolesChatMixin",
-    "LocalPlayerMixin"
+    "LocalPlayerMixin",
+    "ModuleLifecycleMixin",
+    "MouseHandlerAccessor",
+    "MouseHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
