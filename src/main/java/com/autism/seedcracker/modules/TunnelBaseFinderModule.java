@@ -88,6 +88,88 @@ public final class TunnelBaseFinderModule extends Module {
         .description("XENON = straight-line smart avoidance. WALK_2X1 = mine a plain 2x1 walkable tunnel like a normal pickaxe, with automatic human-like camera.")
         .group("Tunnel"));
 
+    /**
+     * Movement / facing engine.
+     *  AUTISM       - the base client's own KillAura-smooth human rotation (AutismHumanRotation).
+     *  MOUSE        - wocky mouse-delta rotation: turns through the REAL mouse handler (most legit).
+     *  VANILLA      - the module's built-in smooth rotation (current behaviour).
+     *  LEGIT        - wocky/Water legit rotation: time-eased, jittered, human-mouse look.
+     *  SILENT       - facing applied to movement packets only (camera never turns).
+     *  HAZARD_ONLY  - hold the camera dead-straight ahead; only turn when a hazard/obstacle
+     *                 (lava/water/avoidance) forces a lane change or 90 turn. Least movement.
+     */
+    public enum MovementStyle { AUTISM, MOUSE, VANILLA, LEGIT, SILENT, HAZARD_ONLY }
+    private final EnumSetting<MovementStyle> movementStyle = add(new EnumSetting<>(
+            "movement-style", "Movement style", MovementStyle.AUTISM, MovementStyle.values())
+        .description("How the bot turns its view. AUTISM = the base client's KillAura-smooth human rotation. MOUSE = through the real mouse handler (wocky). LEGIT = human-mouse eased rotation. SILENT = packets only, camera stays. HAZARD_ONLY = dead-straight unless a hazard forces a turn. VANILLA = the built-in smoother.")
+        .group("Tunnel"));
+    private final BoolSetting silentStrafe = add(new BoolSetting(
+            "silent-strafe", "Silent strafe", true)
+        .description("When silent rotation is on, walk using movement keys resolved against the SILENT yaw so you walk down the tunnel while the server sees you looking at the dig face (wocky strafe-relative-to-silent-yaw).")
+        .group("Tunnel"));
+    private final BoolSetting smartDirection = add(new BoolSetting(
+            "smart-direction", "Smart direction", true)
+        .description("Tunnel toward the nearest flagged base (from the Base Tracker) when one is known; otherwise pick the clearest direction.")
+        .group("Tunnel"));
+    private final BoolSetting autoMend = add(new BoolSetting(
+            "auto-mend", "Auto mend pickaxe", true)
+        .description("When your pickaxe is low on durability, pause and throw XP bottles to mend it before continuing.")
+        .group("Tunnel"));
+    private final BoolSetting silentRotation = add(new BoolSetting(
+            "silent-rotation", "Silent rotation", true)
+        .description("Apply facing via movement packets instead of snapping the client camera (server sees the rotation, screen stays put - less flaggy).")
+        .group("Tunnel"));
+    private final IntSetting mendThreshold = add(new IntSetting(
+            "mend-threshold", "Mend at durability", 60, 5, 500, 5)
+        .description("Mend the pickaxe when its remaining durability falls to this value.")
+        .group("Tunnel")
+        .visibleWhen(() -> autoMend.get()));
+    private final BoolSetting autoTool = add(new BoolSetting(
+            "auto-tool", "Auto tool swap", true)
+        .description("Swap to the best hotbar tool for the block being dug (faster digging).")
+        .group("Tunnel"));
+    private final BoolSetting pauseToEat = add(new BoolSetting(
+            "pause-to-eat", "Pause to eat", true)
+        .description("Pause digging to eat when hungry (resumes after).")
+        .group("Tunnel"));
+    private final IntSetting eatHunger = add(new IntSetting(
+            "eat-hunger", "Eat at hunger", 14, 1, 20, 1)
+        .description("Pause to eat when food level falls to this (out of 20).")
+        .group("Tunnel")
+        .visibleWhen(() -> pauseToEat.get()));
+    private final BoolSetting sellOnFull = add(new BoolSetting(
+            "sell-on-full", "Sell items on full inventory", false)
+        .description("When your inventory is full, /ah sell the listed items instead of dropping them on the ground.")
+        .group("Tunnel"));
+    private final IntSetting digTimeout = add(new IntSetting(
+            "dig-timeout", "Dig timeout (ticks)", 120, 20, 1200, 20)
+        .description("If a block hasn't broken after this many ticks of digging, treat it as unbreakable (too-hard / wrong tool) and avoid it instead of stalling forever.")
+        .group("Tunnel"));
+    private final BoolSetting escapeHoles = add(new BoolSetting(
+            "escape-holes", "Escape bedrock holes", true)
+        .description("If you fall into a hole below the target Y, pillar/jump back up to the target Y before continuing.")
+        .group("Tunnel"));
+    private final IntSetting targetY = add(new IntSetting(
+            "target-y", "Target Y level", -59, -64, 320, 1)
+        .description("The Y level to climb back to when escaping a bedrock hole (and the tunnel's preferred depth).")
+        .group("Tunnel")
+        .visibleWhen(() -> escapeHoles.get()));
+    private final autismclient.api.module.StringSetting sellItems = add(new autismclient.api.module.StringSetting(
+            "sell-items", "Items to sell", "cobblestone,dirt,gravel,netherrack,deepslate")
+        .description("Comma-separated item ids to /ah sell when the inventory is full (e.g. cobblestone,dirt).")
+        .group("Tunnel")
+        .visibleWhen(() -> sellOnFull.get()));
+    private final autismclient.api.module.StringSetting sellPrice = add(new autismclient.api.module.StringSetting(
+            "sell-price", "Sell price", "100")
+        .description("The /ah sell price to list full-inventory items at.")
+        .group("Tunnel")
+        .visibleWhen(() -> sellOnFull.get()));
+    private final BoolSetting sellViaOrders = add(new BoolSetting(
+            "sell-via-orders", "Deliver to orders (not /ah sell)", false)
+        .description("When ON, full-inventory items are delivered to matching /orders instead of listed on the AH (avoids listing the wrong item).")
+        .group("Tunnel")
+        .visibleWhen(() -> sellOnFull.get()));
+
     private static final Set<Block> STORAGE = buildStorage();
 
     // === tunnel state ===
@@ -136,8 +218,8 @@ public final class TunnelBaseFinderModule extends Module {
     private float basePitchBias = 2.0f;
     private long totalTicks = 0;
 
-    private static final float MAX_YAW_DRIFT = 0.7f;
-    private static final float MAX_PITCH_DRIFT = 0.3f;
+    private static final float MAX_YAW_DRIFT = 0.22f;
+    private static final float MAX_PITCH_DRIFT = 0.10f;
 
     private int spawnerCount = 0;
     private final Set<ChunkPos> notified = new HashSet<>();
@@ -165,6 +247,7 @@ public final class TunnelBaseFinderModule extends Module {
         notified.clear();
         spawnerCount = 0;
         totalTicks = 0;
+        autismAim.reset();
         yawInitialized = false;
         avoidState = AvoidState.NONE;
         avoidSideDirection = 0;
@@ -188,6 +271,11 @@ public final class TunnelBaseFinderModule extends Module {
         walkPauseTicks = 0;
         walkPauseCooldown = randomRange(60, 200);
         digGapTicks = 0;
+        goAroundLane = null;
+        goAroundTicks = 0;
+        goAroundFails = 0;
+        stuck.reset();
+        legitMovement.reset();
         com.autism.seedcracker.util.tunnel.HumanPacingEngine.get().setEnabled(true);
         pickNewDriftTarget();
         initTunnelDirection(mc);
@@ -211,11 +299,55 @@ public final class TunnelBaseFinderModule extends Module {
         tunnelDirection = null;
         notified.clear();
         com.autism.seedcracker.util.tunnel.HumanPacingEngine.get().setEnabled(false);
+        com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+        com.autism.seedcracker.util.tunnel.MouseRotation.get().stop();
+        autismAim.clear();
+    }
+
+    /** Rewrite outgoing movement-packet rotation to the silent values while silent rotation is on. */
+    @Override
+    public boolean onPacketSend(net.minecraft.network.protocol.Packet<?> packet) {
+        com.autism.seedcracker.util.tunnel.SilentRotation.processPacket(packet);
+        return false;
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+
+    /** Release every movement/action key so the player stands still (used when a GUI opens). */
+    private static void releaseMovementKeys(Minecraft mc) {
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyJump.setDown(false);
+        mc.options.keySprint.setDown(false);
+        mc.options.keyShift.setDown(false);
+        mc.options.keyUse.setDown(false);
+    }
+
+    /** wocky/Water legit rotation engine (time-eased, jittered, human-mouse look). */
+    private final com.autism.seedcracker.util.tunnel.LegitMovement legitMovement =
+        new com.autism.seedcracker.util.tunnel.LegitMovement();
+
+    /** AUTISM client's own KillAura-smooth human rotation (AutismHumanRotation). */
+    private final com.autism.seedcracker.util.tunnel.AutismAim autismAim =
+        new com.autism.seedcracker.util.tunnel.AutismAim();
+
+    /**
+     * Apply a facing for the LEGIT / SILENT / HAZARD_ONLY styles. LEGIT + HAZARD_ONLY ease the
+     * real camera (human-mouse); SILENT routes the facing to movement packets only and leaves the
+     * camera alone. VANILLA applies its own rotation and never reaches this helper.
+     */
+    private void applyFacing(Minecraft mc, float yaw, float pitch, MovementStyle style) {
+        if (style == MovementStyle.SILENT || (silentRotation.get() && style == MovementStyle.HAZARD_ONLY)) {
+            com.autism.seedcracker.util.tunnel.SilentRotation.apply(yaw, clampPitch(pitch));
+        } else {
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            mc.player.setYRot(yaw);
+            mc.player.setXRot(clampPitch(pitch));
+        }
     }
 
     private void initTunnelDirection(Minecraft mc) {
@@ -236,6 +368,11 @@ public final class TunnelBaseFinderModule extends Module {
 
     private Direction pickBestDirection(Minecraft mc) {
         if (mc.player == null || mc.level == null) return null;
+        // Smart direction: head toward the nearest flagged base if the Base Tracker knows one.
+        if (smartDirection.get()) {
+            Direction toward = directionTowardNearestBase(mc);
+            if (toward != null) return toward;
+        }
         BlockPos playerPos = mc.player.blockPosition();
         Direction[] dirs = {Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
         Direction bestDir = mc.player.getDirection();
@@ -258,10 +395,46 @@ public final class TunnelBaseFinderModule extends Module {
         return bestDir;
     }
 
+    /** Cardinal direction that best points toward the nearest Base Tracker base, or null if none. */
+    private Direction directionTowardNearestBase(Minecraft mc) {
+        java.util.List<com.autism.seedcracker.finder.BaseTracker.Entry> bases =
+            com.autism.seedcracker.finder.BaseTracker.nearest(mc.player.getX(), mc.player.getZ(), 1);
+        if (bases.isEmpty()) return null;
+        com.autism.seedcracker.finder.BaseTracker.Entry b = bases.get(0);
+        double dx = b.blockX() - mc.player.getX();
+        double dz = b.blockZ() - mc.player.getZ();
+        if (Math.abs(dx) < 8 && Math.abs(dz) < 8) return null; // already on top of it
+        if (Math.abs(dx) > Math.abs(dz)) {
+            return dx > 0 ? Direction.EAST : Direction.WEST;
+        }
+        return dz > 0 ? Direction.SOUTH : Direction.NORTH;
+    }
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
+
+        // If a GUI is open (inventory, chest, /ah confirm, etc.) the bot must not keep walking/
+        // digging behind it. Auto-close anything that isn't the sell-on-full confirm screen and
+        // pause for the tick; this is why it previously only seemed to work while in a menu.
+        if (mc.gui.screen() != null) {
+            if (!(mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>)) {
+                mc.gui.setScreen(null);
+            }
+            releaseMovementKeys(mc);
+            if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+            mc.options.keyAttack.setDown(false);
+            return;
+        }
+        // No movement/dig packets within the container grace window (right after a container click).
+        if (com.autism.seedcracker.util.ContainerMutex.containerBusy(mc)) {
+            releaseMovementKeys(mc);
+            if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+            mc.options.keyAttack.setDown(false);
+            return;
+        }
+
         if (tunnelDirection == null) {
             initTunnelDirection(mc);
             if (tunnelDirection == null) return;
@@ -270,9 +443,28 @@ public final class TunnelBaseFinderModule extends Module {
         totalTicks++;
         if (humanize.get() && !quietMovement.get()) tickHumanization(mc);
 
+        // Auto-mend: if the pickaxe is low, pause digging and throw XP bottles to repair it.
+        // (Release movement keys on these pause paths - a latched strafe key from a lane shift
+        // would keep us walking sideways through the whole mend/eat/wait.)
+        if (autoMend.get() && tickMend(mc)) { releaseMovementKeys(mc); return; }
+
+        // Pause to eat: stop digging and eat when hungry.
+        if (pauseToEat.get() && tickEat(mc)) { releaseMovementKeys(mc); return; }
+
+        // Sell on full: /ah sell the listed items when the inventory is full (instead of dropping).
+        if (sellOnFull.get()) tickSellOnFull(mc);
+
         if (idleBreakTicks > 0) { idleBreakTicks--; mc.options.keyUp.setDown(false); }
         if (microPauseTicks > 0) { microPauseTicks--; mc.options.keyUp.setDown(false); }
-        if (waitTicks > 0) { waitTicks--; mc.options.keyUp.setDown(false); return; }
+        if (waitTicks > 0) { waitTicks--; releaseMovementKeys(mc); return; }
+
+        // Grim SpeedA predictor says we're near a speed flag: pause movement a few ticks so the
+        // buffer drains instead of tripping the real check (server-side setback).
+        if (FlagDetectorModule.speedFlagImminent()) {
+            releaseMovementKeys(mc);
+            waitTicks = randomRange(4, 10);
+            return;
+        }
 
         // Player defense
         if (playerDetected) { tickPlayerAttack(mc); return; }
@@ -291,6 +483,7 @@ public final class TunnelBaseFinderModule extends Module {
         }
 
         // Compute target yaw (+ avoidance turns)
+        // Compute target yaw (+ avoidance turns)
         float targetYaw = getDirectionYaw(tunnelDirection);
         boolean isAvoiding = false;
         if (avoidState == AvoidState.SIDESTEP) {
@@ -301,58 +494,109 @@ public final class TunnelBaseFinderModule extends Module {
             isAvoiding = true;
         }
 
-        if (!quietMovement.get()) tickCrosshairDrift();
-        float driftedYaw = targetYaw + (quietMovement.get() ? 0f : driftYawOffset);
-        float pitchTarget = miningLookDown ? 35.0f : basePitchBias;
-        float driftedPitch = pitchTarget + (quietMovement.get() ? 0f : driftPitchOffset);
+        MovementStyle style = movementStyle.get();
+        boolean hazardTurn = isAvoiding || miningLookDown;
 
-        // Rotation. In quiet mode we go straight with no drift/jitter and only smooth-turn for
-        // obstacles/avoidance; in normal mode the humanization engine adds drift + micro-noise.
-        if (quietMovement.get()) {
+        // While WALK_2X1 is actively digging, aimAtBlock owns the camera. Running the forward
+        // rotation here too made two attractors fight every tick (forward vs dig block): the
+        // crosshair oscillated across neighbouring blocks, churning START/ABORT dig packets and
+        // desyncing server break progress -> rubber-band.
+        boolean digAiming = tunnelMode.get() == TunnelMode.WALK_2X1 && walkMiningTarget != null;
+
+        if (digAiming) {
+            // aimAtBlock drives rotation this tick.
+        } else if (style == MovementStyle.HAZARD_ONLY) {
+            // Hold the camera dead-straight ahead at level pitch. Only ease toward a new facing
+            // when a hazard/obstacle actually forces a lane change or a 90-degree turn.
             if (!yawInitialized) {
-                currentSmoothedYaw = mc.player.getYRot();
+                currentSmoothedYaw = getDirectionYaw(tunnelDirection);
                 currentSmoothedPitch = basePitchBias;
                 yawInitialized = true;
             }
-            // Face the tunnel direction (or avoidance direction) with a gentle, jitter-free turn.
-            float rotSpeed = isAvoiding ? 0.10f : 0.08f;
-            currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw, rotSpeed);
-            currentSmoothedPitch = lerp(currentSmoothedPitch, basePitchBias, rotSpeed);
-            LookRotation.apply(currentSmoothedYaw, clampPitch(currentSmoothedPitch));
-        } else {
-            if (!yawInitialized) {
-                currentSmoothedYaw = mc.player.getYRot();
-                currentSmoothedPitch = mc.player.getXRot();
-                yawInitialized = true;
-            }
-            if (avoidCooldown > 0) avoidCooldown--;
-            float yawChange = Math.abs(angleDiff(lastRawTargetYaw, targetYaw));
-            if (yawChange > 5f) {
-                turnSpeedMultiplier = yawChange > 80f
-                    ? 0.06f + rng.nextFloat() * 0.08f
-                    : 0.04f + rng.nextFloat() * 0.06f;
-                turnYawOvershoot = gaussian(0f, 1.0f);
-                turnOvershootDecay = 0.025f + rng.nextFloat() * 0.035f;
-                turnReactionTicks = randomRange(1, 3);
-                lastRawTargetYaw = targetYaw;
-            }
-            if (turnReactionTicks > 0) {
-                turnReactionTicks--;
-                mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.02f));
-                mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+            if (hazardTurn) {
+                currentSmoothedYaw = LookRotation.approachAngle(currentSmoothedYaw, targetYaw, 20.0f);
             } else {
-                turnYawOvershoot = lerp(turnYawOvershoot, 0f, turnOvershootDecay);
-                float rotSpeed = turnSpeedMultiplier;
-                if (isAvoiding) rotSpeed = 0.08f + rng.nextFloat() * 0.10f;
-                float finalYaw = driftedYaw + turnYawOvershoot;
-                currentSmoothedYaw = lerpAngle(currentSmoothedYaw, finalYaw, rotSpeed);
-                currentSmoothedPitch = lerp(currentSmoothedPitch, driftedPitch, rotSpeed);
-                mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.015f));
-                mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.01f)));
+                currentSmoothedYaw = getDirectionYaw(tunnelDirection);
+            }
+            currentSmoothedPitch = LookRotation.approach(currentSmoothedPitch, basePitchBias, 12.0f);
+            applyFacing(mc, currentSmoothedYaw, currentSmoothedPitch, style);
+        } else if (style == MovementStyle.AUTISM) {
+            // The base client's own KillAura-smooth human rotation (AutismHumanRotation). Pitch
+            // biases down while mining. This is the smoothest client-side rotation available.
+            float pitchTgt = miningLookDown ? 35.0f : basePitchBias;
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            float[] rot = autismAim.face(mc, targetYaw, pitchTgt);
+            currentSmoothedYaw = rot[0];
+            currentSmoothedPitch = rot[1];
+        } else if (style == MovementStyle.MOUSE) {
+            // wocky mouse-delta rotation: set the target and let the MouseHandler mixin move the
+            // camera through the real mouse path (most legit). Pitch biases down while mining.
+            float pitchTgt = miningLookDown ? 35.0f : basePitchBias;
+            com.autism.seedcracker.util.tunnel.MouseRotation.get().rotateTo(targetYaw, pitchTgt);
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+        } else if (style == MovementStyle.LEGIT || style == MovementStyle.SILENT) {
+            // wocky/Water legit engine: time-eased, jittered human-mouse rotation. SILENT applies
+            // it to packets only; LEGIT eases the real camera. We suppress the humanize drift here
+            // because the engine adds its own small jitter.
+            float pitchTgt = miningLookDown ? 35.0f : basePitchBias;
+            float[] rot = legitMovement.update(targetYaw, pitchTgt);
+            currentSmoothedYaw = rot[0];
+            currentSmoothedPitch = rot[1];
+            applyFacing(mc, rot[0], rot[1], style);
+        } else {
+            // VANILLA: the module's built-in smoothed rotation (quiet vs humanized).
+            if (!quietMovement.get()) tickCrosshairDrift();
+            float driftedYaw = targetYaw + (quietMovement.get() ? 0f : driftYawOffset);
+            float pitchTarget = miningLookDown ? 35.0f : basePitchBias;
+            float driftedPitch = pitchTarget + (quietMovement.get() ? 0f : driftPitchOffset);
+            if (quietMovement.get()) {
+                if (!yawInitialized) {
+                    currentSmoothedYaw = mc.player.getYRot();
+                    currentSmoothedPitch = basePitchBias;
+                    yawInitialized = true;
+                }
+                float rotSpeed = isAvoiding ? 0.10f : 0.08f;
+                currentSmoothedYaw = lerpAngle(currentSmoothedYaw, targetYaw, rotSpeed);
+                currentSmoothedPitch = lerp(currentSmoothedPitch, basePitchBias, rotSpeed);
+                LookRotation.apply(currentSmoothedYaw, clampPitch(currentSmoothedPitch));
+            } else {
+                if (!yawInitialized) {
+                    currentSmoothedYaw = mc.player.getYRot();
+                    currentSmoothedPitch = mc.player.getXRot();
+                    yawInitialized = true;
+                }
+                if (avoidCooldown > 0) avoidCooldown--;
+                float yawChange = Math.abs(angleDiff(lastRawTargetYaw, targetYaw));
+                if (yawChange > 5f) {
+                    turnSpeedMultiplier = yawChange > 80f
+                        ? 0.06f + rng.nextFloat() * 0.08f
+                        : 0.04f + rng.nextFloat() * 0.06f;
+                    turnYawOvershoot = gaussian(0f, 0.3f);
+                    turnOvershootDecay = 0.025f + rng.nextFloat() * 0.035f;
+                    turnReactionTicks = randomRange(1, 3);
+                    lastRawTargetYaw = targetYaw;
+                }
+                if (turnReactionTicks > 0) {
+                    turnReactionTicks--;
+                    mc.player.setYRot(currentSmoothedYaw);
+                    mc.player.setXRot(clampPitch(currentSmoothedPitch));
+                } else {
+                    turnYawOvershoot = lerp(turnYawOvershoot, 0f, turnOvershootDecay);
+                    float rotSpeed = turnSpeedMultiplier;
+                    if (isAvoiding) rotSpeed = 0.08f + rng.nextFloat() * 0.10f;
+                    float finalYaw = driftedYaw + turnYawOvershoot;
+                    currentSmoothedYaw = lerpAngle(currentSmoothedYaw, finalYaw, rotSpeed);
+                    currentSmoothedPitch = lerp(currentSmoothedPitch, driftedPitch, rotSpeed);
+                    mc.player.setYRot(currentSmoothedYaw);
+                    mc.player.setXRot(clampPitch(currentSmoothedPitch));
+                }
             }
         }
 
-        correctPosition(mc);
+        // Don't strafe-correct while actively digging: we're standing still, and the strafe taps
+        // wobble the crosshair off the dig block (restarting the dig = packet churn).
+        if (!digAiming) correctPosition(mc);
+        else { mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false); }
 
         // Base detection + tunneling.
         notifyFound(mc);
@@ -361,6 +605,14 @@ public final class TunnelBaseFinderModule extends Module {
         } else {
             tickTunneling(mc);
         }
+
+        // Stuck detector: log the exact sub-state if we stop making progress.
+        stuck.setAction("mode=" + tunnelMode.get() + " dir=" + tunnelDirection
+            + " avoid=" + avoidState
+            + (walkMiningTarget != null ? " digging=" + walkMiningTarget : "")
+            + (goAroundLane != null ? " goAround=" + goAroundLane + "/" + goAroundTicks : "")
+            + (waitTicks > 0 ? " wait=" + waitTicks : ""));
+        stuck.tick(mc);
     }
 
     // ---- WALK_2X1 mode: mine a plain 2-high x 1-wide walkable tunnel like a normal pickaxe ----
@@ -373,94 +625,284 @@ public final class TunnelBaseFinderModule extends Module {
      */
     private BlockPos walkMiningTarget = null;
     private int digGapTicks = 0;
+    private int digTicks = 0;
+    private int digTicksTotal = 0;
+
+    /**
+     * Escape a bedrock hole: pillar/jump back up to the target Y. Places a block underfoot when
+     * possible and jumps; stops digging while climbing. Returns control to the tunnel once back
+     * at the target Y.
+     */
+    private void tickEscapeHole(Minecraft mc) {
+        BlockPos pos = mc.player.blockPosition();
+        if (pos.getY() >= targetY.get()) { mc.options.keyJump.setDown(false); return; } // done - stop bunny-hopping
+        // Face down and jump; if there's a solid block under us, keep jumping to climb.
+        mc.options.keyUp.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyAttack.setDown(false);
+        if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+        // Look down and try to place a block beneath us to pillar up.
+        float[] rot = legitMovement.update(mc.player.getYRot(), 80f);
+        mc.player.setYRot(rot[0]);
+        mc.player.setXRot(80f);
+        BlockPos below = pos.below();
+        boolean belowAir = mc.level.getBlockState(below).isAir() || mc.level.getBlockState(below).canBeReplaced();
+        if (belowAir) {
+            int slot = findScaffoldSlotForPillar(mc);
+            if (slot >= 0 && mc.player.onGround()) {
+                com.autism.seedcracker.util.InvSync.select(mc, slot);
+                mc.options.keyJump.setDown(true);
+                // place at the block below via useItemOn against the side of the block we're on
+                net.minecraft.world.phys.BlockHitResult hit = new net.minecraft.world.phys.BlockHitResult(
+                    net.minecraft.world.phys.Vec3.atCenterOf(pos.below()), Direction.UP, pos.below(), false);
+                if (mc.gameMode != null) mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+            } else {
+                // No scaffold block: just jump and hope to grab a ledge.
+                if (mc.player.onGround()) mc.options.keyJump.setDown(true);
+                else mc.options.keyJump.setDown(false);
+            }
+        } else {
+            // Solid below: keep jumping to climb out (or dig the block above if enclosed).
+            if (mc.player.onGround()) mc.options.keyJump.setDown(true);
+            else mc.options.keyJump.setDown(false);
+            BlockPos head = pos.above(2);
+            if (!mc.level.getBlockState(head).isAir() && mc.level.getBlockState(head).getBlock() != Blocks.BEDROCK) {
+                mineDirect(mc, head);
+            }
+        }
+    }
+
+    /** A hotbar slot holding a cheap block to pillar with (dirt/cobble/netherrack, etc). */
+    private int findScaffoldSlotForPillar(Minecraft mc) {
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.world.item.ItemStack s = mc.player.getInventory().getItem(i);
+            if (s.isEmpty()) continue;
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).toString();
+            if (id.endsWith("dirt") || id.endsWith("cobblestone") || id.endsWith("netherrack")
+                || id.endsWith("cobbled_deepslate") || id.endsWith("stone") || id.endsWith("_planks")) return i;
+        }
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.world.item.ItemStack s = mc.player.getInventory().getItem(i);
+            if (!s.isEmpty() && s.getItem() instanceof net.minecraft.world.item.BlockItem) return i;
+        }
+        return -1;
+    }
+
+    /** Adapter: the live world as the planner's boolean view (planner itself is unit-tested). */
+    private com.autism.seedcracker.util.pure.TunnelPlanner.World plannerWorld(Minecraft mc) {
+        return new com.autism.seedcracker.util.pure.TunnelPlanner.World() {
+            @Override public boolean air(BlockPos pos) { return mc.level.getBlockState(pos).isAir(); }
+            @Override public boolean liquid(BlockPos pos) { return isLiquid(mc, pos); }
+            @Override public boolean bedrock(BlockPos pos) { return mc.level.getBlockState(pos).getBlock() == Blocks.BEDROCK; }
+            @Override public boolean falling(BlockPos pos) {
+                return com.autism.seedcracker.util.tunnel.Hazards.isFalling(mc.level.getBlockState(pos));
+            }
+            @Override public boolean hazard(BlockPos pos) { return isHazardous(mc, pos); }
+        };
+    }
 
     private void tickWalkTunnel(Minecraft mc) {
         BlockPos playerPos = mc.player.blockPosition();
-        BlockPos aheadFeet = playerPos.relative(tunnelDirection);
-        BlockPos aheadHead = aheadFeet.above();
 
-        // Lava/water ahead (feet or head, or ground below the next step): sidestep around it
-        // instead of digging through. We shift sideways into a safe lane and keep tunneling.
-        BlockPos groundAhead = aheadFeet.below();
-        boolean lavaAhead = isLiquid(mc, aheadFeet) || isLiquid(mc, aheadHead) || isLiquid(mc, groundAhead);
-        if (lavaAhead) {
-            Direction right = tunnelDirection.getClockWise();
-            Direction left = tunnelDirection.getCounterClockWise();
-            boolean rightSafe = isLaneSafe(mc, right);
-            boolean leftSafe = isLaneSafe(mc, left);
-            Direction lane = rightSafe ? right : (leftSafe ? left : null);
-            if (lane != null) {
-                // Shift the fixed line by one lane and keep tunneling in the same direction.
-                if (fixedCoordIsX) fixedCoord += (lane == right ? 1 : -1) * (tunnelDirection == Direction.NORTH ? -1 : 1);
-                else fixedCoord += (lane == right ? 1 : -1) * (tunnelDirection == Direction.EAST ? -1 : 1);
-                walkMiningTarget = null;
-                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
-                mc.options.keyAttack.setDown(false);
-                // Strafe into the safe lane.
-                if (lane == right) { mc.options.keyRight.setDown(true); mc.options.keyLeft.setDown(false); }
-                else { mc.options.keyLeft.setDown(true); mc.options.keyRight.setDown(false); }
-            } else {
-                // No safe lane: turn 90°.
-                tunnelDirection = tunnelDirection.getClockWise();
-                walkMiningTarget = null;
-                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
-                mc.options.keyAttack.setDown(false);
-                mc.options.keyUp.setDown(false);
-            }
+        // A committed lane shift keeps running until it expires, even though the trigger hazard
+        // is no longer straight ahead (we're mid-strafe; re-deciding every tick causes jitter).
+        if (goAroundLane != null && goAroundTicks > 0) {
+            goAround(mc, "committed");
             return;
+        }
+
+        // Decision core is the pure, unit-tested planner; this method just executes its plan.
+        var world = plannerWorld(mc);
+        var plan = com.autism.seedcracker.util.pure.TunnelPlanner.plan(
+            world, playerPos, tunnelDirection, escapeHoles.get(), targetY.get());
+
+        switch (plan.action()) {
+            case GO_AROUND -> { goAround(mc, plan.reason()); return; }
+            case ESCAPE_HOLE -> { tickEscapeHole(mc); return; }
+            default -> {}
         }
         mc.options.keyLeft.setDown(false);
         mc.options.keyRight.setDown(false);
 
-        BlockState feetState = mc.level.getBlockState(aheadFeet);
-        BlockState headState = mc.level.getBlockState(aheadHead);
-        boolean feetSolid = !feetState.isAir() && feetState.getBlock() != Blocks.BEDROCK;
-        boolean headSolid = !headState.isAir() && headState.getBlock() != Blocks.BEDROCK;
+        // Hazards handled and no commit active: clear go-around state.
+        goAroundLane = null;
+        goAroundTicks = 0;
+        goAroundFails = 0;
 
-        // Pick what to mine: head first (so the tunnel clears top-down), else feet.
-        BlockPos target = headSolid ? aheadHead : (feetSolid ? aheadFeet : null);
-
+        BlockPos target = plan.digTarget();
         if (target != null) {
             walkMiningTarget = target;
+            // Grim legitimacy: never sprint or be airborne while digging (top Grim flags).
+            mc.options.keySprint.setDown(false);
+            mc.options.keyUp.setDown(false); // stand still while mining
+            if (!mc.player.onGround()) {
+                mc.options.keyAttack.setDown(false);
+                if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                return;
+            }
             // Human pacing: wait the engine's break-gap between blocks instead of digging every tick.
             if (digGapTicks > 0) {
                 digGapTicks--;
                 mc.options.keyAttack.setDown(false);
                 if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
-                mc.options.keyUp.setDown(false);
                 return;
             }
-            // Xenon-style: aim directly at the block, then break whatever the crosshair
-            // ray-trace actually reports (with its real face). No custom drift/jitter.
+            // Keep breaking the same block until it's gone (digCrosshair drives the break via
+            // continueDestroyBlock on the converged crosshair; we don't hold the raw attack key).
+            if (lastDigPos != null && lastDigPos.equals(target) && !mc.level.getBlockState(target).isAir()) {
+                // Unbreakable-block detection: if we've been on the same block past the dig timeout,
+                // it's too hard / wrong tool for it - stop and avoid it instead of stalling forever.
+                if (++digTicks > digTimeout.get()) {
+                    digTicks = 0;
+                    digTicksTotal = 0;
+                    lastDigPos = null;
+                    digActive = false;
+                    walkMiningTarget = null;
+                    mc.options.keyAttack.setDown(false);
+                    if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                    com.autism.seedcracker.modules.FlagDetectorModule.report("UNBREAKABLE", "TunnelBaseFinder",
+                        "block not breaking after " + digTimeout.get() + "t at " + target + " state=" + mc.level.getBlockState(target).getBlock());
+                    startObstacleAvoidance(mc);
+                    return;
+                }
+                aimAtBlock(mc, target);
+                digCrosshair(mc);
+                return;
+            }
+            // New target: reset the unbreakable timer, auto-tool, then dig.
+            digTicks = 0;
+            if (autoTool.get()) selectBestTool(mc, mc.level.getBlockState(target));
             aimAtBlock(mc, target);
-            mc.options.keyUp.setDown(false); // stand still while mining
-            mc.options.keyAttack.setDown(true);
             digCrosshair(mc);
-            // Re-arm the human-paced gap for the next block.
+            lastDigPos = target;
+            digActive = true;
             digGapTicks = com.autism.seedcracker.util.tunnel.HumanPacingEngine.get().breakGapTicks();
         } else {
             // 2x1 space ahead is clear: stop mining and walk forward.
             walkMiningTarget = null;
+            lastDigPos = null;
+            digActive = false;
             mc.options.keyAttack.setDown(false);
             if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
             // Face forward (level) and walk.
             faceForwardHuman(mc);
-            mc.options.keyUp.setDown(true);
+            walkForward(mc, mc.player.blockPosition().relative(tunnelDirection));
         }
     }
 
-    /** True if the lane one block to the side has no lava/water at feet/head/ground. */
-    private boolean isLaneSafe(Minecraft mc, Direction sideDir) {
-        BlockPos p = mc.player.blockPosition().relative(sideDir);
-        return !isLiquid(mc, p) && !isLiquid(mc, p.above()) && !isLiquid(mc, p.below());
+    // ---- go-around (shared hazard/bedrock escape) ----
+    private Direction goAroundLane = null;
+    private int goAroundTicks = 0;
+    private int goAroundFails = 0;
+
+    /**
+     * Escape an obstacle (lava, hazard pocket, bedrock wall) by committing to a sideways lane
+     * shift for several ticks. Scores both lanes 3 blocks deep (liquids + bedrock walls) instead
+     * of only 1, digs the lane open when it's blocked-but-safe, and only turns 90 degrees after
+     * repeated failures - so digging along bedrock jogs around the bumps instead of stalling.
+     */
+    private void goAround(Minecraft mc, String why) {
+        walkMiningTarget = null;
+        lastDigPos = null;
+        digTicks = 0;
+        if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+        mc.options.keyAttack.setDown(false);
+        mc.options.keyUp.setDown(false);
+
+        // Committed shift in progress: keep strafing until the lane change lands.
+        if (goAroundLane != null && goAroundTicks > 0) {
+            goAroundTicks--;
+            strafeOrDigLane(mc, goAroundLane);
+            return;
+        }
+
+        Direction lane = com.autism.seedcracker.util.pure.TunnelPlanner.chooseLane(
+            plannerWorld(mc), mc.player.blockPosition(), tunnelDirection);
+        if (lane != null) {
+            if (fixedCoordIsX) fixedCoord += lane.getStepX();
+            else fixedCoord += lane.getStepZ();
+            goAroundLane = lane;
+            goAroundTicks = com.autism.seedcracker.util.Tuning.GO_AROUND_COMMIT_TICKS;
+            goAroundFails = 0;
+            strafeOrDigLane(mc, lane);
+        } else if (++goAroundFails >= com.autism.seedcracker.util.Tuning.GO_AROUND_MAX_FAILS) {
+            // Boxed in on both sides repeatedly: 90-degree turn as the last resort.
+            tunnelDirection = tunnelDirection.getClockWise();
+            goAroundFails = 0;
+            goAroundLane = null;
+            FlagDetectorModule.report("GO_AROUND", "TunnelBaseFinder", "boxed in (" + why + "), turned " + tunnelDirection);
+        }
     }
 
-    /** Aim directly at the tunnel direction, level pitch (Xenon-style, no drift/jitter). */
+    /** Strafe into the lane; if a safe solid block is in the way, dig it open first. */
+    private void strafeOrDigLane(Minecraft mc, Direction lane) {
+        BlockPos p = mc.player.blockPosition().relative(lane);
+        BlockState feet = mc.level.getBlockState(p);
+        BlockState head = mc.level.getBlockState(p.above());
+        boolean feetBlocked = !feet.isAir() && feet.getBlock() != Blocks.BEDROCK && !isHazardous(mc, p);
+        boolean headBlocked = !head.isAir() && head.getBlock() != Blocks.BEDROCK && !isHazardous(mc, p.above());
+        if (headBlocked || feetBlocked) {
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
+            mineDirect(mc, headBlocked ? p.above() : p);
+            return;
+        }
+        miningLookDown = false;
+        boolean isRight = lane == tunnelDirection.getClockWise();
+        mc.options.keyRight.setDown(isRight);
+        mc.options.keyLeft.setDown(!isRight);
+    }
+
+    /** Smoothly turn back to facing the tunnel direction at level pitch (no snap). */
     private void faceForwardHuman(Minecraft mc) {
+        miningLookDown = false;
         float targetYaw = getDirectionYaw(tunnelDirection);
-        currentSmoothedYaw = targetYaw;
-        currentSmoothedPitch = basePitchBias;
-        LookRotation.apply(targetYaw, clampPitch(basePitchBias));
+        MovementStyle style = movementStyle.get();
+        if (style == MovementStyle.AUTISM) {
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            float[] rot = autismAim.face(mc, targetYaw, basePitchBias);
+            currentSmoothedYaw = rot[0];
+            currentSmoothedPitch = rot[1];
+            return;
+        }
+        if (style == MovementStyle.MOUSE) {
+            com.autism.seedcracker.util.tunnel.MouseRotation.get().rotateTo(targetYaw, basePitchBias);
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            return;
+        }
+        if (style == MovementStyle.LEGIT || style == MovementStyle.SILENT || style == MovementStyle.HAZARD_ONLY) {
+            float[] rot = legitMovement.update(targetYaw, basePitchBias);
+            currentSmoothedYaw = rot[0];
+            currentSmoothedPitch = rot[1];
+            applyFacing(mc, rot[0], rot[1], style);
+            return;
+        }
+        currentSmoothedYaw = LookRotation.approachAngle(currentSmoothedYaw, targetYaw, 16.0f);
+        currentSmoothedPitch = LookRotation.approach(currentSmoothedPitch, basePitchBias, 10.0f);
+        if (silentRotation.get()) {
+            // Silent rotation: the server sees us facing forward via movement packets, but the
+            // client camera never snaps (less flaggy). The crosshair dig still uses the camera.
+            com.autism.seedcracker.util.tunnel.SilentRotation.apply(currentSmoothedYaw, clampPitch(currentSmoothedPitch));
+        } else {
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            LookRotation.apply(currentSmoothedYaw, clampPitch(currentSmoothedPitch));
+        }
+    }
+
+    /**
+     * Walk forward toward a target block. When silent rotation is active and silent-strafe is on,
+     * resolve the movement keys against the SILENT yaw (wocky strafe-relative-to-silent-yaw) so we
+     * keep walking down the tunnel while the server sees us looking at the dig face. Otherwise a
+     * plain forward press.
+     */
+    private void walkForward(Minecraft mc, BlockPos target) {
+        if (silentStrafe.get() && com.autism.seedcracker.util.tunnel.SilentRotation.isActive()) {
+            com.autism.seedcracker.util.tunnel.MovementInput.apply(
+                target.getX() + 0.5, target.getZ() + 0.5, false, false);
+        } else {
+            mc.options.keyUp.setDown(true);
+        }
     }
 
     // ---- main tunneling state machine ----
@@ -650,7 +1092,9 @@ public final class TunnelBaseFinderModule extends Module {
             mc.options.keyUp.setDown(false);
             avoidForwardCount++;
             if (avoidForwardCount > 60) {
-                fixedCoord += avoidSideDirection;
+                Direction sideDir = getSideDirection(tunnelDirection, avoidSideDirection);
+                if (fixedCoordIsX) fixedCoord += sideDir.getStepX();
+                else fixedCoord += sideDir.getStepZ();
                 avoidState = AvoidState.SIDESTEP;
                 avoidForwardCount = 0;
                 waitTicks = 5;
@@ -768,9 +1212,17 @@ public final class TunnelBaseFinderModule extends Module {
         mc.player.setYRot(currentSmoothedYaw + gaussian(0f, 0.04f));
         mc.player.setXRot(clampPitch(currentSmoothedPitch + gaussian(0f, 0.04f) * 0.5f));
 
-        if (Math.abs(angleDiff(currentSmoothedYaw, targetYaw)) > 15f) return;
+        // Convergence gate: only swing once BOTH axes are close AND the crosshair ray actually
+        // intersects the target (hitting a player you're not looking at is a Grim HitBox flag).
+        if (Math.abs(angleDiff(currentSmoothedYaw, targetYaw)) > com.autism.seedcracker.util.Tuning.AIM_CONVERGENCE_DEG
+            || Math.abs(currentSmoothedPitch - targetPitch) > com.autism.seedcracker.util.Tuning.ATTACK_PITCH_TOLERANCE_DEG) return;
         if (playerAttackCooldown > 0) { playerAttackCooldown--; return; }
-        if (mc.player.distanceToSqr(targetPlayer) <= 16.0) {
+        // WexSide HitCooldown: only swing once the vanilla attack bar has recharged -
+        // spam-clicking mid-cooldown does no damage and reads as autoclicker.
+        if (mc.player.getAttackStrengthScale(0.5f) < com.autism.seedcracker.util.Tuning.ATTACK_STRENGTH_GATE) return;
+        boolean rayOnTarget = mc.hitResult instanceof net.minecraft.world.phys.EntityHitResult ehr
+            && ehr.getEntity() == targetPlayer;
+        if (rayOnTarget && mc.player.distanceToSqr(targetPlayer) <= 9.0) { // vanilla 3-block reach
             mc.gameMode.attack(mc.player, targetPlayer);
             mc.player.swing(InteractionHand.MAIN_HAND);
             playerAttackHits++;
@@ -798,6 +1250,7 @@ public final class TunnelBaseFinderModule extends Module {
     // ---- block breaking ----
 
     private void mineDirect(Minecraft mc, BlockPos pos) {
+        miningLookDown = true;
         aimAtBlock(mc, pos);
         digCrosshair(mc);
     }
@@ -810,10 +1263,46 @@ public final class TunnelBaseFinderModule extends Module {
      */
     private void digCrosshair(Minecraft mc) {
         if (mc.player.isUsingItem()) return;
+        if (!mc.player.onGround()) return; // never dig while airborne (Grim flag)
+        // AUTISM mode uses a slow human rotation - don't dig until the crosshair has actually
+        // converged on the intended block, else we dig the wrong block mid-turn and lag back.
+        if (movementStyle.get() == MovementStyle.AUTISM && digTarget != null
+            && !autismAim.isDone(getTargetYaw(digTarget), getTargetPitch(digTarget))) {
+            return; // still turning onto the block
+        }
         net.minecraft.world.phys.HitResult target = mc.hitResult;
         if (target != null && target.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
             net.minecraft.world.phys.BlockHitResult bhr = (net.minecraft.world.phys.BlockHitResult) target;
             BlockPos pos = bhr.getBlockPos();
+            if (!withinReach(mc, pos)) return;
+            // Anti-lagback: vanilla continueDestroyBlock RESTARTS the dig (start+abort packets)
+            // every time the position changes. Digging whatever the ray touches mid-turn churned
+            // START/ABORT across neighbouring blocks and desynced server break progress. Only dig
+            // when the ray is on the intended block, or the aim has converged (<8 deg off) so a
+            // neighbouring face of the same cluster is a genuine near-miss, not turn spray.
+            if (digTarget != null && !pos.equals(digTarget)) {
+                float conv = com.autism.seedcracker.util.Tuning.AIM_CONVERGENCE_DEG;
+                float yawErr = Math.abs(angleDiff(mc.player.getYRot(), getTargetYaw(digTarget)));
+                float pitchErr = Math.abs(mc.player.getXRot() - getTargetPitch(digTarget));
+                if (yawErr > conv || pitchErr > conv) return; // still turning; don't touch this block
+            }
+            // Break-desync re-sync (nyx AutoTunnelUtil, same as AutoMine): if the game-mode is
+            // mid-break on a DIFFERENT block than the ray target, release before re-pressing -
+            // continueDestroyBlock on a new pos silently aborts+restarts, churning packets.
+            if (digDesyncCooldown > 0) { digDesyncCooldown--; return; }
+            try {
+                var acc = (autismclient.mixin.accessor.AutismMultiPlayerGameModeAccessor) mc.gameMode;
+                if (acc.autism$isDestroying()) {
+                    BlockPos breaking = acc.autism$getDestroyBlockPos();
+                    if (breaking != null && !breaking.equals(pos)
+                        && !mc.level.getBlockState(breaking).isAir()) {
+                        mc.gameMode.stopDestroyBlock();
+                        digDesyncCooldown = com.autism.seedcracker.util.Tuning.DESYNC_BACKOFF_MIN
+                            + rng.nextInt(com.autism.seedcracker.util.Tuning.DESYNC_BACKOFF_MAX);
+                        return;
+                    }
+                }
+            } catch (Throwable ignored) {}
             if (!mc.level.getBlockState(pos).isAir() && mc.gameMode != null) {
                 mc.gameMode.continueDestroyBlock(pos, bhr.getDirection());
                 mc.player.swing(InteractionHand.MAIN_HAND);
@@ -821,17 +1310,313 @@ public final class TunnelBaseFinderModule extends Module {
         }
     }
 
-    /** Aim the camera directly at a block's centre (Xenon setYaw/setPitch style, no drift). */
+    private int digDesyncCooldown = 0;
+
+    private static float getTargetYaw(BlockPos pos) {
+        Minecraft mc = Minecraft.getInstance();
+        double dx = pos.getX() + 0.5 - mc.player.getX();
+        double dz = pos.getZ() + 0.5 - mc.player.getZ();
+        return (float) Math.toDegrees(Math.atan2(-dx, dz));
+    }
+
+    private static float getTargetPitch(BlockPos pos) {
+        Minecraft mc = Minecraft.getInstance();
+        double dx = pos.getX() + 0.5 - mc.player.getX();
+        double dy = pos.getY() + 0.5 - mc.player.getEyeY();
+        double dz = pos.getZ() + 0.5 - mc.player.getZ();
+        return (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
+    }
+
+    /** Vanilla-ish reach check (a little over survival reach to be safe, not exploit-far). */
+    private static boolean withinReach(Minecraft mc, BlockPos pos) {
+        double dx = pos.getX() + 0.5 - mc.player.getX();
+        double dy = pos.getY() + 0.5 - mc.player.getEyeY();
+        double dz = pos.getZ() + 0.5 - mc.player.getZ();
+        return dx * dx + dy * dy + dz * dz <= 5.2 * 5.2;
+    }
+
+    /** The block we're currently trying to dig (so digCrosshair only fires on it). */
+    private BlockPos digTarget = null;
+    private BlockPos lastDigPos = null;
+    private boolean digActive = false;
+
+    private final com.autism.seedcracker.util.StuckDetector stuck =
+        new com.autism.seedcracker.util.StuckDetector("TunnelBaseFinderModule",
+            com.autism.seedcracker.util.Tuning.STUCK_TICKS_TUNNEL, com.autism.seedcracker.util.Tuning.STUCK_EPSILON);
+
+    // ---- auto-mend ----
+    private int mendCooldown = 0;
+    private int mendingTicks = 0;
+    private boolean wasMending = false;
+    private int mendPhase = 0; // 0=select xp, 1=throw, 2=swap back
+    private int mendPickSlot = -1;
+
+    /**
+     * When the held pickaxe is below the mend threshold, pause digging and throw XP bottles to
+     * repair it (Mending). Returns true while a mend cycle is active (so digging pauses).
+     */
+    private boolean tickMend(Minecraft mc) {
+        if (mendCooldown > 0) { mendCooldown--; }
+        net.minecraft.world.item.ItemStack held = mc.player.getMainHandItem();
+        boolean isPick = !held.isEmpty() && net.minecraft.core.registries.BuiltInRegistries.ITEM
+            .getKey(held.getItem()).toString().endsWith("_pickaxe");
+        boolean lowDurability = isPick && held.getMaxDamage() > 0
+            && (held.getMaxDamage() - held.getDamageValue()) <= mendThreshold.get();
+
+        if (!lowDurability) {
+            if (wasMending) { wasMending = false; mendingTicks = 0; }
+            return false;
+        }
+
+        // Find XP bottles in the hotbar; if none, we can't mend (resume digging to avoid stalling).
+        int xpSlot = findItemSlot(mc, net.minecraft.world.item.Items.EXPERIENCE_BOTTLE);
+        if (xpSlot == -1) return false;
+
+        // Pause digging during the mend.
+        mc.options.keyAttack.setDown(false);
+        if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+        wasMending = true;
+        mendingTicks++;
+
+        // Look down (throw bottles at your feet so the XP orbs hit you) and throw on a cooldown.
+        // Spread select -> use -> swap-back over separate ticks: a same-tick carried-item change
+        // plus use-item plus another carried-item change is a classic bot packet burst.
+        LookRotation.apply(mc.player.getYRot(), 85f);
+        if (mc.gameMode != null) {
+            switch (mendPhase) {
+                case 0 -> {
+                    if (mendCooldown > 0) return true;
+                    mendPickSlot = mc.player.getInventory().getSelectedSlot();
+                    com.autism.seedcracker.util.InvSync.select(mc, xpSlot);
+                    mendPhase = 1;
+                }
+                case 1 -> {
+                    // Verify we actually hold a bottle before throwing (select may not have landed).
+                    if (!mc.player.getMainHandItem().is(net.minecraft.world.item.Items.EXPERIENCE_BOTTLE)) {
+                        mendPhase = 0; return true;
+                    }
+                    mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
+                    mc.player.swing(InteractionHand.MAIN_HAND);
+                    mendPhase = 2;
+                }
+                case 2 -> {
+                    // Swap back to the pickaxe next tick so Mending repairs it when orbs land.
+                    if (mendPickSlot >= 0 && mendPickSlot <= 8) {
+                        com.autism.seedcracker.util.InvSync.select(mc, mendPickSlot);
+                    }
+                    mendCooldown = 12;
+                    mendPhase = 0;
+                }
+            }
+        }
+        // Stay in mend mode while low (digging stays paused); orbs land and repair the pickaxe.
+        return true;
+    }
+
+    // ---- pause-to-eat ----
+    private boolean eating = false;
+    private int eatPrevSlot = -1;
+
+    /** Pause digging and eat when hungry; resumes after. Returns true while eating. */
+    private boolean tickEat(Minecraft mc) {
+        if (mc.gameMode == null) return false;
+        var food = mc.player.getFoodData();
+        boolean hungry = food.getFoodLevel() <= eatHunger.get() && food.getFoodLevel() < 20;
+
+        if (!eating) {
+            if (!hungry) return false;
+            int foodSlot = findFoodSlot(mc);
+            if (foodSlot == -1) return false; // no food: keep digging
+            eating = true;
+            eatPrevSlot = mc.player.getInventory().getSelectedSlot();
+            com.autism.seedcracker.util.InvSync.select(mc, foodSlot);
+        }
+
+        // Eating: stop digging, hold use until full (or food runs out).
+        mc.options.keyAttack.setDown(false);
+        if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+        var heldFood = mc.player.getInventory().getItem(mc.player.getInventory().getSelectedSlot());
+        if (!isFood(heldFood)) {
+            int next = findFoodSlot(mc);
+            if (next == -1) { stopEating(mc); return false; }
+            com.autism.seedcracker.util.InvSync.select(mc, next);
+        }
+        mc.options.keyUse.setDown(true);
+        if (!mc.player.isUsingItem()) mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
+
+        if (food.getFoodLevel() >= 20 || !hungry) { stopEating(mc); return false; }
+        return true;
+    }
+
+    private void stopEating(Minecraft mc) {
+        mc.options.keyUse.setDown(false);
+        if (eatPrevSlot >= 0 && eatPrevSlot <= 8) com.autism.seedcracker.util.InvSync.select(mc, eatPrevSlot);
+        eatPrevSlot = -1;
+        eating = false;
+    }
+
+    private boolean isFood(net.minecraft.world.item.ItemStack s) {
+        return !s.isEmpty() && s.has(net.minecraft.core.component.DataComponents.FOOD);
+    }
+
+    private int findFoodSlot(Minecraft mc) {
+        for (int i = 0; i < 9; i++) {
+            if (isFood(mc.player.getInventory().getItem(i))) return i;
+        }
+        return -1;
+    }
+
+    // ---- sell-on-full ----
+    private int sellCooldown = 0;
+
+    /** When the inventory is full, /ah sell (or /orders deliver) the listed items instead of dropping them. */
+    private void tickSellOnFull(Minecraft mc) {
+        if (sellCooldown > 0) { sellCooldown--; return; }
+        if (mc.getConnection() == null) return;
+        // Full = no empty slot across hotbar + main inventory.
+        boolean full = true;
+        for (int i = 0; i < 36; i++) {
+            if (mc.player.getInventory().getItem(i).isEmpty()) { full = false; break; }
+        }
+        if (!full) return;
+
+        // Build the wanted-id set.
+        java.util.Set<String> wanted = new java.util.HashSet<>();
+        for (String s : sellItems.get().split(",")) wanted.add(s.trim().toLowerCase(java.util.Locale.ROOT));
+
+        // Find a HOTBAR slot holding a listed item (we can only /ah sell the held item, so it must
+        // be in the hotbar and we must select it first - never sell whatever happens to be held).
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.world.item.ItemStack stack = mc.player.getInventory().getItem(i);
+            if (stack.isEmpty()) continue;
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())
+                .toString().replace("minecraft:", "");
+            if (!wanted.contains(id)) continue;
+            // Select the slot, then VERIFY the held item is the one we intend to sell before selling.
+            com.autism.seedcracker.util.InvSync.select(mc, i);
+            net.minecraft.world.item.ItemStack held = mc.player.getMainHandItem();
+            String heldId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(held.getItem())
+                .toString().replace("minecraft:", "");
+            if (!heldId.equals(id)) { sellCooldown = 5; return; } // swap hasn't registered yet; retry
+            if (sellViaOrders.get()) {
+                mc.getConnection().sendCommand("orders");
+            } else {
+                mc.getConnection().sendCommand("ah sell " + sellPrice.get().trim().replace(",", ""));
+            }
+            sellCooldown = 20;
+            return;
+        }
+        // The wanted item isn't in the hotbar. Move a matching main-inventory stack into the hotbar
+        // first (so we never sell the pickaxe/held item by mistake), then sell next tick.
+        for (int i = 9; i < 36; i++) {
+            net.minecraft.world.item.ItemStack stack = mc.player.getInventory().getItem(i);
+            if (stack.isEmpty()) continue;
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())
+                .toString().replace("minecraft:", "");
+            if (!wanted.contains(id)) continue;
+            // Find a hotbar slot that is NOT a wanted-sell item and NOT the tool (prefer junk).
+            int swapTarget = findHotbarSwapTarget(mc, wanted);
+            if (swapTarget >= 0) {
+                swapInventoryToHotbar(mc, i, swapTarget);
+                sellCooldown = 5;
+                return;
+            }
+        }
+        // Nothing listed to sell: drop nothing, just wait (don't loop-sell).
+        sellCooldown = 60;
+    }
+
+    /** A hotbar slot we can safely overwrite (empty, or itself a wanted sell item, not a tool). */
+    private int findHotbarSwapTarget(Minecraft mc, java.util.Set<String> wanted) {
+        for (int i = 0; i < 9; i++) {
+            net.minecraft.world.item.ItemStack stack = mc.player.getInventory().getItem(i);
+            if (stack.isEmpty()) return i;
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())
+                .toString().replace("minecraft:", "");
+            // Safe to consolidate onto another stack of a sellable junk item (not a tool).
+            if (wanted.contains(id) && !id.endsWith("_pickaxe") && !id.endsWith("_axe")
+                && !id.endsWith("_shovel") && !id.endsWith("_sword")) return i;
+        }
+        return -1;
+    }
+
+    /** Move a main-inventory stack into a hotbar slot via the player inventory menu 3-click swap. */
+    private void swapInventoryToHotbar(Minecraft mc, int from, int hotbarSlot) {
+        var h = mc.player.inventoryMenu;
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(h.containerId, from, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(h.containerId, 36 + hotbarSlot, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(h.containerId, from, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
+    }
+
+    private int findItemSlot(Minecraft mc, net.minecraft.world.item.Item item) {
+        for (int i = 0; i < 9; i++) {
+            if (mc.player.getInventory().getItem(i).is(item)) return i;
+        }
+        return -1;
+    }
+
+    /** Swap to the hotbar slot with the fastest destroy speed for the given block (auto-tool). */
+    private void selectBestTool(Minecraft mc, net.minecraft.world.level.block.state.BlockState state) {
+        int bestSlot = -1;
+        float bestSpeed = -1.0f;
+        for (int slot = 0; slot < 9; slot++) {
+            net.minecraft.world.item.ItemStack stack = mc.player.getInventory().getItem(slot);
+            if (stack.isEmpty()) continue;
+            float speed = stack.getDestroySpeed(state);
+            // Skip non-tools (speed 1.0 = hand) unless nothing better exists.
+            if (speed > bestSpeed) { bestSpeed = speed; bestSlot = slot; }
+        }
+        if (bestSlot == -1) return;
+        float current = mc.player.getMainHandItem().getDestroySpeed(state);
+        if (bestSpeed > current) {
+            com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
+        }
+    }
+
+    /**
+     * Smoothly turn the camera toward a block (real-player mouse speed), not an instant snap.
+     * Records the block as the dig target so digCrosshair only fires once we're actually on it.
+     */
     private void aimAtBlock(Minecraft mc, BlockPos pos) {
+        digTarget = pos;
         double dx = pos.getX() + 0.5 - mc.player.getX();
         double dy = pos.getY() + 0.5 - mc.player.getEyeY();
         double dz = pos.getZ() + 0.5 - mc.player.getZ();
         double dist = Math.hypot(dx, dz);
         float targetYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         float targetPitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
-        currentSmoothedYaw = targetYaw;
-        currentSmoothedPitch = targetPitch;
-        LookRotation.apply(targetYaw, clampPitch(targetPitch));
+        MovementStyle style = movementStyle.get();
+        if (style == MovementStyle.AUTISM) {
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            float[] rot = autismAim.faceBlock(mc, pos);
+            currentSmoothedYaw = rot[0];
+            currentSmoothedPitch = rot[1];
+            return;
+        }
+        if (style == MovementStyle.MOUSE) {
+            // Mouse-delta rotation drives the crosshair onto the block through the real mouse path.
+            com.autism.seedcracker.util.tunnel.MouseRotation.get().rotateTo(targetYaw, targetPitch);
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            return;
+        }
+        if (style == MovementStyle.LEGIT || style == MovementStyle.SILENT || style == MovementStyle.HAZARD_ONLY) {
+            // Legit engine eases onto the block like a human mouse. A dig genuinely needs the
+            // crosshair on the block, so even SILENT mode eases the real camera here (silent
+            // packet-rotation is reserved for walking, where we don't need the crosshair).
+            float[] rot = legitMovement.update(targetYaw, targetPitch);
+            currentSmoothedYaw = rot[0];
+            currentSmoothedPitch = rot[1];
+            com.autism.seedcracker.util.tunnel.SilentRotation.clear();
+            mc.player.setYRot(rot[0]);
+            mc.player.setXRot(clampPitch(rot[1]));
+            return;
+        }
+        // VANILLA path: ease onto the block with the human-turn curve (fast flick, slow settle,
+        // no overshoot) so it looks like a real mouse instead of a constant-speed snap.
+        float yawStep = 26.0f, pitchStep = 20.0f;
+        currentSmoothedYaw = LookRotation.humanTurn(currentSmoothedYaw, targetYaw, yawStep);
+        currentSmoothedPitch = LookRotation.humanTurnPitch(currentSmoothedPitch, targetPitch, pitchStep);
+        LookRotation.apply(currentSmoothedYaw, clampPitch(currentSmoothedPitch));
     }
 
     private void handleBlockBreaking(Minecraft mc, boolean breaking, BlockHitResult hit) {
@@ -903,6 +1688,14 @@ public final class TunnelBaseFinderModule extends Module {
 
     private void onBaseFound(Minecraft mc, String kind, int x, int y, int z) {
         if (!notify.get()) return;
+        // Dedup: only notify once per base (keyed by kind + rough location, with a cooldown), so
+        // the sound/toast doesn't spam every tick while a base stays in range.
+        long now = System.currentTimeMillis();
+        String key = kind + ":" + (x >> 4) + ":" + (z >> 4);
+        Long last = foundNotifiedAt.get(key);
+        if (last != null && now - last < FOUND_COOLDOWN_MS) return;
+        foundNotifiedAt.put(key, now);
+
         String msg = "Found " + kind + " at X:" + x + " Y:" + y + " Z:" + z;
         AutismNotifications.warning("Tunnel base: " + kind + " at " + x + " " + z);
         AutismClientMessaging.sendPrefixed("§d[TunnelBaseFinder] §f" + msg);
@@ -910,6 +1703,10 @@ public final class TunnelBaseFinderModule extends Module {
         if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
         if (pauseOnFind.get()) setEnabled(false);
     }
+
+    /** kind:chunkX:chunkZ -> last-notified time (dedupes the base-found sound/toast). */
+    private final java.util.Map<String, Long> foundNotifiedAt = new java.util.HashMap<>();
+    private static final long FOUND_COOLDOWN_MS = 60_000L;
 
     private void logToBaseFile(Minecraft mc, int x, int y, int z, String kind) {
         try {
@@ -1018,24 +1815,22 @@ public final class TunnelBaseFinderModule extends Module {
 
     // ---- hazard helpers ----
 
+    // Hazard classification lives in the shared Hazards util (single source of truth for both
+    // tunnel bots); these thin wrappers keep the module's call sites unchanged.
     private boolean isHazardous(Minecraft mc, BlockPos pos) {
-        Block b = mc.level.getBlockState(pos).getBlock();
-        return b == Blocks.LAVA || b == Blocks.WATER || b == Blocks.GRAVEL || b == Blocks.SAND || b == Blocks.RED_SAND;
+        return com.autism.seedcracker.util.tunnel.Hazards.isHazardous(mc, pos);
     }
 
     private boolean isLiquid(Minecraft mc, BlockPos pos) {
-        Block b = mc.level.getBlockState(pos).getBlock();
-        return b == Blocks.LAVA || b == Blocks.WATER;
+        return com.autism.seedcracker.util.tunnel.Hazards.isLiquid(mc, pos);
+    }
+
+    private boolean isLava(Minecraft mc, BlockPos pos) {
+        return com.autism.seedcracker.util.tunnel.Hazards.isLava(mc, pos);
     }
 
     private boolean hasHazardAbove(Minecraft mc, BlockPos headPos, int maxHeight) {
-        for (int y = 1; y <= maxHeight; y++) {
-            BlockPos above = headPos.above(y);
-            Block b = mc.level.getBlockState(above).getBlock();
-            if (b == Blocks.GRAVEL || b == Blocks.SAND || b == Blocks.RED_SAND || b == Blocks.LAVA || b == Blocks.WATER) return true;
-            if (!mc.level.getBlockState(above).isAir() && !isHazardous(mc, above)) break;
-        }
-        return false;
+        return com.autism.seedcracker.util.tunnel.Hazards.hasHazardAbove(mc, headPos, maxHeight);
     }
 
     private boolean isSideSafe(Minecraft mc, Direction sideDir) {

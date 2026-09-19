@@ -38,21 +38,24 @@ public final class CoordSnapperModule extends Module {
         return true;
     }
 
+    private final com.autism.seedcracker.util.tunnel.SimpleSneakCentering centering =
+        new com.autism.seedcracker.util.tunnel.SimpleSneakCentering();
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        BlockPos block = mc.player.blockPosition();
-        double x = block.getX() + 0.5;
-        double z = block.getZ() + 0.5;
-        double y = snapY.get() ? block.getY() : mc.player.getY();
+        // Legit centering: drive the player toward the block centre using movement keys (like a
+        // real player nudging into place), never setPos/setDeltaMovement (those are teleports the
+        // anti-cheat flags instantly).
+        if (!centering.isActive()) centering.startCentering();
+        centering.tick();
+    }
 
-        mc.player.setPos(x, y, z);
-        if (stopMotion.get()) {
-            Vec3 motion = mc.player.getDeltaMovement();
-            mc.player.setDeltaMovement(0.0, snapY.get() ? Math.min(0.0, motion.y) : motion.y, 0.0);
-        }
+    @Override
+    public void onDisable() {
+        centering.stopCentering();
     }
 
     @Override

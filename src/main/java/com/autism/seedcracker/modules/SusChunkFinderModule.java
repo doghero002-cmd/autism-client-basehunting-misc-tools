@@ -43,6 +43,11 @@ public final class SusChunkFinderModule extends Module {
             "mode", "Mode", Mode.XENON, Mode.values())
         .description("XENON = fast below-Y15 player-placement detection. TYPES = per-block-type detector.")
         .group("General"));
+    private final EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
+        new EnumSetting<>("sensitivity", "Sensitivity",
+            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+        .description("XENON: HIGH/MEDIUM = 1 player-placed block flags, LOW = need 2. TYPES: scales the per-type min counts.")
+        .group("General"));
     private final IntSetting scanRadius = add(new IntSetting(
             "scan-radius", "Scan radius (chunks)", 4, 1, 16, 1)
         .description("Chunk bubble around the player scanned.")
@@ -50,10 +55,6 @@ public final class SusChunkFinderModule extends Module {
     private final IntSetting rescanMs = add(new IntSetting(
             "rescan-ms", "Rescan (ms)", 1000, 250, 10000, 250)
         .description("How often each chunk is re-scanned (XENON mode).")
-        .group("General"));
-    private final IntSetting sensitivity = add(new IntSetting(
-            "sensitivity", "Sensitivity (TYPES)", 3, 1, 20, 1)
-        .description("Suspicious blocks needed in a chunk to flag it (TYPES mode).")
         .group("General"));
     private final ColorSetting color = add(new ColorSetting(
             "color", "Chunk colour", 0x50FF5050)
@@ -71,29 +72,58 @@ public final class SusChunkFinderModule extends Module {
             "skip-structures", "Skip natural structures", true)
         .description("XENON: don't flag spawners/blocks inside dungeons or trial chambers (they aren't player bases).")
         .group("General"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
+        .description("How many chunks to scan per tick (TYPES mode). Lower = less FPS impact (spread over more seconds); higher = faster full scan.")
+        .group("Performance"));
 
-    // TYPES-mode per-type toggles.
+    // TYPES-mode per-type toggles + per-type min-count sliders.
     private final BoolSetting kelp = add(new BoolSetting("kelp", "Kelp", true).group("Types"));
     private final IntSetting kelpCount = add(new IntSetting("kelp-count", "Kelp min count", 3, 1, 200, 1)
-        .description("Kelp blocks in a chunk needed to count toward the flag (dense kelp = a farm).").group("Types"));
+        .description("Kelp blocks in a chunk needed to flag (dense kelp = a farm).").group("Types"));
     private final BoolSetting caveVines = add(new BoolSetting("cave-vines", "Cave Vines", true).group("Types"));
+    private final IntSetting caveVinesCount = add(new IntSetting("cave-vines-count", "Cave vines min count", 3, 1, 200, 1)
+        .description("Cave-vine blocks in a chunk needed to flag.").group("Types"));
     private final BoolSetting vines = add(new BoolSetting("vines", "Vines", true).group("Types"));
+    private final IntSetting vinesCount = add(new IntSetting("vines-count", "Vines min count", 3, 1, 200, 1)
+        .description("Vine blocks in a chunk needed to flag.").group("Types"));
     private final BoolSetting amethystShards = add(new BoolSetting("amethyst-shards", "Amethyst Shards", true)
         .description("Amethyst clusters/buds - harvested by players, so a strong base indicator.")
         .group("Types"));
+    private final IntSetting amethystShardsCount = add(new IntSetting("amethyst-shards-count", "Amethyst shards min count", 1, 1, 200, 1)
+        .description("Amethyst clusters/buds in a chunk needed to flag.").group("Types"));
     private final BoolSetting amethystBlocks = add(new BoolSetting("amethyst-blocks", "Amethyst Blocks", false)
         .description("Full amethyst/budding blocks (geode structure - not player-placed).")
         .group("Types"));
+    private final IntSetting amethystBlocksCount = add(new IntSetting("amethyst-blocks-count", "Amethyst blocks min count", 4, 1, 200, 1)
+        .description("Full amethyst/budding blocks in a chunk needed to flag.").group("Types"));
     private final BoolSetting bamboo = add(new BoolSetting("bamboo", "Bamboo", true).group("Types"));
     private final IntSetting bambooCount = add(new IntSetting("bamboo-count", "Bamboo min count", 3, 1, 200, 1)
-        .description("Bamboo blocks in a chunk needed to count toward the flag (dense bamboo = a farm).").group("Types"));
+        .description("Bamboo blocks in a chunk needed to flag (dense bamboo = a farm).").group("Types"));
     private final BoolSetting beeNest = add(new BoolSetting("bee-nest", "Bee Nest", true).group("Types"));
+    private final IntSetting beeNestCount = add(new IntSetting("bee-nest-count", "Bee nest min count", 1, 1, 200, 1)
+        .description("Bee nests/hives in a chunk needed to flag.").group("Types"));
     private final BoolSetting rotatedDeepslate = add(new BoolSetting("rotated-deepslate", "Rotated Deepslate", true).group("Types"));
+    private final IntSetting rotatedDeepslateCount = add(new IntSetting("rotated-deepslate-count", "Rotated deepslate min count", 3, 1, 200, 1)
+        .description("Rotated (non-Y-axis) deepslate blocks in a chunk needed to flag.").group("Types"));
+    private final BoolSetting skullCandle = add(new BoolSetting("skull-candle", "Skulls / Candles", true)
+        .description("Mob skulls + candles (strong player-build / decoration markers, nyx signal).").group("Types"));
+    private final IntSetting skullCandleCount = add(new IntSetting("skull-candle-count", "Skull/candle min count", 1, 1, 200, 1)
+        .description("Skull or candle blocks in a chunk needed to flag.").group("Types"));
+    private final BoolSetting cocoa = add(new BoolSetting("cocoa", "Cocoa", false)
+        .description("Cocoa pods (a farm indicator, nyx signal).").group("Types"));
+    private final IntSetting cocoaCount = add(new IntSetting("cocoa-count", "Cocoa min count", 3, 1, 200, 1)
+        .description("Cocoa pods in a chunk needed to flag.").group("Types"));
+    private final BoolSetting villagerHall = add(new BoolSetting("villager-hall", "Villager hall (entities)", true)
+        .description("Villager/zombie-villager/allay/vindicator/warden entities in a chunk - an active base or villager hall (nyx signal).")
+        .group("Types"));
+    private final BoolSetting persistFlags = add(new BoolSetting("persist-flags", "Persist flags to disk", true)
+        .description("Save flagged chunks to disk keyed by dimension and reload them on join (survives relog, nyx behaviour).")
+        .group("General"));
 
     private final Set<ChunkPos> flagged = ConcurrentHashMap.newKeySet();
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private final Map<ChunkPos, Long> lastScan = new ConcurrentHashMap<>();
-    private long typesLastScanMs = 0;
 
     public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
@@ -105,19 +135,50 @@ public final class SusChunkFinderModule extends Module {
         flagged.clear();
         notified.clear();
         lastScan.clear();
+        if (persistFlags.get()) loadFlags();
     }
 
     @Override
     public void onDisable() {
+        if (persistFlags.get()) saveFlags();
         flagged.clear();
         notified.clear();
         lastScan.clear();
         ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
     }
 
+    // ---- disk persistence (nyx ChunkActivityScanner behaviour) ----
+    private java.nio.file.Path flagsFile() {
+        Minecraft mc = Minecraft.getInstance();
+        String dim = mc.level != null ? mc.level.dimension().toString().replace(':', '_') : "unknown";
+        return autismclient.AutismClientAddon.FOLDER.toPath()
+            .resolve("sus-chunk-flags-" + dim + ".txt");
+    }
+
+    private void loadFlags() {
+        try {
+            java.nio.file.Path f = flagsFile();
+            if (!java.nio.file.Files.exists(f)) return;
+            for (String line : java.nio.file.Files.readAllLines(f)) {
+                String[] p = line.trim().split(",");
+                if (p.length != 2) continue;
+                flagged.add(new ChunkPos(Integer.parseInt(p[0]), Integer.parseInt(p[1])));
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void saveFlags() {
+        try {
+            java.nio.file.Path f = flagsFile();
+            java.nio.file.Files.createDirectories(f.getParent());
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            for (ChunkPos p : flagged) lines.add(p.x() + "," + p.z());
+            java.nio.file.Files.write(f, lines);
+        } catch (Throwable ignored) {}
+    }
+
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -141,7 +202,12 @@ public final class SusChunkFinderModule extends Module {
         ChunkPos center = mc.player.chunkPosition();
         int minY = mc.level.getMinY();
 
-        for (int dx = -radius; dx <= radius; dx++) {
+        // Budgeted: only chunksPerTick chunks per tick (a full 16x16x79-block scan per chunk is
+        // ~20k block reads; the old loop did the whole radius in one tick whenever the rescan
+        // timers expired together = FPS hitch).
+        int budget = chunksPerTick.get();
+        outer:
+        for (int dx = -radius; dx <= radius && budget > 0; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 int cx = center.x() + dx;
                 int cz = center.z() + dz;
@@ -160,6 +226,7 @@ public final class SusChunkFinderModule extends Module {
                 } else {
                     flagged.remove(pos);
                 }
+                if (--budget <= 0) break outer;
             }
         }
 
@@ -177,15 +244,27 @@ public final class SusChunkFinderModule extends Module {
      * variants, torches, etc.). This avoids flagging every cave/ore vein.
      */
     private boolean isSusBelowY15(LevelChunk chunk, int minY) {
+        // LOW sensitivity: one lone torch/chest can be a dungeon remnant - need 2+ placed blocks.
+        int need = sensitivity.get() == com.autism.seedcracker.finder.FinderSensitivity.LOW ? 2 : 1;
+        int found = 0;
         int startX = chunk.getPos().getMinBlockX();
         int startZ = chunk.getPos().getMinBlockZ();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = 15; y >= minY; y--) {
-                    m.set(startX + x, y, startZ + z);
-                    if (isPlayerPlaced(chunk.getBlockState(m).getBlock())) {
-                        return true;
+        // Scan section-by-section, skipping all-air sections (hasOnlyAir is a cached palette
+        // check) - cuts most of the 20k block reads in cavey chunks.
+        for (int sy = minY; sy <= 15; sy += 16) {
+            int sectionIdx = chunk.getSectionIndex(sy);
+            if (sectionIdx < 0 || sectionIdx >= chunk.getSectionsCount()) continue;
+            if (chunk.getSection(sectionIdx).hasOnlyAir()) continue;
+            int yLo = Math.max(sy, minY);
+            int yHi = Math.min(sy + 15, 15);
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int y = yHi; y >= yLo; y--) {
+                        m.set(startX + x, y, startZ + z);
+                        if (isPlayerPlaced(chunk.getBlockState(m).getBlock()) && ++found >= need) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -227,69 +306,107 @@ public final class SusChunkFinderModule extends Module {
         return structureBlocks >= 3;
     }
 
-    // ---- TYPES mode: per-block-type counter (throttled to avoid the 1 FPS full-volume scan) ----
+    // ---- TYPES mode: incremental per-block-type scanner (spread across ticks to avoid lag) ----
+
+    private java.util.List<LevelChunk> scanQueue = java.util.Collections.emptyList();
+    private int scanIndex = 0;
+    private long lastQueueRefreshMs = 0;
 
     private void tickTypes(Minecraft mc) {
-        // Use the shared rescan delay (ms) between full scans, with the early-exit count cap so
-        // we never do a full-volume scan every frame.
+        // Refresh the chunk queue periodically (or when exhausted), then scan only chunksPerTick
+        // chunks this tick. A full pass therefore spreads over several seconds, so there's no
+        // single-tick FPS spike.
         long now = System.currentTimeMillis();
-        if (now - typesLastScanMs < rescanMs.get()) return;
-        typesLastScanMs = now;
-
-        int radius = scanRadius.get();
-        ChunkPos center = mc.player.chunkPosition();
-        int threshold = sensitivity.get();
-        java.util.List<LevelChunk> chunks = com.autism.seedcracker.finder.ChunkScanHelper.loadedChunksAround(mc, radius);
-
-        for (LevelChunk chunk : chunks) {
-            ChunkPos pos = chunk.getPos();
-            // Kelp and bamboo have their own count thresholds (dense patches = a farm), the rest
-            // use the shared sensitivity.
-            boolean sus = false;
-            if (kelp.get() && com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(
-                    chunk, s -> s.is(Blocks.KELP) || s.is(Blocks.KELP_PLANT), kelpCount.get()) >= kelpCount.get()) {
-                sus = true;
-            }
-            if (!sus && bamboo.get() && com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(
-                    chunk, s -> s.is(Blocks.BAMBOO) || s.is(Blocks.BAMBOO_SAPLING), bambooCount.get()) >= bambooCount.get()) {
-                sus = true;
-            }
-            if (!sus) {
-                int count = com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, this::isSuspiciousType, threshold);
-                if (count >= threshold) sus = true;
-            }
-            if (sus) {
-                if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
-            } else {
-                flagged.remove(pos);
-            }
+        if (scanIndex >= scanQueue.size() && now - lastQueueRefreshMs >= rescanMs.get()) {
+            scanQueue = com.autism.seedcracker.finder.ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
+            scanIndex = 0;
+            lastQueueRefreshMs = now;
         }
-        int pr = radius + 2;
+
+        int budget = chunksPerTick.get();
+        ChunkPos center = mc.player.chunkPosition();
+        while (budget-- > 0 && scanIndex < scanQueue.size()) {
+            LevelChunk chunk = scanQueue.get(scanIndex++);
+            scanChunkTypes(mc, chunk);
+        }
+
+        int pr = scanRadius.get() + 2;
         flagged.removeIf(p -> tooFar(p, center, pr));
         notified.removeIf(p -> tooFar(p, center, pr));
     }
 
-    private boolean isSuspiciousType(net.minecraft.world.level.block.state.BlockState state) {
-        if (state.isAir()) return false;
-        // (kelp and bamboo use their own count sliders in tickTypes, not this shared predicate)
-        if (caveVines.get() && (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT))) return true;
-        if (vines.get() && state.is(Blocks.VINE)) return true;
-        // Amethyst shards (the bits players harvest - a base indicator), separate from the
-        // full amethyst geode blocks below.
-        if (amethystShards.get() && (state.is(Blocks.AMETHYST_CLUSTER)
-            || state.is(Blocks.LARGE_AMETHYST_BUD)
-            || state.is(Blocks.MEDIUM_AMETHYST_BUD)
-            || state.is(Blocks.SMALL_AMETHYST_BUD))) return true;
-        if (amethystBlocks.get() && (state.is(Blocks.AMETHYST_BLOCK) || state.is(Blocks.BUDDING_AMETHYST))) return true;
-        if (beeNest.get() && (state.is(Blocks.BEE_NEST) || state.is(Blocks.BEEHIVE))) return true;
-        if (rotatedDeepslate.get() && state.is(Blocks.DEEPSLATE)
-            && state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)
-            && state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS) != net.minecraft.core.Direction.Axis.Y) return true;
-        return false;
+    /** Count-vs-threshold with the sensitivity scale applied (TYPES mode). */
+    private boolean typeHit(LevelChunk chunk, java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> pred, int baseCount) {
+        int need = sensitivity.get().scale(baseCount);
+        return com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, pred, need) >= need;
+    }
+
+    /** Run every enabled block-type check on one chunk and flag/unflag it. */
+    private void scanChunkTypes(Minecraft mc, LevelChunk chunk) {
+        ChunkPos pos = chunk.getPos();
+        boolean sus = false;
+        if (kelp.get() && typeHit(chunk, s -> s.is(Blocks.KELP) || s.is(Blocks.KELP_PLANT), kelpCount.get())) sus = true;
+        if (!sus && bamboo.get() && typeHit(chunk, s -> s.is(Blocks.BAMBOO) || s.is(Blocks.BAMBOO_SAPLING), bambooCount.get())) sus = true;
+        if (!sus && caveVines.get() && typeHit(chunk, s -> s.is(Blocks.CAVE_VINES) || s.is(Blocks.CAVE_VINES_PLANT), caveVinesCount.get())) sus = true;
+        if (!sus && vines.get() && typeHit(chunk, s -> s.is(Blocks.VINE), vinesCount.get())) sus = true;
+        if (!sus && amethystShards.get() && typeHit(chunk,
+                s -> s.is(Blocks.AMETHYST_CLUSTER) || s.is(Blocks.LARGE_AMETHYST_BUD)
+                    || s.is(Blocks.MEDIUM_AMETHYST_BUD) || s.is(Blocks.SMALL_AMETHYST_BUD),
+                amethystShardsCount.get())) sus = true;
+        if (!sus && amethystBlocks.get() && typeHit(chunk,
+                s -> s.is(Blocks.AMETHYST_BLOCK) || s.is(Blocks.BUDDING_AMETHYST),
+                amethystBlocksCount.get())) sus = true;
+        if (!sus && beeNest.get() && typeHit(chunk, s -> s.is(Blocks.BEE_NEST) || s.is(Blocks.BEEHIVE), beeNestCount.get())) sus = true;
+        if (!sus && rotatedDeepslate.get() && typeHit(chunk,
+                s -> s.is(Blocks.DEEPSLATE)
+                    && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)
+                    && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS) != net.minecraft.core.Direction.Axis.Y,
+                rotatedDeepslateCount.get())) sus = true;
+        if (!sus && skullCandle.get() && typeHit(chunk, SusChunkFinderModule::isSkullOrCandle, skullCandleCount.get())) sus = true;
+        if (!sus && cocoa.get() && typeHit(chunk, s -> s.is(Blocks.COCOA), cocoaCount.get())) sus = true;
+        if (!sus && villagerHall.get() && chunkHasVillagerHall(mc, pos)) sus = true;
+        if (sus) {
+            if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
+        } else {
+            flagged.remove(pos);
+        }
     }
 
     private static boolean tooFar(ChunkPos a, ChunkPos b, int radius) {
         return Math.abs(a.x() - b.x()) > radius || Math.abs(a.z() - b.z()) > radius;
+    }
+
+    /** Mob skulls + candles (nyx player-build / decoration signal). Dyed candles are typed
+     *  collections in 26.2 (no plain Blocks constant), so candles are matched by registry id. */
+    private static boolean isSkullOrCandle(net.minecraft.world.level.block.state.BlockState s) {
+        Block b = s.getBlock();
+        if (b == Blocks.SKELETON_SKULL || b == Blocks.WITHER_SKELETON_SKULL
+            || b == Blocks.ZOMBIE_HEAD || b == Blocks.CREEPER_HEAD || b == Blocks.PLAYER_HEAD
+            || b == Blocks.PIGLIN_HEAD || b == Blocks.DRAGON_HEAD
+            || b == Blocks.SKELETON_WALL_SKULL || b == Blocks.WITHER_SKELETON_WALL_SKULL
+            || b == Blocks.ZOMBIE_WALL_HEAD || b == Blocks.CREEPER_WALL_HEAD || b == Blocks.PLAYER_WALL_HEAD
+            || b == Blocks.PIGLIN_WALL_HEAD || b == Blocks.DRAGON_WALL_HEAD) return true;
+        if (b == Blocks.CANDLE) return true;
+        net.minecraft.resources.Identifier id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b);
+        return id != null && id.toString().endsWith("_candle");
+    }
+
+    /** True if the chunk has a villager/zombie-villager/allay/vindicator/warden (nyx base signal). */
+    private static boolean chunkHasVillagerHall(Minecraft mc, ChunkPos pos) {
+        if (mc.level == null) return false;
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
+            pos.getMinBlockX(), mc.level.getMinY(), pos.getMinBlockZ(),
+            pos.getMaxBlockX() + 1, mc.level.getMaxY() + 1, pos.getMaxBlockZ() + 1);
+        for (net.minecraft.world.entity.Entity e : mc.level.getEntitiesOfClass(
+                net.minecraft.world.entity.Entity.class, box,
+                x -> x instanceof net.minecraft.world.entity.npc.villager.Villager
+                    || x instanceof net.minecraft.world.entity.monster.zombie.ZombieVillager
+                    || x instanceof net.minecraft.world.entity.monster.illager.Vindicator
+                    || x instanceof net.minecraft.world.entity.animal.allay.Allay
+                    || x instanceof net.minecraft.world.entity.monster.warden.Warden)) {
+            return true;
+        }
+        return false;
     }
 
     private void onNewFlag(ChunkPos pos) {

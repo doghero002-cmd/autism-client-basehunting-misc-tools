@@ -107,7 +107,8 @@ public final class AntiAFKModule extends Module {
             mc.options.keyLeft.setDown(!strafeLeft);
             mc.options.keyRight.setDown(strafeLeft);
             strafeLeft = !strafeLeft;
-            strafeTimer = 20;
+            // Jitter the interval so the strafe doesn't form a detectable metronome.
+            strafeTimer = 15 + random.nextInt(25);
         }
 
         if (spin.get()) {

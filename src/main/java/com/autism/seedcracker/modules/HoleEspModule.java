@@ -79,8 +79,7 @@ public final class HoleEspModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -269,7 +268,10 @@ public final class HoleEspModule extends Module {
                 int kz = (int) (key & 0xffffffffL);
                 if (Math.abs(kx - pcx) > drawRange || Math.abs(kz - pcz) > drawRange) continue;
                 for (Hole hole : e.getValue()) {
-                    int color = hole.depth >= 10 ? DEEP : (hole.is1x1 ? SAFE : UNSAFE);
+                    // "Deep" is derived from the configured min-depth (2x) so the colour band
+                    // always makes sense regardless of the min-depth setting.
+                    int deepThreshold = Math.max(10, minDepth.get() * 2);
+                    int color = hole.depth >= deepThreshold ? DEEP : (hole.is1x1 ? SAFE : UNSAFE);
                     AABB b = hole.box;
                     AABB rel = new AABB(
                         b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,

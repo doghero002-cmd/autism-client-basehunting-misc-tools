@@ -52,6 +52,11 @@ public final class ChunkFinderModule extends Module {
     private static final int MAX_CONCURRENT = 16;
     private static final long RESCAN_MS = 5000L;
 
+    private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
+        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
+            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+        .description("Scales all signal thresholds: HIGH = shorter veins/fewer blocks flag (more noise), LOW = doubled (only unmistakable).")
+        .group("General"));
     private final IntSetting scanRadius = add(new IntSetting(
             "scan-radius", "Scan radius (chunks)", 4, 1, 12, 1)
         .description("Chunk bubble around the player scanned.")
@@ -140,8 +145,7 @@ public final class ChunkFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -241,13 +245,13 @@ public final class ChunkFinderModule extends Module {
                         }
                     }
 
-                    // Diorite/granite/andesite vein enclosed in stone (length >= 5).
+                    // Diorite/granite/andesite vein enclosed in stone (length >= 5, sensitivity-scaled).
                     if (detectVeins.get() && !a.dioriteVein && isStoneOre(state)) {
                         long key = m.asLong();
                         if (!veinVisited.contains(key)) {
                             BlockPos imm = m.immutable();
                             int total = 1 + countRun(mc, imm, Direction.UP, this::isStoneOre) + countRun(mc, imm, Direction.DOWN, this::isStoneOre);
-                            if (total >= 5) {
+                            if (total >= sensitivity.get().scale(5)) {
                                 BlockPos start = imm.below(countRun(mc, imm, Direction.DOWN, this::isStoneOre));
                                 boolean enclosed = true;
                                 for (int i = 0; i < total; i++) {
@@ -267,7 +271,7 @@ public final class ChunkFinderModule extends Module {
                             BlockPos imm = m.immutable();
                             java.util.function.Predicate<BlockState> isObs = s -> s.is(Blocks.OBSIDIAN);
                             int total = 1 + countRun(mc, imm, Direction.UP, isObs) + countRun(mc, imm, Direction.DOWN, isObs);
-                            if (total >= 15) {
+                            if (total >= sensitivity.get().scale(15)) {
                                 BlockPos start = imm.below(countRun(mc, imm, Direction.DOWN, isObs));
                                 boolean enclosed = true;
                                 for (int i = 0; i < total; i++) {
@@ -292,7 +296,7 @@ public final class ChunkFinderModule extends Module {
                                 len++;
                                 cur = cur.below();
                             }
-                            if (len >= 12) { a.longDripstone = true; if (a.susPos == null) a.susPos = m.immutable(); }
+                            if (len >= sensitivity.get().scale(12)) { a.longDripstone = true; if (a.susPos == null) a.susPos = m.immutable(); }
                         }
                     }
 
@@ -304,7 +308,7 @@ public final class ChunkFinderModule extends Module {
                             int len = 1;
                             BlockPos cur = m.below();
                             while (mc.level.getBlockState(cur).is(Blocks.VINE)) { len++; cur = cur.below(); }
-                            if (len >= 8) { a.longVine = true; if (a.susPos == null) a.susPos = m.immutable(); }
+                            if (len >= sensitivity.get().scale(8)) { a.longVine = true; if (a.susPos == null) a.susPos = m.immutable(); }
                         }
                     }
 
@@ -343,7 +347,7 @@ public final class ChunkFinderModule extends Module {
 
     private void evaluate(Minecraft mc, ChunkPos pos, Analysis a) {
         List<String> reasons = new ArrayList<>();
-        if (a.rotated >= rotatedThreshold.get()) reasons.add("Rotated:" + a.rotated);
+        if (a.rotated >= sensitivity.get().scale(rotatedThreshold.get())) reasons.add("Rotated:" + a.rotated);
         if (a.longDripstone) reasons.add("LongDripstone");
         if (a.longVine) reasons.add("LongVine");
         if (a.grownKelp) reasons.add("GrownKelp");

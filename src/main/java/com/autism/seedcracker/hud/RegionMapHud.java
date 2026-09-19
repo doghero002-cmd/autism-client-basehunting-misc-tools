@@ -45,17 +45,69 @@ public final class RegionMapHud implements HudElementProvider {
 
     /** Server clusters (CodeEngine values() order + labels). Colours chosen to match the source. */
     public enum Cluster {
-        EU_CENTRAL("EU Central", 0xFF4AB1D8),
-        EU_WEST("EU West", 0xFFE68A3C),
-        NA_EAST("NA East", 0xFF9B59D0),
-        NA_WEST("NA West", 0xFF5DD35D),
-        ASIA("Asia", 0xFFF1C40F),
-        OCEANIA("Oceania", 0xFF7A6FF0),
+        EU_CENTRAL("EU Central", 0xFF9FCE63),
+        EU_WEST("EU West", 0xFF00A663),
+        NA_EAST("NA East", 0xFF4FADE6),
+        NA_WEST("NA West", 0xFF2F6EBA),
+        ASIA("Asia", 0xFFF5C242),
+        OCEANIA("Oceania", 0xFFFC8803),
         NONE("", 0xFF141418);
 
         public final String label;
         public final int argb;
         Cluster(String label, int argb) { this.label = label; this.argb = argb; }
+    }
+
+    /**
+     * Water Client region layout: [regionId, clusterIndex] per cell (row-major, 9x9). The
+     * regionId is the real DonutSMP region number shown in each cell; clusterIndex maps to the
+     * Cluster enum order (EU Central, EU West, NA East, NA West, Asia, Oceania).
+     */
+    private static final int[][] REGION_LAYOUT = {
+        {82, 4}, {100, 2}, {101, 2}, {102, 2}, {103, 1}, {104, 1}, {105, 1}, {106, 1}, {91, 1},
+        {83, 4}, {44, 2}, {75, 2}, {42, 2}, {41, 1}, {40, 1}, {39, 1}, {38, 1}, {92, 1},
+        {84, 4}, {45, 2}, {14, 2}, {13, 2}, {12, 1}, {11, 1}, {10, 1}, {37, 1}, {93, 1},
+        {85, 4}, {46, 4}, {74, 4}, {3, 2}, {2, 1}, {1, 1}, {25, 1}, {36, 1}, {94, 1},
+        {86, 3}, {47, 3}, {72, 3}, {71, 3}, {5, 1}, {4, 1}, {24, 1}, {35, 1}, {95, 1},
+        {87, 3}, {51, 0}, {17, 0}, {9, 5}, {8, 5}, {7, 5}, {23, 5}, {34, 5}, {96, 1},
+        {88, 3}, {54, 0}, {18, 0}, {61, 5}, {62, 5}, {21, 5}, {22, 5}, {33, 5}, {97, 5},
+        {89, 5}, {26, 0}, {27, 5}, {28, 5}, {29, 5}, {30, 5}, {59, 5}, {32, 5}, {98, 5},
+        {90, 5}, {107, 0}, {108, 0}, {109, 0}, {110, 0}, {111, 0}, {112, 0}, {113, 0}, {99, 5}
+    };
+
+    /** Cluster-index -> Cluster, matching REGION_LAYOUT's clusterIndex (0-based into the 6 real clusters). */
+    private static final Cluster[] LAYOUT_CLUSTERS = {
+        Cluster.EU_CENTRAL, Cluster.EU_WEST, Cluster.NA_EAST, Cluster.NA_WEST, Cluster.ASIA, Cluster.OCEANIA
+    };
+
+    /** The real DonutSMP region ID for a 1-based cell, or -1 if out of range. */
+    public static int regionIdOf(int cell) {
+        if (cell < 1 || cell > REGION_LAYOUT.length) return -1;
+        return REGION_LAYOUT[cell - 1][0];
+    }
+
+    /** The cluster for a 1-based cell from the water region layout (NONE for index 5 filler). */
+    public static Cluster layoutClusterOf(int cell) {
+        if (cell < 1 || cell > REGION_LAYOUT.length) return Cluster.NONE;
+        int idx = REGION_LAYOUT[cell - 1][1];
+        if (idx < 0 || idx >= LAYOUT_CLUSTERS.length) return Cluster.NONE;
+        // Water layout uses index 5 as "Oceania" for its map; index 5 cells are still coloured.
+        return LAYOUT_CLUSTERS[idx];
+    }
+
+    /**
+     * Sub-cell player position within a cell: [0..1, 0..1] position of the player inside their
+     * current cell (for smooth, non-snapping player marker placement). Water Client
+     * worldToCellPosition, using the 50k-block / 225k-offset region math.
+     */
+    public static double[] cellPositionOf(double worldX, double worldZ, int cellBlocks) {
+        double offset = ((long) 9 * cellBlocks) / 2.0;
+        double cx = ((worldX + offset) % cellBlocks) / cellBlocks;
+        double cz = ((worldZ + offset) % cellBlocks) / cellBlocks;
+        return new double[] {
+            Math.max(0.0, Math.min(1.0, cx)),
+            Math.max(0.0, Math.min(1.0, cz))
+        };
     }
 
     /** CodeEngine's cluster fallback array (regionMapServerClusterArray). */

@@ -43,6 +43,10 @@ public final class SimpleSneakCentering {
         if (!active || mc.player == null || mc.options == null) return false;
         LocalPlayer player = mc.player;
         tickCount++;
+
+        // Water CenterCharacter watchdog: never let centering stick - bail after 100 ticks.
+        if (tickCount > 100) { stopCentering(); return false; }
+
         double worldOffsetX = player.getX() - targetX;
         double worldOffsetZ = player.getZ() - targetZ;
 
@@ -53,6 +57,10 @@ public final class SimpleSneakCentering {
 
         releaseAllKeys();
         mc.options.keyShift.setDown(true);
+
+        // Water CenterCharacter: TAP the key every other tick instead of holding it - subtler
+        // correction that doesn't overshoot and reads as a real player nudging into place.
+        if (tickCount % 2 != 0) return true;
 
         float yaw = player.getYRot();
         double yawRad = Math.toRadians(yaw);

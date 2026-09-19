@@ -59,4 +59,77 @@ public final class LookRotation {
     public static boolean isActive() {
         return requested != null;
     }
+
+    // ---- shared smooth-rotation helpers (human turn-rate limiting) ----
+
+    private static final java.util.Random ROT_RNG = new java.util.Random();
+
+    /** Move a linear value toward a target by at most maxStep (e.g. pitch). */
+    public static float approach(float current, float target, float maxStep) {
+        float d = target - current;
+        if (d > maxStep) d = maxStep;
+        if (d < -maxStep) d = -maxStep;
+        return current + d;
+    }
+
+    /** Move an angle (yaw, degrees) toward a target by at most maxStep, wrapping at ±180. */
+    public static float approachAngle(float current, float target, float maxStep) {
+        float d = target - current;
+        while (d > 180f) d -= 360f;
+        while (d < -180f) d += 360f;
+        if (d > maxStep) d = maxStep;
+        if (d < -maxStep) d = -maxStep;
+        return current + d;
+    }
+
+    /**
+     * Human turn easing (Krypton AimAssist + Water RotateCharacter + Wocky wind/gravity), one
+     * central upgrade for every rotation consumer. Instead of a constant maxStep/tick sweep (a
+     * known bot signature), the step:
+     *  - scales DOWN as you near the target (Water's dist/20 ease - fast flick, slow settle),
+     *  - is clamped to never overshoot (Krypton's "toRotate > remaining -> use remaining"),
+     *  - occasionally hesitates (Water's 5% micro-pause on big turns),
+     *  - carries a smoothed gust (Wocky's wind/gravity: adaptive step + per-tick jitter),
+     *  - so the yaw curve reads like a real mouse instead of a metronome.
+     *
+     * @param current current yaw (deg)
+     * @param target  target yaw (deg)
+     * @param baseStep the nominal (max) step for a large turn, in degrees
+     */
+    public static float humanTurn(float current, float target, float baseStep) {
+        float remaining = target - current;
+        while (remaining > 180f) remaining -= 360f;
+        while (remaining < -180f) remaining += 360f;
+        float dist = Math.abs(remaining);
+        if (dist < 1.0e-4f) return target;
+
+        // Water: ease factor slows near the target (full speed when far, ~20% when very close).
+        float ease = Math.min(1.0f, dist / 20.0f);
+        float step = baseStep * (0.2f + 0.8f * ease);
+
+        // Wocky wind/gravity: a smoothed per-tick gust so the speed isn't perfectly uniform.
+        step += (ROT_RNG.nextFloat() - 0.5f) * (baseStep * 0.35f);
+
+        // Water: 5% micro-hesitation on larger turns.
+        if (dist > 5f && ROT_RNG.nextFloat() < 0.05f) step *= 0.1f;
+
+        if (step < 0.15f) step = 0.15f;
+        // Krypton: never overshoot - clamp the step to the remaining angle.
+        float signed = Math.copySign(Math.min(step, dist), remaining);
+        return current + signed;
+    }
+
+    /** Pitch variant of {@link #humanTurn} (no wrap). */
+    public static float humanTurnPitch(float current, float target, float baseStep) {
+        float remaining = target - current;
+        float dist = Math.abs(remaining);
+        if (dist < 1.0e-4f) return target;
+        float ease = Math.min(1.0f, dist / 20.0f);
+        float step = baseStep * (0.2f + 0.8f * ease);
+        step += (ROT_RNG.nextFloat() - 0.5f) * (baseStep * 0.35f);
+        if (dist > 5f && ROT_RNG.nextFloat() < 0.05f) step *= 0.1f;
+        if (step < 0.15f) step = 0.15f;
+        float signed = Math.copySign(Math.min(step, dist), remaining);
+        return current + signed;
+    }
 }

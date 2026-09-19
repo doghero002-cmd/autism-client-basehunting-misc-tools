@@ -36,16 +36,24 @@ public final class AntiTrapModule extends Module {
         .description("Attack hopper minecarts.").group("Targets"));
     private final IntSetting range = add(new IntSetting("range", "Range", 5, 1, 10, 1)
         .description("How far to look for trap entities.").group("General"));
+    private final IntSetting cooldown = add(new IntSetting("cooldown", "Attack cooldown (ticks)", 10, 0, 60, 1)
+        .description("Ticks between attacks (avoids attacking every tick, which flags and looks bot-like).")
+        .group("General"));
+    private final BoolSetting notify = add(new BoolSetting("notify", "Notifications", true)
+        .description("Chat + toast when a trap entity is destroyed.").group("General"));
 
     public AntiTrapModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-anti-trap", "Anti Trap", category,
             "Attacks armor stands and minecarts used to trap you.");
     }
 
+    private int cooldownTicks = 0;
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
+        if (cooldownTicks > 0) { cooldownTicks--; return; }
 
         List<Entity> targets = new ArrayList<>();
         double rSq = (double) range.get() * range.get();
@@ -58,6 +66,13 @@ public final class AntiTrapModule extends Module {
         for (Entity e : targets) {
             mc.gameMode.attack(mc.player, e);
             mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+            cooldownTicks = cooldown.get();
+            if (notify.get()) {
+                String msg = "Removed trap entity (" + e.getName().getString() + ")";
+                autismclient.util.AutismClientMessaging.sendPrefixed("§c[AntiTrap] §f" + msg);
+                autismclient.util.AutismNotifications.warning("AntiTrap: " + msg);
+            }
+            break; // one per cooldown, like a real player clicking
         }
     }
 

@@ -90,8 +90,7 @@ public final class PaperRigModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     private void reset() {
@@ -191,9 +190,9 @@ public final class PaperRigModule extends Module {
         for (Slot slot : menu.slots) {
             ItemStack stack = slot.getItem();
             if (!stack.isEmpty() && stack.is(tracked)) {
-                mc.gameMode.handleContainerInput(
+                com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(
                     menu.containerId, slot.index, 0, ContainerInput.PICKUP, mc.player);
-                mc.gameMode.handleContainerInput(
+                com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(
                     menu.containerId, slot.index, 0, ContainerInput.PICKUP, mc.player);
                 return;
             }

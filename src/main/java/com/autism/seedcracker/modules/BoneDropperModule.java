@@ -30,6 +30,9 @@ public final class BoneDropperModule extends Module {
         .group("General"));
 
     private long nextDropMs = 0L;
+    private int dropsQueued = 0;
+    private int restoreSlot = -1;
+    private int dropGapTicks = 0;
 
     public BoneDropperModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-bone-dropper", "Bone Dropper", category,
@@ -39,6 +42,9 @@ public final class BoneDropperModule extends Module {
     @Override
     public void onEnable() {
         nextDropMs = 0L;
+        dropsQueued = 0;
+        restoreSlot = -1;
+        dropGapTicks = 0;
     }
 
     @Override
@@ -46,6 +52,20 @@ public final class BoneDropperModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
         if (mc.gui.screen() != null) return; // don't drop while a screen is open
+
+        // Drain the queue one drop per gap (a burst of drop packets in one tick is a bot tell).
+        if (dropsQueued > 0) {
+            if (dropGapTicks > 0) { dropGapTicks--; return; }
+            Item target = resolveItem();
+            if (target == null || !mc.player.getMainHandItem().is(target)) {
+                finishQueue(mc); // held item changed under us: stop, restore
+                return;
+            }
+            mc.player.drop(false);
+            dropGapTicks = 1 + (int) (Math.random() * 2); // 1-2 ticks between single drops
+            if (--dropsQueued <= 0) finishQueue(mc);
+            return;
+        }
 
         long now = System.currentTimeMillis();
         if (now < nextDropMs) return;
@@ -59,8 +79,17 @@ public final class BoneDropperModule extends Module {
             return;
         }
 
-        dropFromSlot(mc, slot, Math.max(1, amount.get()));
+        beginDrop(mc, slot, Math.max(1, amount.get()));
         nextDropMs = now + Math.max(50, delayMs.get());
+    }
+
+    private void finishQueue(Minecraft mc) {
+        dropsQueued = 0;
+        if (restoreSlot >= 0 && restoreSlot <= 8
+            && mc.player.getInventory().getSelectedSlot() != restoreSlot) {
+            com.autism.seedcracker.util.InvSync.select(mc, restoreSlot);
+        }
+        restoreSlot = -1;
     }
 
     private Item resolveItem() {
@@ -80,18 +109,19 @@ public final class BoneDropperModule extends Module {
         return -1;
     }
 
-    private void dropFromSlot(Minecraft mc, int slot, int count) {
+    /** Select the source slot (packet-synced) and queue the drops; the tick loop drains them. */
+    private void beginDrop(Minecraft mc, int slot, int count) {
         var inv = mc.player.getInventory();
         int selected = inv.getSelectedSlot();
         if (slot <= 8) {
-            // Hotbar: select then drop.
-            inv.setSelectedSlot(slot);
-            for (int i = 0; i < count; i++) mc.player.drop(false);
-            inv.setSelectedSlot(selected);
+            restoreSlot = selected;
+            if (slot != selected) com.autism.seedcracker.util.InvSync.select(mc, slot);
         } else {
-            // Main inventory: move to hotbar, drop, move back.
+            // Main inventory: swap the stack into the current hotbar slot first.
             autismclient.util.AutismInventoryHelper.swapInventorySlots(mc, slot, selected);
-            for (int i = 0; i < count; i++) mc.player.drop(false);
+            restoreSlot = -1; // nothing to restore; the stack is now in hand
         }
+        dropsQueued = count;
+        dropGapTicks = 1; // let the select/swap land before the first drop
     }
 }

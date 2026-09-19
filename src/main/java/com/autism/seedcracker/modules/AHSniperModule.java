@@ -123,8 +123,7 @@ public final class AHSniperModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -348,7 +347,7 @@ public final class AHSniperModule extends Module {
 
     private void click(Minecraft mc, AbstractContainerMenu menu, int slot) {
         if (mc.gameMode == null) return;
-        mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
     }
 
     private void closeScreen(Minecraft mc) {

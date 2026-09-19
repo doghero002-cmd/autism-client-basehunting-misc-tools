@@ -52,6 +52,9 @@ public final class SeedcrackerModule extends Module {
         .group("Database")
         .visibleWhen(() -> databaseSubmits.get()));
 
+
+
+
     // Maps each AUTISM setting id to the SeedCrackerX FeatureToggle it controls.
     private final Map<String, FeatureToggleBinding> featureToggles = new LinkedHashMap<>();
 

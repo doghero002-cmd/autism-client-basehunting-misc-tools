@@ -34,6 +34,11 @@ public final class EntityScannerModule extends Module {
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private int tickCounter = 0;
 
+    private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
+        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
+            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+        .description("HIGH = flag on half the threshold (more finds, more noise). LOW = double (quiet, high confidence).")
+        .group("General"));
     private final IntSetting threshold = add(new IntSetting("threshold", "Threshold", 10, 1, 500, 1)
         .description("Entity score a chunk needs to be flagged as active.")
         .group("General"));
@@ -43,6 +48,9 @@ public final class EntityScannerModule extends Module {
     private final IntSetting maxNotify = add(new IntSetting("max-notify", "Max notify", 3, 1, 10, 1)
         .description("Max notifications per scan pass.")
         .group("General"));
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
+        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).").group("Performance"));
+    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     public EntityScannerModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-entity-scanner", "Entity Scanner", category,
@@ -69,11 +77,11 @@ public final class EntityScannerModule extends Module {
         tickCounter++;
 
         int notifiedThisPass = 0;
-        for (LevelChunk chunk : ChunkScanHelper.loadedChunksAround(mc, scanRadius.get())) {
+        for (LevelChunk chunk : scanCursor.nextBatch(mc, scanRadius.get(), 400, chunksPerTick.get())) {
             ChunkPos cpos = chunk.getPos();
             double score = scoreChunk(mc, cpos);
             scores.put(cpos, score);
-            if (score >= threshold.get() && notified.add(cpos) && notifiedThisPass < maxNotify.get()) {
+            if (score >= sensitivity.get().scale(threshold.get()) && notified.add(cpos) && notifiedThisPass < maxNotify.get()) {
                 notifiedThisPass++;
                 autismclient.util.AutismNotifications.warning(
                     "Active chunk X:" + cpos.getMiddleBlockX() + " Z:" + cpos.getMiddleBlockZ() + " (score " + (int) score + ")");
@@ -108,7 +116,7 @@ public final class EntityScannerModule extends Module {
 
     @Override
     public String info() {
-        long hot = scores.values().stream().filter(s -> s >= threshold.get()).count();
+        long hot = scores.values().stream().filter(s -> s >= sensitivity.get().scale(threshold.get())).count();
         return hot + " hot";
     }
 }

@@ -64,6 +64,19 @@ public final class SpawnerProtectModule extends Module {
             "enemy-radius", "Enemy radius", 32, 4, 64, 1)
         .description("How close an enemy player must be before spawners are protected.")
         .group("General"));
+    private final autismclient.api.module.BoolSetting sneakMine = add(new autismclient.api.module.BoolSetting(
+            "sneak-mine", "Sneak mine (hold shift)", true)
+        .description("Hold shift while mining the spawner (DonutSMP shift-mine drops it as an item into your inventory).")
+        .group("Storage"));
+    private final autismclient.api.module.BoolSetting storeShulker = add(new autismclient.api.module.BoolSetting(
+            "store-shulker", "Store in shulker", true)
+        .description("After collecting, put the spawners into a shulker box from your inventory.")
+        .group("Storage"));
+    private final autismclient.api.module.BoolSetting storeEChest = add(new autismclient.api.module.BoolSetting(
+            "store-echest", "Shulker into ender chest", true)
+        .description("After filling the shulker, put the shulker box into your ender chest (shift-click while the echest is open).")
+        .group("Storage")
+        .visibleWhen(() -> storeShulker.get()));
 
     // ---- state ----
     private BlockPos target;
@@ -97,8 +110,7 @@ public final class SpawnerProtectModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -106,6 +118,9 @@ public final class SpawnerProtectModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
         if (posting) return; // don't mine while a webhook is in flight
+
+        // Storage phase (shulker -> echest) takes priority once spawners are collected.
+        if (tickStorage(mc)) return;
 
         int pickSlot = findSilkTouchSlot(mc);
         if (pickSlot == -1) {
@@ -134,13 +149,27 @@ public final class SpawnerProtectModule extends Module {
             }
         }
 
-        // Face the spawner, hold the pickaxe, and mine it.
-        mc.player.getInventory().setSelectedSlot(pickSlot);
+        // Face the spawner with a smooth eased turn. Only dig once the crosshair is actually on it,
+        // using the real ray-reported face (not a computed one) - and let continueDestroyBlock drive
+        // progress (no start+continue same tick, which is a breakfrequency flag).
+        com.autism.seedcracker.util.InvSync.select(mc, pickSlot);
         face(mc, target);
-        Direction side = facingToward(mc, target);
-        mc.gameMode.startDestroyBlock(target, side);
-        mc.gameMode.continueDestroyBlock(target, side);
-        mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        // Gate the dig until the camera has converged on the spawner (within a couple degrees).
+        if (!facingTarget(mc, target, 6.0f)) {
+            if (mc.gameMode != null && mc.gameMode.isDestroying()) mc.gameMode.stopDestroyBlock();
+            return; // still turning
+        }
+        // Sneak to silk-touch it (hold shift) - set once we're digging, not in the same swap tick.
+        if (sneakMine.get()) mc.options.keyShift.setDown(true);
+        // Dig whatever the real crosshair ray reports (its actual face), if it's the spawner.
+        if (mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult bhr
+            && mc.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            BlockPos hitPos = bhr.getBlockPos();
+            if (isSpawner(mc, hitPos) && mc.gameMode != null) {
+                mc.gameMode.continueDestroyBlock(hitPos, bhr.getDirection());
+                mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+            }
+        }
 
         if (!isSpawner(mc, target)) {
             minedCount++;
@@ -224,18 +253,41 @@ public final class SpawnerProtectModule extends Module {
         return mc.player.isWithinBlockInteractionRange(pos, mc.player.blockInteractionRange());
     }
 
-    /** Rotate the player to look at the centre of the block. */
+    /** Smoothly rotate the player toward the block centre (bounded per-tick step, like a mouse). */
+    private float smoothYaw = 0f;
+    private float smoothPitch = 0f;
+    private boolean rotInit = false;
+
     private void face(Minecraft mc, BlockPos pos) {
+        if (!rotInit) {
+            smoothYaw = mc.player.getYRot();
+            smoothPitch = mc.player.getXRot();
+            rotInit = true;
+        }
         Vec3 eye = mc.player.getEyePosition();
         Vec3 centre = Vec3.atCenterOf(pos);
         double dx = centre.x - eye.x;
         double dy = centre.y - eye.y;
         double dz = centre.z - eye.z;
         double horiz = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
-        float pitch = (float) (-Math.toDegrees(Math.atan2(dy, horiz)));
-        mc.player.setYRot(yaw);
-        mc.player.setXRot(pitch);
+        float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float targetPitch = (float) (-Math.toDegrees(Math.atan2(dy, horiz)));
+        smoothYaw = com.autism.seedcracker.util.tunnel.LookRotation.approachAngle(smoothYaw, targetYaw, 16.0f);
+        smoothPitch = com.autism.seedcracker.util.tunnel.LookRotation.approach(smoothPitch, targetPitch, 12.0f);
+        mc.player.setYRot(smoothYaw);
+        mc.player.setXRot(net.minecraft.util.Mth.clamp(smoothPitch, -90f, 90f));
+    }
+
+    /** True if the camera is within {@code tolDeg} of facing the block's centre (converged). */
+    private boolean facingTarget(Minecraft mc, BlockPos pos, float tolDeg) {
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 centre = Vec3.atCenterOf(pos);
+        double dx = centre.x - eye.x, dy = centre.y - eye.y, dz = centre.z - eye.z;
+        float targetYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float targetPitch = (float) (-Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz))));
+        float yawDiff = Math.abs(net.minecraft.util.Mth.wrapDegrees(targetYaw - mc.player.getYRot()));
+        float pitchDiff = Math.abs(targetPitch - mc.player.getXRot());
+        return yawDiff < tolDeg && pitchDiff < tolDeg;
     }
 
     private Direction facingToward(Minecraft mc, BlockPos pos) {
@@ -252,20 +304,212 @@ public final class SpawnerProtectModule extends Module {
         if (mc.gameMode != null && mc.gameMode.isDestroying()) {
             mc.gameMode.stopDestroyBlock();
         }
+        if (sneakMine.get() && mc.options != null) mc.options.keyShift.setDown(false);
     }
 
-    /** Called when no more spawners are reachable; post the optional webhook notice. */
+    /** Called when no more spawners are reachable; store the haul, then post the webhook notice. */
     private void finish(Minecraft mc) {
         if (minedCount == 0) return;
         int total = minedCount;
         minedCount = 0;
+        if (storeShulker.get()) {
+            // Kick off the storage phase (place shulker -> fill -> break -> store in echest).
+            storageStage = StorageStage.PLACE_SHULKER;
+            storageTicks = 0;
+            placedShulkerPos = null;
+            placedEcPos = null;
+        }
+        notifyLocal("All spawners collected (" + total + ")");
         sendWebhook(mc, "[SpawnerProtect] All your spawners have been collected.",
             "Mined " + total + " spawner(s) before an enemy could reach them.");
     }
 
     private void onSpawnerMined(Minecraft mc, BlockPos pos) {
+        notifyLocal("Spawner protected at " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ());
         sendWebhook(mc, "[SpawnerProtect] Spawner protected.",
             "Collected a spawner at " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ".");
+    }
+
+    /** Unified local feedback (chat prefix + toast), matching the other finder modules. */
+    private void notifyLocal(String msg) {
+        autismclient.util.AutismClientMessaging.sendPrefixed("§5[SpawnerProtect] §f" + msg);
+        autismclient.util.AutismNotifications.warning("SpawnerProtect: " + msg);
+    }
+
+    // ========================================================================
+    // Storage phase: place a shulker in front of the player, shift-click the collected spawners
+    // into it, break it (picks it up with contents), then shift-click it into the ender chest.
+    // All container moves use QUICK_MOVE (shift-click) so the server sees them.
+    // ========================================================================
+    private enum StorageStage {
+        IDLE, PLACE_SHULKER, OPEN_SHULKER_GUI, FILL_SHULKER, BREAK_SHULKER, PLACE_EC, OPEN_EC_GUI, MOVE_TO_EC, DONE
+    }
+    private StorageStage storageStage = StorageStage.IDLE;
+    private int storageTicks = 0;
+    private int storageTimeout = 0;
+    private BlockPos placedShulkerPos = null;
+    private BlockPos placedEcPos = null;
+
+    /** Drive the storage state machine from tick (runs after spawners are collected). */
+    private boolean tickStorage(Minecraft mc) {
+        if (storageStage == StorageStage.IDLE || storageStage == StorageStage.DONE) return false;
+        if (mc.player == null || mc.gameMode == null) { resetStorage(); return false; }
+        storageTicks++;
+        int wait = 4; // ticks between actions (legit pacing)
+        if (storageTicks < wait) return true;
+        storageTicks = 0;
+
+        switch (storageStage) {
+            case PLACE_SHULKER -> {
+                int shulkerSlot = findShulkerSlot(mc);
+                BlockPos spot = placementSpot(mc);
+                if (shulkerSlot == -1 || spot == null) { resetStorage(); return true; }
+                com.autism.seedcracker.util.InvSync.select(mc, shulkerSlot);
+                face(mc, spot);
+                mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(spot),
+                        net.minecraft.core.Direction.UP, spot, false));
+                if (mc.level.getBlockState(spot).getBlock().toString().contains("shulker_box")) {
+                    placedShulkerPos = spot;
+                    storageStage = StorageStage.FILL_SHULKER;
+                } else {
+                    // Placement failed (spot occupied/blocked): give up cleanly.
+                    resetStorage();
+                }
+            }
+            case OPEN_SHULKER_GUI -> {
+                if (placedShulkerPos == null) { resetStorage(); return true; }
+                // Open the placed shulker; wait for its container to actually appear next ticks.
+                face(mc, placedShulkerPos);
+                mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(placedShulkerPos),
+                        net.minecraft.core.Direction.UP, placedShulkerPos, false));
+                storageStage = StorageStage.FILL_SHULKER;
+                storageTimeout = 20; // give the open-screen packet up to 20 ticks to arrive
+            }
+            case FILL_SHULKER -> {
+                if (placedShulkerPos == null) { resetStorage(); return true; }
+                // Only quick-move once the shulker container is actually open (not the inventory menu).
+                boolean guiOpen = mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+                if (!guiOpen) {
+                    if (--storageTimeout <= 0) { resetStorage(); }
+                    return true; // keep waiting for the shulker menu to open
+                }
+                boolean moved = moveMatchingToContainer(mc, this::isSpawnerItem);
+                if (!moved) {
+                    mc.player.closeContainer();
+                    storageStage = storeEChest.get() ? StorageStage.BREAK_SHULKER : StorageStage.DONE;
+                }
+            }
+            case BREAK_SHULKER -> {
+                if (placedShulkerPos == null) { resetStorage(); return true; }
+                // Mine the placed shulker to pick it up (it keeps its contents as an item).
+                face(mc, placedShulkerPos);
+                net.minecraft.core.Direction side = facingToward(mc, placedShulkerPos);
+                mc.gameMode.startDestroyBlock(placedShulkerPos, side);
+                mc.gameMode.continueDestroyBlock(placedShulkerPos, side);
+                mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+                if (mc.level.getBlockState(placedShulkerPos).isAir()) {
+                    if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+                    placedShulkerPos = null;
+                    storageStage = StorageStage.PLACE_EC;
+                }
+            }
+            case PLACE_EC -> {
+                int ecSlot = findItemSlot(mc, net.minecraft.world.item.Items.ENDER_CHEST);
+                BlockPos spot = placementSpot(mc);
+                if (ecSlot == -1 || spot == null) { resetStorage(); return true; }
+                com.autism.seedcracker.util.InvSync.select(mc, ecSlot);
+                face(mc, spot);
+                mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(spot),
+                        net.minecraft.core.Direction.UP, spot, false));
+                if (mc.level.getBlockState(spot).is(net.minecraft.world.level.block.Blocks.ENDER_CHEST)) {
+                    placedEcPos = spot;
+                    storageStage = StorageStage.OPEN_EC_GUI;
+                } else {
+                    resetStorage();
+                }
+            }
+            case OPEN_EC_GUI -> {
+                if (placedEcPos == null) { resetStorage(); return true; }
+                face(mc, placedEcPos);
+                mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(placedEcPos),
+                        net.minecraft.core.Direction.UP, placedEcPos, false));
+                storageStage = StorageStage.MOVE_TO_EC;
+                storageTimeout = 20;
+            }
+            case MOVE_TO_EC -> {
+                if (placedEcPos == null) { resetStorage(); return true; }
+                // Only quick-move once the ender-chest container is actually open.
+                boolean guiOpen = mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+                if (!guiOpen) {
+                    if (--storageTimeout <= 0) { resetStorage(); }
+                    return true;
+                }
+                moveMatchingToContainer(mc, this::isShulkerBox);
+                mc.player.closeContainer();
+                storageStage = StorageStage.DONE;
+            }
+            default -> storageStage = StorageStage.IDLE;
+        }
+        return true;
+    }
+
+    private void resetStorage() {
+        storageStage = StorageStage.IDLE;
+        placedShulkerPos = null;
+        placedEcPos = null;
+    }
+
+    /** A free air block in front of the player at foot level to place a block on, or null. */
+    private BlockPos placementSpot(Minecraft mc) {
+        BlockPos base = mc.player.blockPosition();
+        for (net.minecraft.core.Direction dir : new net.minecraft.core.Direction[]{
+            mc.player.getDirection(), mc.player.getDirection().getClockWise(), mc.player.getDirection().getCounterClockWise()}) {
+            BlockPos p = base.relative(dir);
+            if (mc.level.getBlockState(p).isAir() && !mc.level.getBlockState(p.below()).isAir()) return p;
+        }
+        return null;
+    }
+
+    /** Shift-click every matching stack from the player's inventory into the open container. Returns true if any moved. */
+    private boolean moveMatchingToContainer(Minecraft mc, java.util.function.Predicate<net.minecraft.world.item.ItemStack> match) {
+        var handler = mc.player.containerMenu;
+        boolean moved = false;
+        for (int i = 0; i < handler.slots.size(); i++) {
+            net.minecraft.world.item.ItemStack s = handler.getSlot(i).getItem();
+            if (!s.isEmpty() && match.test(s)) {
+                com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(handler.containerId, i, 0,
+                    net.minecraft.world.inventory.ContainerInput.QUICK_MOVE, mc.player);
+                moved = true;
+            }
+        }
+        return moved;
+    }
+
+    private boolean isSpawnerItem(net.minecraft.world.item.ItemStack s) {
+        return s.getItem().toString().toLowerCase(java.util.Locale.ROOT).contains("spawner");
+    }
+
+    private boolean isShulkerBox(net.minecraft.world.item.ItemStack s) {
+        String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).toString();
+        return id.endsWith("shulker_box");
+    }
+
+    private int findShulkerSlot(Minecraft mc) {
+        for (int i = 0; i < 9; i++) {
+            if (isShulkerBox(mc.player.getInventory().getItem(i))) return i;
+        }
+        return -1;
+    }
+
+    private int findItemSlot(Minecraft mc, net.minecraft.world.item.Item item) {
+        for (int i = 0; i < 9; i++) {
+            if (mc.player.getInventory().getItem(i).is(item)) return i;
+        }
+        return -1;
     }
 
     /** Post a simple Discord embed to the configured webhook, if one is set. */

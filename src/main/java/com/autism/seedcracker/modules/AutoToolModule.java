@@ -37,17 +37,45 @@ public final class AutoToolModule extends Module {
     private final BoolSetting requireCorrectTool = add(new BoolSetting("correct-tool", "Only if it can drop", false)
         .description("Only consider tools that are the 'correct' tool for the block (so it drops).")
         .group("General"));
+    private final BoolSetting switchBack = add(new BoolSetting("switch-back", "Switch back", true)
+        .description("Restore your previous slot when you stop attacking.")
+        .group("General"));
+    private final BoolSetting antiBreak = add(new BoolSetting("anti-break", "Anti-break", true)
+        .description("Never pick a tool that's about to shatter (Krypton) - protects expensive picks.")
+        .group("General"));
+    private final autismclient.api.module.IntSetting antiBreakPercent = add(new autismclient.api.module.IntSetting(
+            "anti-break-percent", "Anti-break at %", 5, 1, 50, 1)
+        .description("Skip tools whose remaining durability is below this % of max.")
+        .group("General").visibleWhen(() -> antiBreak.get()));
 
     public AutoToolModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-auto-tool", "Auto Tool", category,
             "Automatically swaps to the best hotbar tool for the block or entity you're attacking.");
     }
 
+    private int prevSlot = -1;
+
+    @Override
+    public void onDisable() {
+        restoreSlot();
+    }
+
+    private void restoreSlot() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null && prevSlot >= 0 && prevSlot <= 8) {
+            com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
+        }
+        prevSlot = -1;
+    }
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null || mc.options == null) return;
-        if (!mc.options.keyAttack.isDown()) return;
+        if (!mc.options.keyAttack.isDown()) {
+            if (switchBack.get()) restoreSlot();
+            return;
+        }
         HitResult hit = mc.hitResult;
         if (hit == null) return;
 
@@ -77,7 +105,9 @@ public final class AutoToolModule extends Module {
         if (bestSlot == -1) return;
         double current = miningScore(mc.player.getMainHandItem(), state);
         if (bestSpeed > current) {
-            mc.player.getInventory().setSelectedSlot(bestSlot);
+            int sel = mc.player.getInventory().getSelectedSlot();
+            if (prevSlot == -1 && sel != bestSlot) prevSlot = sel;
+            com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
         }
     }
 
@@ -95,7 +125,9 @@ public final class AutoToolModule extends Module {
             }
         }
         if (bestSlot != -1 && bestSlot != mc.player.getInventory().getSelectedSlot()) {
-            mc.player.getInventory().setSelectedSlot(bestSlot);
+            int sel = mc.player.getInventory().getSelectedSlot();
+            if (prevSlot == -1) prevSlot = sel;
+            com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
         }
     }
 
@@ -107,11 +139,19 @@ public final class AutoToolModule extends Module {
         if (stack.isEmpty()) return -1.0;
         if (!isTool(stack)) return -1.0;
         if (requireCorrectTool.get() && !stack.isCorrectToolForDrops(state)) return -1.0;
+        if (antiBreak.get() && breakingSoon(stack)) return -1.0; // don't shatter good tools
         // A sword is a poor general-purpose mining tool unless the block is a web.
         if (itemId(stack).endsWith("_sword") && !state.is(Blocks.COBWEB)) return -1.0;
         float speed = stack.getDestroySpeed(state);
         if (speed <= 1.0f) return -1.0; // no bonus over hand
         return speed;
+    }
+
+    /** True if the tool's remaining durability is below the anti-break threshold (Krypton). */
+    private boolean breakingSoon(ItemStack stack) {
+        if (stack.getMaxDamage() <= 0) return false;
+        int remaining = stack.getMaxDamage() - stack.getDamageValue();
+        return remaining < stack.getMaxDamage() * antiBreakPercent.get() / 100;
     }
 
     /** Attack damage of a stack, falling back to tier heuristics for swords/axes. */
@@ -143,13 +183,14 @@ public final class AutoToolModule extends Module {
             || id.endsWith("_hoe") || id.endsWith("_sword");
     }
 
+    /** Weapon damage tier (actual attack damage order, not mining speed: gold hits like wood). */
     private static double tierBonus(String id) {
         if (id.startsWith("netherite_")) return 6.0;
         if (id.startsWith("diamond_")) return 5.0;
         if (id.startsWith("iron_")) return 4.0;
-        if (id.startsWith("golden_")) return 3.0;
-        if (id.startsWith("stone_")) return 2.0;
-        if (id.startsWith("wooden_")) return 1.0;
+        if (id.startsWith("stone_")) return 3.0;
+        if (id.startsWith("golden_")) return 2.0;
+        if (id.startsWith("wooden_")) return 2.0;
         return 0.0;
     }
 

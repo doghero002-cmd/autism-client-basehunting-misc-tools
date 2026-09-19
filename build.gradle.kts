@@ -73,6 +73,14 @@ dependencies {
     val latticg = "com.seedfinding:latticg:${property("latticg_version")}"
     implementation(latticg)
     include(latticg)
+
+    // Unit tests (pure-logic classes only - no Minecraft bootstrap in tests).
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 // Turns an exact Minecraft version (e.g. "26.2") into a compatible range ("~26.2") so the addon

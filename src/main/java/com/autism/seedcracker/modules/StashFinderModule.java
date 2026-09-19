@@ -56,6 +56,11 @@ public final class StashFinderModule extends Module {
             "mode", "Mode", Mode.THRESHOLD, Mode.values())
         .description("THRESHOLD = simple storage-block count per chunk. SCORING = CodeEngine classifier that scores chest clusters as REAL base vs FAKE stash.")
         .group("General"));
+    private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
+        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
+            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+        .description("THRESHOLD: HIGH = half the storage count flags, LOW = double. SCORING: shifts the real/ambiguous score gates.")
+        .group("General"));
     private final IntSetting threshold = add(new IntSetting(
             "threshold", "Threshold", 10, 1, 100, 1)
         .description("Storage blocks in a chunk needed to flag it as a stash.")
@@ -66,6 +71,11 @@ public final class StashFinderModule extends Module {
         .description("SCORING: cluster score >= this is a REAL base.")
         .group("Scoring")
         .visibleWhen(() -> mode.get() == Mode.SCORING));
+    private final IntSetting minConfidence = add(new IntSetting(
+            "min-confidence", "Min base confidence", 20, 0, 100, 5)
+        .description("THRESHOLD: base-confidence score (0-100) needed to flag a low-count chunk (filters lone chests in natural structures).")
+        .group("General")
+        .visibleWhen(() -> mode.get() == Mode.THRESHOLD));
     private final IntSetting ambiguousThreshold = add(new IntSetting(
             "ambiguous-threshold", "Ambiguous threshold", -10, -100, 100, 1)
         .description("SCORING: cluster score >= this (but < real) is AMBIGUOUS.")
@@ -92,6 +102,11 @@ public final class StashFinderModule extends Module {
             "notification", "Notification", true)
         .description("Toast + chat ping when a stash chunk is found.")
         .group("General"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
+        .description("THRESHOLD mode: how many chunks to scan per tick (lower = less lag, spread over more seconds).")
+        .group("Performance"));
+    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     /** Chunks currently over the threshold. */
     private final Set<ChunkPos> flagged = new HashSet<>();
@@ -119,8 +134,7 @@ public final class StashFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() {
-        setEnabledSilently(false);
+    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -128,28 +142,50 @@ public final class StashFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
-        // Throttle the full scan to roughly every 8 ticks.
-        tickCounter++;
-        if (tickCounter % 8 == 0) {
+        // THRESHOLD scans incrementally every tick (budgeted); SCORING runs on its rescan timer.
+        if (mode.get() == Mode.THRESHOLD) {
             scan(mc);
+        } else {
+            tickCounter++;
+            if (tickCounter % 8 == 0) scan(mc);
         }
 
         // Feed the renderer every tick so markers stay alive.
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-stash-finder", flagged, color.get(), tracer.get());
+
+        // Report flagged chunks to the Base Tracker HUD (with confidence) for the merged view.
+        for (ChunkPos pos : flagged) {
+            int conf = 50;
+            LevelChunk chunk = mc.level.hasChunk(pos.x(), pos.z()) ? mc.level.getChunk(pos.x(), pos.z()) : null;
+            if (chunk != null) {
+                conf = com.autism.seedcracker.finder.BaseConfidence.score(chunk).score();
+            }
+            com.autism.seedcracker.finder.BaseTracker.report(pos.getMinBlockX() + 8, pos.getMinBlockZ() + 8, conf, "Stash");
+        }
     }
 
     private void scan(Minecraft mc) {
-        List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
         ChunkPos playerChunk = mc.player.chunkPosition();
         int radius = scanRadius.get();
 
         if (mode.get() == Mode.SCORING) {
+            // SCORING needs the whole chunk set at once for clustering: keep it on the rescan timer.
+            List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, radius);
             scanScoring(mc, chunks);
         } else {
-            for (LevelChunk chunk : chunks) {
+            // THRESHOLD: incremental scan, a few chunks per tick (no full-volume spike).
+            for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
                 ChunkPos pos = chunk.getPos();
                 int count = ChunkScanHelper.countBlocksInChunk(chunk, StashFinderModule::isStorage);
-                if (count >= threshold.get()) {
+                int need = sensitivity.get().scale(threshold.get());
+                boolean sus = count >= need;
+                // Confidence gate: a lone chest in a natural chunk (mineshaft/ruin) shouldn't flag.
+                if (sus && count < need * 2) {
+                    com.autism.seedcracker.finder.BaseConfidence.Result conf =
+                        com.autism.seedcracker.finder.BaseConfidence.score(chunk);
+                    if (conf.score() < minConfidence.get()) sus = false;
+                }
+                if (sus) {
                     flagged.add(pos);
                     if (notified.add(pos)) {
                         onNewFlag(pos, count);
@@ -203,8 +239,11 @@ public final class StashFinderModule extends Module {
         for (List<net.minecraft.core.BlockPos> cluster : clusters.values()) {
             if (cluster.size() < 2) continue;
             ScoreResult res = scoreCluster(mc, cluster);
-            boolean isReal = res.score >= realThreshold.get();
-            boolean isAmb = !isReal && res.score >= ambiguousThreshold.get();
+            // Sensitivity shifts the score gates: HIGH lowers them 15 (flags weaker clusters),
+            // LOW raises them 15 (only clear-cut bases).
+            int shift = switch (sensitivity.get()) { case HIGH -> -15; case MEDIUM -> 0; case LOW -> 15; };
+            boolean isReal = res.score >= realThreshold.get() + shift;
+            boolean isAmb = !isReal && res.score >= ambiguousThreshold.get() + shift;
             if (isReal || (isAmb && !realOnly.get())) {
                 net.minecraft.core.BlockPos c = res.centre;
                 ChunkPos cp = new ChunkPos(c.getX() >> 4, c.getZ() >> 4);
@@ -242,7 +281,8 @@ public final class StashFinderModule extends Module {
         // Multi-kind: distinct storage block types in the cluster.
         Set<Block> blockKinds = new HashSet<>();
         for (net.minecraft.core.BlockPos p : cluster) blockKinds.add(mc.level.getBlockState(p).getBlock());
-        net.minecraft.core.BlockPos centre = new net.minecraft.core.BlockPos((int)(sx/size), (int)(sy/size), (int)(sz/size));
+        net.minecraft.core.BlockPos centre = new net.minecraft.core.BlockPos(
+            (int) Math.floorDiv(sx, size), (int) Math.floorDiv(sy, size), (int) Math.floorDiv(sz, size));
 
         EnvScan env = scanEnv(mc, centre);
         int score = 0;
@@ -382,6 +422,7 @@ public final class StashFinderModule extends Module {
     }
 
     private void onNewScoreFlag(net.minecraft.core.BlockPos centre, int score, int size, boolean isReal) {
+        recordHeat(centre.getX(), centre.getZ());
         if (!notify.get()) return;
         String band = isReal ? "REAL base" : "ambiguous";
         String msg = band + " (score " + score + ", " + size + " storage) at X:" + centre.getX() + " Y:" + centre.getY() + " Z:" + centre.getZ();
@@ -402,6 +443,7 @@ public final class StashFinderModule extends Module {
     }
 
     private void onNewFlag(ChunkPos pos, int count) {
+        recordHeat(pos.getMinBlockX() + 8, pos.getMinBlockZ() + 8);
         if (!notify.get()) return;
         String msg = "Stash chunk (" + count + " storage) at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
         AutismNotifications.warning(msg);
@@ -409,6 +451,20 @@ public final class StashFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+        }
+    }
+
+    /** Record a find into the heatmap (auto) or queue it for manual confirm, per the setting. */
+    private void recordHeat(int blockX, int blockZ) {
+        int cb = com.autism.seedcracker.modules.RegionMapModule.cellBlocks();
+        if (com.autism.seedcracker.modules.RegionMapModule.isAutoHeatmap()) {
+            com.autism.seedcracker.finder.BaseHeatTracker.recordFind(blockX, blockZ, cb);
+        } else {
+            com.autism.seedcracker.finder.BaseHeatTracker.queueFind(blockX, blockZ, cb);
+            if (notify.get()) {
+                AutismClientMessaging.sendPrefixed("§7[Heatmap] Queued ("
+                    + com.autism.seedcracker.finder.BaseHeatTracker.pendingCount() + " pending). /heatconfirm to add.");
+            }
         }
     }
 }
