@@ -1352,6 +1352,7 @@ public final class TunnelBaseFinderModule extends Module {
         double nearestDist = range * range;
         for (Player p : mc.level.players()) {
             if (p == mc.player || p.isSpectator()) continue;
+            if (autismclient.modules.TeamsModule.isFriendOrTeam(p)) continue; // never defend-attack a friend
             double d = mc.player.distanceToSqr(p);
             if (d < nearestDist) { nearestDist = d; nearest = p; }
         }

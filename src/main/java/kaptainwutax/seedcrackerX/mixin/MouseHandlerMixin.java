@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(MouseHandler.class)
 public abstract class MouseHandlerMixin {
 
-    @Redirect(method = "turnPlayer", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MouseHandler;accumulatedDX:D"))
+    @Redirect(require = 0, method = "turnPlayer", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MouseHandler;accumulatedDX:D"))
     private double seedcracker$cursorDeltaX(MouseHandler self) {
         if (MouseRotation.get().isActive()) {
             return MouseRotation.get().nextCursorDeltaX();
@@ -23,7 +23,7 @@ public abstract class MouseHandlerMixin {
         return ((MouseHandlerAccessor) self).seedcracker$getAccumulatedDX();
     }
 
-    @Redirect(method = "turnPlayer", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MouseHandler;accumulatedDY:D"))
+    @Redirect(require = 0, method = "turnPlayer", at = @At(value = "FIELD", target = "Lnet/minecraft/client/MouseHandler;accumulatedDY:D"))
     private double seedcracker$cursorDeltaY(MouseHandler self) {
         if (MouseRotation.get().isActive()) {
             return MouseRotation.get().nextCursorDeltaY();
