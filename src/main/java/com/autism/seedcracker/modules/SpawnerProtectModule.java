@@ -189,6 +189,7 @@ public final class SpawnerProtectModule extends Module {
             if (other == mc.player) continue;
             if (other.isSpectator()) continue;
             if (isWhitelisted(other)) continue;
+            if (autismclient.modules.TeamsModule.isFriendOrTeam(other)) continue; // friends never count as enemies
             if (other.distanceTo(mc.player) <= r) return true;
         }
         return false;
