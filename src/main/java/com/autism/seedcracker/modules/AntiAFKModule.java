@@ -78,6 +78,14 @@ public final class AntiAFKModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
+        if (mc.gui.screen() != null) {
+            // GUI open: release everything (a latched key under a screen sticks until it closes).
+            mc.options.keyJump.setDown(false);
+            mc.options.keyShift.setDown(false);
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
+            return;
+        }
 
         if (jump.get()) {
             if (mc.options.keyJump.isDown()) {
@@ -85,6 +93,8 @@ public final class AntiAFKModule extends Module {
             } else if (random.nextInt(99) == 0) {
                 mc.options.keyJump.setDown(true);
             }
+        } else if (mc.options.keyJump.isDown()) {
+            mc.options.keyJump.setDown(false); // setting toggled off mid-latch
         }
 
         if (swing.get() && random.nextInt(99) == 0) {
@@ -101,18 +111,28 @@ public final class AntiAFKModule extends Module {
                 mc.options.keyShift.setDown(true);
                 sneakTimer++;
             }
+        } else if (mc.options.keyShift.isDown()) {
+            mc.options.keyShift.setDown(false); // setting toggled off mid-sneak
         }
 
-        if (strafe.get() && strafeTimer-- <= 0) {
-            mc.options.keyLeft.setDown(!strafeLeft);
-            mc.options.keyRight.setDown(strafeLeft);
-            strafeLeft = !strafeLeft;
-            // Jitter the interval so the strafe doesn't form a detectable metronome.
-            strafeTimer = 15 + random.nextInt(25);
+        if (strafe.get()) {
+            if (strafeTimer-- <= 0) {
+                mc.options.keyLeft.setDown(!strafeLeft);
+                mc.options.keyRight.setDown(strafeLeft);
+                strafeLeft = !strafeLeft;
+                // Jitter the interval so the strafe doesn't form a detectable metronome.
+                strafeTimer = 15 + random.nextInt(25);
+            }
+        } else if (mc.options.keyLeft.isDown() || mc.options.keyRight.isDown()) {
+            mc.options.keyLeft.setDown(false); // setting toggled off mid-strafe
+            mc.options.keyRight.setDown(false);
         }
 
         if (spin.get()) {
-            yaw += spinSpeed.get();
+            // Jittered rate (+-30%) and wrapped yaw: a constant-rate infinite spin is the most
+            // machine-detectable idle pattern there is.
+            float jitter = 0.7f + random.nextFloat() * 0.6f;
+            yaw = net.minecraft.util.Mth.wrapDegrees(yaw + spinSpeed.get() * jitter);
             mc.player.setYRot(yaw);
         }
     }

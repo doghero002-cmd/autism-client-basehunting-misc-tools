@@ -3,7 +3,6 @@ package com.autism.seedcracker.modules;
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
 
-import autismclient.api.module.BoolSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 
@@ -20,10 +19,7 @@ import autismclient.modules.Module;
 public final class ChunkWaypointsModule extends Module {
 
     private final IntSetting yLevel = add(new IntSetting("y-level", "Marker Y level", 16, -64, 320, 1)
-        .description("World Y where all finder chunk markers are drawn.")
-        .group("General"));
-    private final BoolSetting followBelow = add(new BoolSetting("follow-when-below", "Follow camera when below", true)
-        .description("If you go BELOW the marker Y (e.g. bedrock tunneling under a Y64 plane), markers temporarily follow the camera again so they stay visible.")
+        .description("World Y where all finder chunk markers are drawn. Markers always stay pinned here - they never follow the camera.")
         .group("General"));
 
     public ChunkWaypointsModule(autismclient.modules.ModuleCategory category) {
@@ -47,13 +43,8 @@ public final class ChunkWaypointsModule extends Module {
 
     @Override
     public void tick() {
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc.player == null) return;
-        boolean fixed = true;
-        if (followBelow.get() && mc.player.getY() < yLevel.get() - 4) {
-            fixed = false; // player is under the plane: follow the camera so markers stay visible
-        }
-        ChunkFlagRenderer.configureDisplayY(fixed, yLevel.get());
+        // Re-assert every tick so nothing (stale config, other callers) can flip it back to camera-follow.
+        ChunkFlagRenderer.configureDisplayY(true, yLevel.get());
     }
 
     @Override

@@ -82,10 +82,10 @@ public final class TunnelBaseFinderModule extends Module {
         .description("Turn and hit a player that comes within 16 blocks.")
         .group("Tunnel"));
 
-    public enum TunnelMode { XENON, WALK_2X1 }
+    public enum TunnelMode { WATER, XENON, WALK_2X1 }
     private final EnumSetting<TunnelMode> tunnelMode = add(new EnumSetting<>(
-            "mode", "Tunnel mode", TunnelMode.XENON, TunnelMode.values())
-        .description("XENON = straight-line smart avoidance. WALK_2X1 = mine a plain 2x1 walkable tunnel like a normal pickaxe, with automatic human-like camera.")
+            "mode", "Tunnel mode", TunnelMode.WATER, TunnelMode.values())
+        .description("WATER (default) = hand off to the Tunnel Base (Water) engine - the reliable one. XENON = straight-line smart avoidance. WALK_2X1 = mine a plain 2x1 walkable tunnel like a normal pickaxe, with automatic human-like camera.")
         .group("Tunnel"));
 
     /**
@@ -243,6 +243,18 @@ public final class TunnelBaseFinderModule extends Module {
 
     @Override
     public void onEnable() {
+        if (tunnelMode.get() == TunnelMode.WATER) {
+            // Default mode: hand off to the Water engine and step aside.
+            autismclient.modules.Module water =
+                autismclient.modules.ModuleRegistry.get(SeedcrackerAddon.ID + ":tunnel-base-water");
+            if (water != null) {
+                if (!water.isEnabled()) water.setEnabled(true);
+                AutismClientMessaging.sendPrefixed("§aTunnel Base Finder: Water engine running (Tunnel Base (Water)).");
+                setEnabledSilently(false);
+                return;
+            }
+            AutismClientMessaging.sendPrefixed("§eWater engine module missing - falling back to XENON.");
+        }
         Minecraft mc = Minecraft.getInstance();
         notified.clear();
         spawnerCount = 0;
@@ -271,6 +283,12 @@ public final class TunnelBaseFinderModule extends Module {
         walkPauseTicks = 0;
         walkPauseCooldown = randomRange(60, 200);
         digGapTicks = 0;
+        lastDigPos = null;
+        digTicks = 0;
+        caveAborts = 0;
+        lastCaveAbortTick = 0;
+        escapeBestY = Integer.MIN_VALUE;
+        escapeStallTicks = 0;
         goAroundLane = null;
         goAroundTicks = 0;
         goAroundFails = 0;
@@ -288,13 +306,8 @@ public final class TunnelBaseFinderModule extends Module {
     public void onDisable() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) {
-            mc.options.keyLeft.setDown(false);
-            mc.options.keyRight.setDown(false);
-            mc.options.keyUp.setDown(false);
-            mc.options.keyShift.setDown(false);
-            mc.options.keySprint.setDown(false);
+            releaseMovementKeys(mc);
             mc.options.keyAttack.setDown(false);
-            mc.options.keyJump.setDown(false);
         }
         tunnelDirection = null;
         notified.clear();
@@ -414,6 +427,17 @@ public final class TunnelBaseFinderModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
+
+        // Mode switched to WATER mid-run: hand off to the Water engine and step aside.
+        if (tunnelMode.get() == TunnelMode.WATER) {
+            autismclient.modules.Module water =
+                autismclient.modules.ModuleRegistry.get(SeedcrackerAddon.ID + ":tunnel-base-water");
+            if (water != null) {
+                if (!water.isEnabled()) water.setEnabled(true);
+                setEnabledSilently(false);
+                return;
+            }
+        }
 
         // If a GUI is open (inventory, chest, /ah confirm, etc.) the bot must not keep walking/
         // digging behind it. Auto-close anything that isn't the sell-on-full confirm screen and
@@ -565,7 +589,6 @@ public final class TunnelBaseFinderModule extends Module {
                     currentSmoothedPitch = mc.player.getXRot();
                     yawInitialized = true;
                 }
-                if (avoidCooldown > 0) avoidCooldown--;
                 float yawChange = Math.abs(angleDiff(lastRawTargetYaw, targetYaw));
                 if (yawChange > 5f) {
                     turnSpeedMultiplier = yawChange > 80f
@@ -581,7 +604,7 @@ public final class TunnelBaseFinderModule extends Module {
                     mc.player.setYRot(currentSmoothedYaw);
                     mc.player.setXRot(clampPitch(currentSmoothedPitch));
                 } else {
-                    turnYawOvershoot = lerp(turnYawOvershoot, 0f, turnOvershootDecay);
+                    turnYawOvershoot = lerp(turnYawOvershoot, 0.0f, turnOvershootDecay);
                     float rotSpeed = turnSpeedMultiplier;
                     if (isAvoiding) rotSpeed = 0.08f + rng.nextFloat() * 0.10f;
                     float finalYaw = driftedYaw + turnYawOvershoot;
@@ -628,44 +651,66 @@ public final class TunnelBaseFinderModule extends Module {
     private int digTicks = 0;
     private int digTicksTotal = 0;
 
+    private int escapeBestY = Integer.MIN_VALUE;
+    private int escapeStallTicks = 0;
+
     /**
-     * Escape a bedrock hole: pillar/jump back up to the target Y. Places a block underfoot when
-     * possible and jumps; stops digging while climbing. Returns control to the tunnel once back
-     * at the target Y.
+     * Escape a bedrock hole with a LEGIT tower: look down (eased), hold jump on the ground and
+     * hold use while rising - vanilla clicks the exposed top face beneath you, exactly the input
+     * pattern of a real player pillaring up. The old version useItemOn'd an AIR block (invalid
+     * click, server ignores it), so the pillar never actually placed and the escape spun forever.
      */
     private void tickEscapeHole(Minecraft mc) {
         BlockPos pos = mc.player.blockPosition();
-        if (pos.getY() >= targetY.get()) { mc.options.keyJump.setDown(false); return; } // done - stop bunny-hopping
-        // Face down and jump; if there's a solid block under us, keep jumping to climb.
+        if (pos.getY() >= targetY.get()) { // done - release the tower inputs
+            mc.options.keyJump.setDown(false);
+            mc.options.keyUse.setDown(false);
+            escapeBestY = Integer.MIN_VALUE;
+            escapeStallTicks = 0;
+            return;
+        }
+        // Stall watchdog: no upward progress for 10s (no blocks, unreachable lip) -> stop
+        // towering and route around instead of cycling jump/place forever.
+        if (pos.getY() > escapeBestY) { escapeBestY = pos.getY(); escapeStallTicks = 0; }
+        else if (++escapeStallTicks > 200) {
+            escapeBestY = Integer.MIN_VALUE;
+            escapeStallTicks = 0;
+            mc.options.keyJump.setDown(false);
+            mc.options.keyUse.setDown(false);
+            goAround(mc, "escape stalled");
+            return;
+        }
         mc.options.keyUp.setDown(false);
         mc.options.keyLeft.setDown(false);
         mc.options.keyRight.setDown(false);
         mc.options.keyAttack.setDown(false);
         if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
-        // Look down and try to place a block beneath us to pillar up.
+        // Eased look-down (yaw AND pitch through the legit engine - no raw pitch snap).
         float[] rot = legitMovement.update(mc.player.getYRot(), 80f);
         mc.player.setYRot(rot[0]);
-        mc.player.setXRot(80f);
+        mc.player.setXRot(clampPitch(rot[1]));
         BlockPos below = pos.below();
         boolean belowAir = mc.level.getBlockState(below).isAir() || mc.level.getBlockState(below).canBeReplaced();
         if (belowAir) {
             int slot = findScaffoldSlotForPillar(mc);
-            if (slot >= 0 && mc.player.onGround()) {
+            if (slot >= 0) {
                 com.autism.seedcracker.util.InvSync.select(mc, slot);
-                mc.options.keyJump.setDown(true);
-                // place at the block below via useItemOn against the side of the block we're on
-                net.minecraft.world.phys.BlockHitResult hit = new net.minecraft.world.phys.BlockHitResult(
-                    net.minecraft.world.phys.Vec3.atCenterOf(pos.below()), Direction.UP, pos.below(), false);
-                if (mc.gameMode != null) mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
+                if (mc.player.onGround()) {
+                    mc.options.keyJump.setDown(true);   // launch
+                    mc.options.keyUse.setDown(false);
+                } else {
+                    mc.options.keyJump.setDown(false);
+                    mc.options.keyUse.setDown(true);    // vanilla places on the face below at the apex
+                }
             } else {
                 // No scaffold block: just jump and hope to grab a ledge.
-                if (mc.player.onGround()) mc.options.keyJump.setDown(true);
-                else mc.options.keyJump.setDown(false);
+                mc.options.keyUse.setDown(false);
+                mc.options.keyJump.setDown(mc.player.onGround());
             }
         } else {
             // Solid below: keep jumping to climb out (or dig the block above if enclosed).
-            if (mc.player.onGround()) mc.options.keyJump.setDown(true);
-            else mc.options.keyJump.setDown(false);
+            mc.options.keyUse.setDown(false);
+            mc.options.keyJump.setDown(mc.player.onGround());
             BlockPos head = pos.above(2);
             if (!mc.level.getBlockState(head).isAir() && mc.level.getBlockState(head).getBlock() != Blocks.BEDROCK) {
                 mineDirect(mc, head);
@@ -827,8 +872,11 @@ public final class TunnelBaseFinderModule extends Module {
             goAroundFails = 0;
             strafeOrDigLane(mc, lane);
         } else if (++goAroundFails >= com.autism.seedcracker.util.Tuning.GO_AROUND_MAX_FAILS) {
-            // Boxed in on both sides repeatedly: 90-degree turn as the last resort.
+            // Boxed in on both sides repeatedly: 90-degree turn as the last resort. The strafe
+            // line MUST re-anchor to the new axis or correctPosition keeps steering to the old
+            // coordinate and grinds the player into the wall it just turned away from.
             tunnelDirection = tunnelDirection.getClockWise();
+            retargetLine(mc);
             goAroundFails = 0;
             goAroundLane = null;
             FlagDetectorModule.report("GO_AROUND", "TunnelBaseFinder", "boxed in (" + why + "), turned " + tunnelDirection);
@@ -910,6 +958,11 @@ public final class TunnelBaseFinderModule extends Module {
     private void tickTunneling(Minecraft mc) {
         BlockPos currentPos = mc.player.blockPosition();
 
+        // Cooldown must tick here: it previously only decremented inside ONE rotation style
+        // (VANILLA humanized), so in every other style the first avoidance froze the cave/ground
+        // safety scans FOREVER (avoidCooldown stuck at 60 -> walked straight into the next lake).
+        if (avoidCooldown > 0) avoidCooldown--;
+
         // Emergency: mine gravel/sand we're standing in.
         if (isHazardous(mc, currentPos) && !isLiquid(mc, currentPos)) { mineDirect(mc, currentPos); mc.options.keyUp.setDown(false); return; }
         BlockPos headPos = currentPos.above();
@@ -925,11 +978,12 @@ public final class TunnelBaseFinderModule extends Module {
             case RETURN -> tickReturn(mc);
         }
 
-        if (stuckTicks > 100 && avoidState == AvoidState.NONE) {
+        // Livelier stuck ladder (was 100/200 ticks = 5/10s of standing still before reacting).
+        if (stuckTicks > 40 && avoidState == AvoidState.NONE) {
             mc.options.keyUp.setDown(false);
             startObstacleAvoidance(mc);
             stuckTicks = 0;
-        } else if (stuckTicks > 200) {
+        } else if (stuckTicks > 90) {
             avoidSideDirection = -avoidSideDirection;
             avoidState = AvoidState.SIDESTEP;
             avoidForwardCount = 0;
@@ -942,8 +996,7 @@ public final class TunnelBaseFinderModule extends Module {
         BlockPos nextPos = playerPos.relative(tunnelDirection);
 
         if (!isGroundSafe(mc, tunnelDirection, 2)) {
-            mc.options.keyUp.setDown(false);
-            if (avoidCooldown <= 0) { startObstacleAvoidance(mc); avoidCooldown = 60; }
+            caveAbort(mc, 60);
             return;
         }
 
@@ -965,8 +1018,7 @@ public final class TunnelBaseFinderModule extends Module {
             }
         }
         if (air > solid * 2 || hazard > 4 || caveDepth > 10) {
-            mc.options.keyUp.setDown(false);
-            if (avoidCooldown <= 0) { startObstacleAvoidance(mc); avoidCooldown = 20; }
+            caveAbort(mc, 20);
             return;
         }
 
@@ -1008,19 +1060,40 @@ public final class TunnelBaseFinderModule extends Module {
         if (headBlocked && !headHazard && isHazardous(mc, behindHead)) { mc.options.keyUp.setDown(false); startObstacleAvoidance(mc); return; }
         if (feetBlocked && !feetHazard && hasHazardAbove(mc, behindHead, 5)) { mc.options.keyUp.setDown(false); startObstacleAvoidance(mc); return; }
 
-        // Mine the block we're looking at (crosshair), like holding the mouse button.
-        boolean didMine = false;
-        if ((feetBlocked && !feetHazard && !feetLiquid) || (headBlocked && !headHazard && !headLiquid)) {
-            HitResult hit = mc.hitResult;
-            if (hit instanceof BlockHitResult bhr) {
-                BlockPos bp = bhr.getBlockPos();
-                if (!mc.level.getBlockState(bp).isAir() && !isHazardous(mc, bp)) {
-                    handleBlockBreaking(mc, true, bhr);
-                    didMine = true;
-                }
+        // Dig with a CONVERGED aim (same believable packet path as WALK_2X1): pick the blocked
+        // block (head first - tunnels clear top-down), aim onto it, and let digCrosshair break it
+        // once the crosshair is really there. The old code relied on the crosshair HAPPENING to
+        // rest on the block; at level pitch it never covered the feet block, so the module walked
+        // into a half-cleared wall, tripped the stuck counter, and churned sidestep avoidance
+        // forever - the "bugs out / lags back" loop.
+        BlockPos digPos = null;
+        if (headBlocked && !headHazard && !headLiquid) digPos = nextPos.above();
+        else if (feetBlocked && !feetHazard && !feetLiquid) digPos = nextPos;
+        if (digPos != null) {
+            if (!digPos.equals(lastDigPos)) {
+                lastDigPos = digPos;
+                digTicks = 0;
+                if (autoTool.get()) selectBestTool(mc, mc.level.getBlockState(digPos));
+            } else if (++digTicks > digTimeout.get()) {
+                // Unbreakable / wrong tool: don't stall forever - route around it.
+                digTicks = 0;
+                lastDigPos = null;
+                handleBlockBreaking(mc, false, null);
+                FlagDetectorModule.report("UNBREAKABLE", "TunnelBaseFinder",
+                    "xenon dig timeout at " + digPos + " state=" + mc.level.getBlockState(digPos).getBlock());
+                caveAbort(mc, 20);
+                return;
             }
+            mc.options.keyUp.setDown(false);      // stand still while digging (Grim legitimacy)
+            mc.options.keySprint.setDown(false);
+            aimAtBlock(mc, digPos);
+            digCrosshair(mc);
+            stuckTicks = 0; // breaking IS progress - don't trip the stuck ladder mid-deepslate
+            return;
         }
-        if (!didMine) handleBlockBreaking(mc, false, null);
+        lastDigPos = null;
+        digTicks = 0;
+        handleBlockBreaking(mc, false, null);
 
         // Periodic walk pauses.
         if (walkPauseTicks > 0) { walkPauseTicks--; com.autism.seedcracker.util.tunnel.HumanMotionSim.releaseAll(); return; }
@@ -1041,6 +1114,44 @@ public final class TunnelBaseFinderModule extends Module {
             mc.options.keyUp.setDown(true);
         }
         stuckTicks = 0;
+    }
+
+    private int caveAborts = 0;
+    private long lastCaveAbortTick = 0;
+
+    /**
+     * Cave/ground abort with escalation: repeated aborts in the same area mean the sidestep dance
+     * is circling a megacave/ravine - after 4 of them inside 30s, turn 90 degrees and commit to a
+     * fresh line instead of sidestepping forever.
+     */
+    private void caveAbort(Minecraft mc, int cooldown) {
+        mc.options.keyUp.setDown(false);
+        if (avoidCooldown > 0) return;
+        if (totalTicks - lastCaveAbortTick > 600) caveAborts = 0;
+        lastCaveAbortTick = totalTicks;
+        if (++caveAborts >= 4) {
+            caveAborts = 0;
+            tunnelDirection = tunnelDirection.getClockWise();
+            retargetLine(mc);
+            avoidState = AvoidState.NONE;
+            avoidCooldown = 40;
+            FlagDetectorModule.report("CAVE_ESCALATE", "TunnelBaseFinder",
+                "4 cave aborts - turned " + tunnelDirection);
+            return;
+        }
+        startObstacleAvoidance(mc);
+        avoidCooldown = cooldown;
+    }
+
+    /** Re-anchor the strafe-correction line after any 90-degree heading change. */
+    private void retargetLine(Minecraft mc) {
+        if (tunnelDirection == Direction.NORTH || tunnelDirection == Direction.SOUTH) {
+            fixedCoordIsX = true;
+            fixedCoord = Math.floor(mc.player.getX()) + 0.5;
+        } else {
+            fixedCoordIsX = false;
+            fixedCoord = Math.floor(mc.player.getZ()) + 0.5;
+        }
     }
 
     private void startObstacleAvoidance(Minecraft mc) {

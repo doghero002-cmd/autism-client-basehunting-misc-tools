@@ -10,6 +10,7 @@
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FakeRolesChatMixin",
+    "HudScoreboardMixin",
     "LocalPlayerMixin",
     "ModuleLifecycleMixin",
     "MouseHandlerAccessor",

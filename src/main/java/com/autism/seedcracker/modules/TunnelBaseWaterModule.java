@@ -66,6 +66,9 @@ public final class TunnelBaseWaterModule extends Module {
     private final BoolSetting spawnerCritical = add(new BoolSetting("spawner-critical", "Spawner critical", false)
         .description("Disconnect the moment any spawner is detected (else only on chest/shulker/piston counts).")
         .group("General"));
+    private final BoolSetting requireSpawner = add(new BoolSetting("require-spawner", "Require spawner", true)
+        .description("Only flag a BASE when a spawner is ALSO loaded. Chest/shulker/piston counts alone (kelp farms, shops, lush caves) won't trigger.")
+        .group("Base Detection"));
     private final IntSetting obiSlot = add(new IntSetting("obsidian-slot", "Obsidian slot", 2, 1, 9, 1).group("Slots"));
     private final IntSetting pearlSlot = add(new IntSetting("pearl-slot", "Pearl slot", 3, 1, 9, 1).group("Slots"));
     private final IntSetting xpSlot = add(new IntSetting("bottle-slot", "Bottle slot", 4, 1, 9, 1).group("Slots"));
@@ -162,6 +165,7 @@ public final class TunnelBaseWaterModule extends Module {
         yRecoveryRotationDone = false; yRecoveryBasePos = null; mendStage = MendStage.ENSURE;
         buyStage = BuyStage.NONE; buyWait = 0; stuckTicks = 0; lastCoords = null;
         isBackup = false; mendingGraceTicks = 0; pearlReset = true; shouldCloseInventory = false;
+        preferredSide = 0; detourStartPos = null; hazardCommitTicks = 0; noFoodCooldown = 0;
         resetMiningTick = 0; resetUseTick = 0; wasScreenOpen = false; jumped = false;
         look.reset();
         stuck.reset();
@@ -187,13 +191,10 @@ public final class TunnelBaseWaterModule extends Module {
     @Override
     public void onDisable() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.options != null) {
-            mc.options.keyUp.setDown(false);
-            mc.options.keyJump.setDown(false);
-            updateMining(mc, false);
-            updateUsage(mc, false);
-        }
+        if (mc.options != null) stopMovement(mc);
         state = State.NONE; backup = State.NONE; isRotating = false; rotCallback = null;
+        isBackup = false; backupDirection = null; preferredSide = 0; detourStartPos = null;
+        hazardCommitTicks = 0;
         stuck.reset();
     }
 
@@ -212,11 +213,16 @@ public final class TunnelBaseWaterModule extends Module {
 
     private void tickRotation(Minecraft mc) {
         if (!isRotating) return;
-        // Bounded turn-speed step (not the slow LegitMovement default): snappy enough to keep pace
-        // while walking, without an instant head-flick. turnSpeed is degrees per tick.
-        float step = turnSpeed.get();
-        currentSmoothedYaw = LookRotationCompat.approachAngle(currentSmoothedYaw, pendingYaw, step);
-        currentSmoothedPitch = LookRotationCompat.approach(currentSmoothedPitch, pendingPitch, step);
+        // Ease-out profile: step proportional to remaining angle (35%), clamped to [1.5, turnSpeed].
+        // Real mouse turns decelerate into the target; a constant-rate sweep with a hard stop is a
+        // machine signature. Still lands on the GCD grid below.
+        float cap = turnSpeed.get();
+        float yawRemain = Math.abs(net.minecraft.util.Mth.wrapDegrees(pendingYaw - currentSmoothedYaw));
+        float pitchRemain = Math.abs(pendingPitch - currentSmoothedPitch);
+        float yawStep = Math.max(1.5f, Math.min(cap, yawRemain * 0.35f));
+        float pitchStep = Math.max(1.5f, Math.min(cap, pitchRemain * 0.35f));
+        currentSmoothedYaw = LookRotationCompat.approachAngle(currentSmoothedYaw, pendingYaw, yawStep);
+        currentSmoothedPitch = LookRotationCompat.approach(currentSmoothedPitch, pendingPitch, pitchStep);
         mc.player.setYRot(currentSmoothedYaw);
         mc.player.setXRot(net.minecraft.util.Mth.clamp(currentSmoothedPitch, -90f, 90f));
         float yawDiff = Math.abs(net.minecraft.util.Mth.wrapDegrees(pendingYaw - mc.player.getYRot()));
@@ -268,6 +274,7 @@ public final class TunnelBaseWaterModule extends Module {
         }
 
         if (mendingGraceTicks > 0) mendingGraceTicks--;
+        if (noFoodCooldown > 0) noFoodCooldown--;
 
         boolean busy = state == State.AUTOMEND || state == State.AUTOEAT
             || state == State.BUYXP || state == State.BUYPEARL
@@ -280,7 +287,15 @@ public final class TunnelBaseWaterModule extends Module {
                 else if (kickOnNoTotem.get()) { disconnect(mc, "YOUR TOTEM POPPED"); return; }
             }
             if (isPickaxeLow(mc)) { backup = state; state = State.AUTOMEND; }
-            else if (mc.player.getFoodData().getFoodLevel() <= 6) { backup = state; state = State.AUTOEAT; }
+            // Eat before hunger can halt sprint/regen; noFoodCooldown stops an eat<->mine ping-pong when there is no food.
+            else if (mc.player.getFoodData().getFoodLevel() <= 10 && noFoodCooldown <= 0) { backup = state; state = State.AUTOEAT; }
+        }
+
+        // Lane-centering strafe keys are only managed inside MINING; drop them everywhere else
+        // or a latched strafe drifts the tower/mend/buy states sideways (off the pillar).
+        if (state != State.MINING) {
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
         }
 
         switch (state) {
@@ -332,7 +347,9 @@ public final class TunnelBaseWaterModule extends Module {
         if (chests >= chestThreshold.get()) { found = true; reason = "BASE"; }
         else if (shulkers >= shulkerThreshold.get()) { found = true; reason = "BASE"; }
         else if (movingPiston >= pistonThreshold.get()) { found = true; reason = "BASE"; }
-        else if (foundSpawner && spawnerCritical.get()) { found = true; reason = "SPAWNER"; }
+        // Storage counts alone can be a kelp farm / shop chunk: require a loaded spawner too.
+        if (found && requireSpawner.get() && !foundSpawner) { found = false; reason = ""; }
+        if (!found && foundSpawner && spawnerCritical.get()) { found = true; reason = "SPAWNER"; }
         if (found) onBaseFound(mc, reason);
     }
 
@@ -371,32 +388,61 @@ public final class TunnelBaseWaterModule extends Module {
         com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc));
         if (mode.get() == MiningMode.CRAWL && mc.player.getPose() != Pose.SWIMMING) state = State.PEARL;
 
-        if (mc.hitResult == null || mc.hitResult.getType() == HitResult.Type.MISS) {
-            BlockPos cur = mc.player.blockPosition();
-            if (cur.equals(lastCoords)) {
-                if (stuckTicks < 20) stuckTicks++;
-                else {
-                    stuckTicks = 0;
-                    avoidHazard(mc, false);
-                }
-            } else { stuckTicks = 0; lastCoords = cur; }
-        } else { stuckTicks = 0; lastCoords = mc.player.blockPosition(); }
+        // Stuck ladder: position-based (not hitResult-based) so "aiming at a block but not
+        // progressing" (lag-back, wrong face, unbreakable) is caught too.
+        // Escalates: hop -> exact re-aim + attack retrigger -> sidestep -> tower out.
+        BlockPos cur = mc.player.blockPosition();
+        if (cur.equals(lastCoords)) {
+            stuckTicks++;
+            if (stuckTicks == 20) {
+                mc.options.keyJump.setDown(true); jumped = true; // hop a lip / unstick feet
+            } else if (stuckTicks == 40) {
+                reAimAtFrontBlock(mc);
+                updateMining(mc, false); // drop the attack latch so it re-triggers next tick
+            } else if (stuckTicks == 60) {
+                avoidHazard(mc, false);
+            } else if (stuckTicks >= 90) {
+                stuckTicks = 0;
+                state = State.GOABOVEHAZARD; // climb out of the pocket
+                return;
+            }
+        } else { stuckTicks = 0; lastCoords = cur; }
 
         tryJumpStep(mc);
 
-        if (isBackup) {
-            if (!checkHazardDirection(mc, backupDirection, 0)) {
+        if (isBackup && backupDirection != null) {
+            // Hysteresis against turn ping-pong: only resume the heading after we've actually
+            // stepped OUT of the pocket (2+ blocks from where the detour began) AND the heading is
+            // clear far ahead (extra scan). Resuming off a bare 5-block scan from inside the pocket
+            // is what caused the constant second-guessing turns.
+            boolean movedAside = detourStartPos == null
+                || detourStartPos.distManhattan(mc.player.blockPosition()) >= 2;
+            if (movedAside && !checkHazardDirection(mc, backupDirection, 8)) {
                 currentDirection = backupDirection;
                 isBackup = false;
+                detourStartPos = null;
+                hazardCommitTicks = 10; // commit to the resumed heading too
                 float[] v = dirValues(currentDirection);
                 rotateTo(v[0], v[1], null);
             }
         }
 
-        mc.options.keyUp.setDown(true);
+        // Gravel/sand column in the lane: stand still and chew through it - walking into a
+        // falling column is the classic suffocation-jitter loop.
+        BlockPos feetFront = cur.relative(currentDirection);
+        BlockPos headFront = feetFront.above();
+        boolean fallingAhead =
+            mc.level.getBlockState(feetFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+            || mc.level.getBlockState(headFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock;
+
+        mc.options.keyUp.setDown(!fallingAhead);
+        laneCenterCorrection(mc);
+
         if (mode.get() == MiningMode.STANDING) {
             if (mc.hitResult instanceof BlockHitResult hit) {
-                updateMining(mc, hit.getBlockPos().getY() >= mc.player.blockPosition().getY());
+                updateMining(mc, fallingAhead || hit.getBlockPos().getY() >= cur.getY());
+            } else {
+                updateMining(mc, fallingAhead);
             }
         } else {
             updateMining(mc, true);
@@ -404,38 +450,110 @@ public final class TunnelBaseWaterModule extends Module {
         if (checkHazardDirection(mc, currentDirection, 0)) avoidHazard(mc, true);
     }
 
+    /** Re-aim precisely at the centre of the head-level block in front (stuck-recovery step). */
+    private void reAimAtFrontBlock(Minecraft mc) {
+        if (isRotating || currentDirection == null) return;
+        BlockPos head = mc.player.blockPosition().above().relative(currentDirection);
+        BlockPos target = !isAir(mc, head) ? head : mc.player.blockPosition().relative(currentDirection);
+        if (isAir(mc, target)) return;
+        net.minecraft.world.phys.Vec3 c = net.minecraft.world.phys.Vec3.atCenterOf(target);
+        double dx = c.x - mc.player.getX(), dz = c.z - mc.player.getZ();
+        double dy = c.y - mc.player.getEyeY();
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)));
+        rotateTo(yaw, pitch, null);
+    }
+
+    /** Keep centred on the tunnel lane so shoulders don't clip the wall (a silent stuck cause). */
+    private void laneCenterCorrection(Minecraft mc) {
+        if (currentDirection == null || isRotating) {
+            mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false);
+            return;
+        }
+        boolean alongZ = currentDirection == Direction.NORTH || currentDirection == Direction.SOUTH;
+        double frac = alongZ
+            ? mc.player.getX() - Math.floor(mc.player.getX())
+            : mc.player.getZ() - Math.floor(mc.player.getZ());
+        double off = frac - 0.5;
+        if (Math.abs(off) < 0.22) {
+            mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false);
+            return;
+        }
+        // Which strafe key re-centres depends on the facing sign along the lane axis.
+        boolean pressLeft = switch (currentDirection) {
+            case NORTH -> off > 0;
+            case SOUTH -> off < 0;
+            case WEST -> off < 0;
+            case EAST -> off > 0;
+            default -> false;
+        };
+        mc.options.keyLeft.setDown(pressLeft);
+        mc.options.keyRight.setDown(!pressLeft);
+    }
+
     private int hazardCommitTicks = 0; // lock a hazard-turn decision so we don't flip-flop
+    private int preferredSide = 0;     // sticky detour side: -1 left, +1 right (0 = pick fresh)
+    private BlockPos detourStartPos = null; // where the current detour began
 
     private void avoidHazard(Minecraft mc, boolean markBackup) {
         // If we recently committed to a turn, hold it for a few ticks instead of re-deciding every
         // tick (the left<->right oscillation that looks like a stuck loop).
         if (hazardCommitTicks > 0) { hazardCommitTicks--; return; }
-        // Try to go AROUND the hazard first: left, then right (wider scan), then the two back
-        // diagonals. Only tower up/down as an absolute last resort when fully boxed in - never dig
-        // straight down into bedrock-level lava.
-        Direction[] sides = { dirLeft(currentDirection), dirRight(currentDirection),
-            currentDirection.getOpposite(), dirLeft(currentDirection), dirRight(currentDirection) };
-        int[] extras = { 5, 5, 0, 12, 12 }; // progressively wider search before giving up
-        for (int i = 0; i < sides.length; i++) {
-            if (!checkHazardDirection(mc, sides[i], extras[i])) {
-                if (markBackup) { isBackup = true; backupDirection = currentDirection; }
-                currentDirection = sides[i];
-                hazardCommitTicks = 8;
+        // True tunnel heading: while detouring, currentDirection is the sidestep, not the heading.
+        Direction heading = (isBackup && backupDirection != null) ? backupDirection : currentDirection;
+        Direction left = dirLeft(heading), right = dirRight(heading);
+        // Sticky side: keep detouring around the SAME side of the lake instead of re-rolling
+        // left/right on every call - alternating sides is exactly the back-and-forth loop.
+        if (preferredSide == 0) preferredSide = Math.random() < 0.5 ? -1 : 1;
+        Direction firstSide = preferredSide > 0 ? right : left;
+        Direction otherSide = preferredSide > 0 ? left : right;
+
+        Direction[] cands; int[] scans;
+        if (isBackup) {
+            // Detour lane just got blocked: try resuming the heading first, then the sides.
+            cands = new Direction[]{ heading, firstSide, otherSide, firstSide, otherSide };
+            scans = new int[]{ 0, 5, 5, 12, 12 };
+        } else {
+            cands = new Direction[]{ firstSide, otherSide, firstSide, otherSide };
+            scans = new int[]{ 5, 5, 12, 12 };
+        }
+        for (int i = 0; i < cands.length; i++) {
+            Direction d = cands[i];
+            if (d == currentDirection) continue; // that's the blocked lane
+            if (!checkHazardDirection(mc, d, scans[i])) {
+                if (d == heading) {
+                    isBackup = false; detourStartPos = null; // resumed the tunnel heading
+                } else {
+                    if (markBackup && !isBackup) { isBackup = true; backupDirection = heading; detourStartPos = mc.player.blockPosition(); }
+                    preferredSide = (d == right) ? 1 : -1; // stay on this side next time
+                }
+                currentDirection = d;
+                hazardCommitTicks = 10;
                 float[] v = dirValues(currentDirection);
                 rotateTo(v[0], v[1], null);
                 return;
             }
         }
-        // Fully boxed in by hazard on every side. Only tower if it's actually safe above/below -
-        // never dig straight down into lava at bedrock.
-        if (!checkHazardAbove(mc) && !checkHazardBelow(mc)) {
+        // Both sides blocked: tower OVER the hazard (keeps forward progress into fresh chunks).
+        // Only the ceiling matters for climbing UP - lava below the floor must NOT veto the climb
+        // (at bedrock there is nearly always lava within a few blocks down, which used to box us in).
+        if (!checkHazardAbove(mc)) {
             state = State.GOABOVEHAZARD;
-        } else {
-            // No safe path at all: stop and warn rather than digging into lava.
-            com.autism.seedcracker.modules.FlagDetectorModule.report("HAZARD_BOXED", "TunnelBaseWater",
-                "fully boxed by lava at " + mc.player.blockPosition());
-            stopMovement(mc);
+            return;
         }
+        // Dead end: only now consider the way we came, otherwise stop and warn.
+        Direction back = heading.getOpposite();
+        if (!checkHazardDirection(mc, back, 0)) {
+            if (markBackup && !isBackup) { isBackup = true; backupDirection = heading; detourStartPos = mc.player.blockPosition(); }
+            currentDirection = back;
+            hazardCommitTicks = 10;
+            float[] v = dirValues(currentDirection);
+            rotateTo(v[0], v[1], null);
+            return;
+        }
+        com.autism.seedcracker.modules.FlagDetectorModule.report("HAZARD_BOXED", "TunnelBaseWater",
+            "fully boxed by lava at " + mc.player.blockPosition());
+        stopMovement(mc);
     }
 
     /** True if there's lava/water directly below (so towering down would dig into it). */
@@ -453,6 +571,13 @@ public final class TunnelBaseWaterModule extends Module {
         if (jumpCooldown > 0) { jumpCooldown--; return; }
         BlockPos down = mc.player.blockPosition().relative(currentDirection);
         BlockPos up = down.above(), up2 = up.above(), up3 = mc.player.blockPosition().above(2);
+        Block stepBlock = mc.level.getBlockState(down).getBlock();
+        if (isContactHazard(stepBlock)) return; // never step onto magma etc.
+        // Fences/walls/gates are 1.5 blocks tall: a normal jump can't clear them, so hopping at
+        // one just bounces forever. Mine through instead (fall through to normal mining).
+        if (stepBlock instanceof net.minecraft.world.level.block.FenceBlock
+            || stepBlock instanceof net.minecraft.world.level.block.WallBlock
+            || stepBlock instanceof net.minecraft.world.level.block.FenceGateBlock) return;
         if (!isAir(mc, down) && isAir(mc, up) && isAir(mc, up2) && isAir(mc, up3)) {
             mc.options.keyJump.setDown(true);
             jumped = true;
@@ -492,11 +617,26 @@ public final class TunnelBaseWaterModule extends Module {
 
     // ---- GO ABOVE HAZARD (tower) ----
     private void handleGoAbove(Minecraft mc) {
-        if (!ensureInHotbar(mc, Items.OBSIDIAN, obiSlot.get() - 1, State.BUYOBI)) return;
-        if (checkHazardAbove(mc)) { disconnect(mc, "NO SAFE PATH - HAZARD ABOVE"); return; }
-        if (towerBasePos == null) { towerBasePos = mc.player.blockPosition(); phase = Phase.DIG; phaseStartTime = System.currentTimeMillis(); }
+        if (!ensurePillarBlock(mc)) return;
+        if (checkHazardAbove(mc)) {
+            // Ceiling unsafe (gravel/fluid): shuffle sideways and retry instead of instantly kicking.
+            state = State.MINING;
+            avoidHazard(mc, false);
+            return;
+        }
+        if (towerBasePos == null) {
+            towerBasePos = mc.player.blockPosition();
+            towerTargetY = computeTowerTargetY(mc); // position goal, not a timer
+            towerBestY = towerBasePos.getY();
+            towerStallTicks = 0;
+            phase = Phase.DIG; phaseStartTime = System.currentTimeMillis();
+        }
+        if (tickTowerProgress(mc)) return;
         BlockPos below = mc.player.blockPosition().below();
-        if (!isAir(mc, below) && !checkHazardDirection(mc, currentDirection, 0)) {
+        int y = mc.player.blockPosition().getY();
+        // Exit when the computed safe height is reached OR the forward lane went clear early.
+        boolean atTarget = towerTargetY != Integer.MIN_VALUE && y >= towerTargetY && mc.player.onGround();
+        if (!isAir(mc, below) && (atTarget || !checkHazardDirection(mc, currentDirection, 0))) {
             float[] v = dirValues(currentDirection);
             rotateTo(v[0], v[1], () -> { com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc)); state = State.MINING; resetTower(); });
             updateMining(mc, false); mc.options.keyJump.setDown(false); mc.options.keyUse.setDown(false);
@@ -506,10 +646,53 @@ public final class TunnelBaseWaterModule extends Module {
         towerPhase(mc);
     }
 
+    /** First Y above us whose forward corridor (5 blocks, feet+head) is fluid/hazard-free floor-safe. */
+    private int computeTowerTargetY(Minecraft mc) {
+        Direction heading = (isBackup && backupDirection != null) ? backupDirection : currentDirection;
+        if (heading == null) return mc.player.blockPosition().getY() + 4;
+        BlockPos feet = mc.player.blockPosition();
+        for (int dy = 2; dy <= 6; dy++) {
+            boolean clear = true;
+            for (int i = 1; i <= 5 && clear; i++) {
+                BlockPos fw = feet.above(dy).relative(heading, i);
+                for (int h = 0; h <= 1 && clear; h++) {
+                    net.minecraft.world.level.block.state.BlockState st = mc.level.getBlockState(fw.above(h));
+                    if (!st.getFluidState().isEmpty() || isContactHazard(st.getBlock())) clear = false;
+                }
+                if (!mc.level.getBlockState(fw.below()).getFluidState().isEmpty()) clear = false;
+            }
+            if (clear) return feet.getY() + dy;
+        }
+        return feet.getY() + 4;
+    }
+
+    /** Stall watchdog for tower states: no upward progress for 10s = bail out sideways. True = bailed. */
+    private boolean tickTowerProgress(Minecraft mc) {
+        int y = mc.player.blockPosition().getY();
+        if (y > towerBestY) { towerBestY = y; towerStallTicks = 0; return false; }
+        if (++towerStallTicks < 200) return false;
+        // Not gaining height (out of blocks? unbreakable ceiling pocket?): stop towering, flip the
+        // detour side, and let the hazard router find another lane instead of cycling forever.
+        resetTower();
+        updateMining(mc, false); updateUsage(mc, false); mc.options.keyJump.setDown(false);
+        com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc));
+        preferredSide = -preferredSide;
+        hazardCommitTicks = 0;
+        state = State.MINING;
+        avoidHazard(mc, true);
+        return true;
+    }
+
     // ---- Y RECOVERY (tower back up) ----
     private void handleYRecovery(Minecraft mc) {
-        if (!ensureInHotbar(mc, Items.OBSIDIAN, obiSlot.get() - 1, State.BUYOBI)) return;
-        if (yRecoveryBasePos == null) { yRecoveryBasePos = mc.player.blockPosition(); phase = Phase.DIG; phaseStartTime = System.currentTimeMillis(); }
+        if (!ensurePillarBlock(mc)) return;
+        if (yRecoveryBasePos == null) {
+            yRecoveryBasePos = mc.player.blockPosition();
+            towerBestY = yRecoveryBasePos.getY();
+            towerStallTicks = 0;
+            phase = Phase.DIG; phaseStartTime = System.currentTimeMillis();
+        }
+        if (tickTowerProgress(mc)) { yRecoveryBasePos = null; return; }
         BlockPos below = mc.player.blockPosition().below();
         if (mc.player.blockPosition().getY() >= MIN_Y_LEVEL && !isAir(mc, below)) {
             float[] v = dirValues(currentDirection);
@@ -529,8 +712,17 @@ public final class TunnelBaseWaterModule extends Module {
         switch (phase) {
             case DIG -> {
                 mc.options.keyJump.setDown(false); mc.options.keyUse.setDown(false);
-                rotateTo(mc.player.getYRot(), 90f, () -> { com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc)); updateMining(mc, true); });
-                if (System.currentTimeMillis() - phaseStartTime >= PHASE_TIME_MS) { updateMining(mc, false); switchPhase(mc, Phase.TOWER); }
+                // Clear HEADROOM (pitch -90). The old port looked DOWN (90) here, which re-broke the
+                // fresh pillar / dug toward bedrock lava, so every tower attempt stalled.
+                rotateTo(mc.player.getYRot(), -90f, () -> { com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc)); updateMining(mc, true); });
+                // Position-verified: the moment 3 blocks of headroom are ACTUALLY air, start placing
+                // (the 5s timer stays only as a fallback for unbreakables/lag).
+                BlockPos p = mc.player.blockPosition();
+                boolean headroomClear = isAir(mc, p.above(1)) && isAir(mc, p.above(2)) && isAir(mc, p.above(3));
+                if ((headroomClear && !isRotating)
+                    || System.currentTimeMillis() - phaseStartTime >= PHASE_TIME_MS) {
+                    updateMining(mc, false); switchPhase(mc, Phase.TOWER);
+                }
             }
             case TOWER -> {
                 updateMining(mc, false);
@@ -564,7 +756,14 @@ public final class TunnelBaseWaterModule extends Module {
         updateMining(mc, false); updateUsage(mc, false); mc.options.keyJump.setDown(false);
     }
 
-    private void resetTower() { towerBasePos = null; towerRotationDone = false; phase = Phase.DIG; phaseStartTime = System.currentTimeMillis(); }
+    private void resetTower() {
+        towerBasePos = null; towerRotationDone = false; phase = Phase.DIG; phaseStartTime = System.currentTimeMillis();
+        towerTargetY = Integer.MIN_VALUE; towerBestY = Integer.MIN_VALUE; towerStallTicks = 0;
+    }
+
+    private int towerTargetY = Integer.MIN_VALUE;
+    private int towerBestY = Integer.MIN_VALUE;
+    private int towerStallTicks = 0;
 
     // ---- AUTO MEND ----
     private void handleMend(Minecraft mc) {
@@ -601,14 +800,51 @@ public final class TunnelBaseWaterModule extends Module {
     }
 
     // ---- AUTO EAT ----
+    private int noFoodCooldown = 0;
+
     private void handleEating(Minecraft mc) {
-        if (!ensureInHotbar(mc, Items.GOLDEN_CARROT, carrotSlot.get() - 1, State.BUYCARROT)) return;
-        if (mc.player.getInventory().getSelectedSlot() != carrotSlot.get() - 1) {
-            com.autism.seedcracker.util.InvSync.select(mc, carrotSlot.get() - 1);
-        } else {
-            if (mc.player.getFoodData().getFoodLevel() <= 6) updateUsage(mc, true);
-            else { updateUsage(mc, false); state = backup; backup = State.NONE; }
+        // Prefer the configured carrot slot, but eat ANY food so low hunger never stalls the bot.
+        int slot = carrotSlot.get() - 1;
+        if (!isFood(mc.player.getInventory().getItem(slot))) {
+            int food = findAnyFood(mc);
+            if (food == -1) {
+                if (buying.get()) { state = State.BUYCARROT; buyStage = BuyStage.NONE; return; }
+                if (noFoodCooldown <= 0) {
+                    AutismClientMessaging.sendPrefixed("§e[TunnelBase-Water] §fNo food in inventory - tunneling on while hungry (no sprint/regen).");
+                }
+                noFoodCooldown = 20 * 60; // retry food in a minute; don't ping-pong eat<->mine every tick
+                updateUsage(mc, false);
+                state = backup == State.NONE ? State.MINING : backup; backup = State.NONE;
+                return;
+            }
+            if (food < 9) {
+                slot = food; // food already in another hotbar slot - eat from there
+            } else {
+                if (!(mc.gui.screen() instanceof InventoryScreen)) { mc.gui.setScreen(new InventoryScreen(mc.player)); return; }
+                moveSlot(mc, food, slot);
+                shouldCloseInventory = true;
+                return;
+            }
         }
+        if (mc.player.getInventory().getSelectedSlot() != slot) {
+            com.autism.seedcracker.util.InvSync.select(mc, slot);
+        } else if (mc.player.getFoodData().getFoodLevel() < 18) {
+            updateUsage(mc, true); // keep eating until well fed, not just past the trigger point
+        } else {
+            updateUsage(mc, false);
+            com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc));
+            state = backup == State.NONE ? State.MINING : backup; backup = State.NONE;
+        }
+    }
+
+    private static boolean isFood(ItemStack s) {
+        return !s.isEmpty() && s.has(net.minecraft.core.component.DataComponents.FOOD);
+    }
+
+    private static int findAnyFood(Minecraft mc) {
+        for (int i = 0; i < 9; i++) if (isFood(mc.player.getInventory().getItem(i))) return i; // hotbar first: no inv click
+        for (int i = 9; i < 36; i++) if (isFood(mc.player.getInventory().getItem(i))) return i;
+        return -1;
     }
 
     // ---- SHOP RESTOCK (XP / pearl / obi / carrot share one stage machine) ----
@@ -749,6 +985,33 @@ public final class TunnelBaseWaterModule extends Module {
     private boolean ensureXpReady(Minecraft mc) {
         if (hasXpOffhand(mc)) return true;
         return ensureInHotbar(mc, Items.EXPERIENCE_BOTTLE, xpSlot.get() - 1, State.BUYXP);
+    }
+
+    /** Blocks acceptable for pillaring when obsidian runs out (solid junk we mined anyway). */
+    private static final Item[] PILLAR_FALLBACKS = {
+        Items.OBSIDIAN, Items.COBBLED_DEEPSLATE, Items.COBBLESTONE, Items.DEEPSLATE, Items.TUFF,
+        Items.ANDESITE, Items.DIORITE, Items.GRANITE, Items.NETHERRACK, Items.BASALT,
+        Items.BLACKSTONE, Items.STONE, Items.DIRT, Items.CALCITE
+    };
+
+    /** Ensure SOME pillar block sits in the obsidian slot: obsidian first, then mined junk. */
+    private boolean ensurePillarBlock(Minecraft mc) {
+        int slot = obiSlot.get() - 1;
+        for (Item it : PILLAR_FALLBACKS) if (mc.player.getInventory().getItem(slot).is(it)) return true;
+        for (Item it : PILLAR_FALLBACKS) {
+            int found = findInInventory(mc, it);
+            if (found == -1) continue;
+            if (found == slot) return true;
+            if (!(mc.gui.screen() instanceof InventoryScreen)) { mc.gui.setScreen(new InventoryScreen(mc.player)); return false; }
+            moveSlot(mc, found, slot);
+            shouldCloseInventory = true;
+            return false;
+        }
+        if (buying.get()) { state = State.BUYOBI; buyStage = BuyStage.NONE; return false; }
+        // Nothing to pillar with and buying is off: sidestep instead of hard-stopping.
+        state = State.MINING;
+        avoidHazard(mc, false);
+        return false;
     }
 
     /** Ensure an item is in the given hotbar slot; if it's elsewhere, 3-click it over (open inv). */
@@ -957,6 +1220,8 @@ public final class TunnelBaseWaterModule extends Module {
         mc.options.keyDown.setDown(false);
         mc.options.keyLeft.setDown(false);
         mc.options.keyRight.setDown(false);
+        mc.options.keyShift.setDown(false);
+        mc.options.keySprint.setDown(false);
         updateUsage(mc, false);
         mc.options.keyJump.setDown(false);
         updateMining(mc, false);

@@ -36,6 +36,22 @@ import net.minecraft.world.level.chunk.LevelChunk;
 public final class ActivityFinderModule extends Module {
 
     // ---- settings ----
+    /** Which block entities count as activity. */
+    public enum Mode {
+        /** Any block entity (original). */
+        ALL,
+        /** Storage only: chests/barrels/shulkers/hoppers (loot rooms). */
+        STORAGE,
+        /** Work stations: furnaces/brewing/enchanting/anvil area blocks (active base). */
+        UTILITY,
+        /** Redstone machinery: hoppers/dispensers/droppers/comparators (farms & vaults). */
+        REDSTONE
+    }
+
+    private final autismclient.api.module.EnumSetting<Mode> mode = add(
+        new autismclient.api.module.EnumSetting<>("mode", "Mode", Mode.ALL, Mode.values())
+        .description("ALL = any block entity. STORAGE = chests/shulkers (loot). UTILITY = furnaces/brewing (lived-in). REDSTONE = hoppers/dispensers (farms/vaults).")
+        .group("General"));
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
             com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
@@ -85,6 +101,15 @@ public final class ActivityFinderModule extends Module {
     }
 
     @Override
+    protected void onOptionValueChanged(String settingId) {
+        // Mode swap: re-judge every chunk under the new filter immediately.
+        if ("mode".equals(settingId) || "sensitivity".equals(settingId) || "y-level".equals(settingId)) {
+            flagged.clear();
+            notified.clear();
+        }
+    }
+
+    @Override
     public void onDisable() {
         flagged.clear();
         notified.clear();
@@ -110,9 +135,10 @@ public final class ActivityFinderModule extends Module {
         int yGate = yLevel.get();
 
         int need = sensitivity.get().scale(1); // HIGH/MEDIUM 1, LOW 2
+        Mode m = mode.get();
         for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
             ChunkPos pos = chunk.getPos();
-            boolean active = countActivityAtOrBelow(chunk, yGate, need) >= need;
+            boolean active = countActivityAtOrBelow(chunk, yGate, need, m) >= need;
             if (active) {
                 flagged.add(pos);
                 if (notified.add(pos)) {
@@ -127,15 +153,34 @@ public final class ActivityFinderModule extends Module {
         notified.removeIf(p -> tooFar(p, playerChunk, r));
     }
 
-    /** Count block entities at or below {@code yGate}, stopping early at {@code enough}. */
-    private static int countActivityAtOrBelow(LevelChunk chunk, int yGate, int enough) {
+    /** Count mode-matching block entities at or below {@code yGate}, stopping early at {@code enough}. */
+    private static int countActivityAtOrBelow(LevelChunk chunk, int yGate, int enough, Mode mode) {
         int n = 0;
         for (BlockEntity be : chunk.getBlockEntities().values()) {
             if (be == null) continue;
             BlockPos p = be.getBlockPos();
-            if (p != null && p.getY() <= yGate && ++n >= enough) return n;
+            if (p == null || p.getY() > yGate) continue;
+            if (!matchesMode(be, mode)) continue;
+            if (++n >= enough) return n;
         }
         return n;
+    }
+
+    private static boolean matchesMode(BlockEntity be, Mode mode) {
+        if (mode == Mode.ALL) return true;
+        String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE
+            .getKey(be.getType()).getPath();
+        return switch (mode) {
+            case STORAGE -> id.equals("chest") || id.equals("trapped_chest") || id.equals("barrel")
+                || id.equals("shulker_box") || id.equals("ender_chest") || id.equals("hopper");
+            case UTILITY -> id.equals("furnace") || id.equals("blast_furnace") || id.equals("smoker")
+                || id.equals("brewing_stand") || id.equals("enchanting_table") || id.equals("beacon")
+                || id.equals("campfire") || id.equals("lectern") || id.equals("crafter");
+            case REDSTONE -> id.equals("hopper") || id.equals("dispenser") || id.equals("dropper")
+                || id.equals("comparator") || id.equals("piston") || id.equals("daylight_detector")
+                || id.equals("sculk_sensor") || id.equals("calibrated_sculk_sensor");
+            default -> true;
+        };
     }
 
     private static boolean tooFar(ChunkPos a, ChunkPos b, int radius) {

@@ -25,23 +25,26 @@ import net.minecraft.world.level.chunk.LevelChunk;
 /**
  * Sus Chunk Finder.
  *
- * Two modes:
- *  - XENON: the fast base-detection heuristic. Only active while you're above the activation Y
- *    (slider). It flags any chunk that has a block below Y15 that is NOT deepslate or bedrock -
- *    i.e. something a player placed there, since natural deep terrain is just deepslate + bedrock.
- *    Very cheap: one top-down pass per chunk, cached on a rescan interval.
- *  - TYPES: the original per-block-type detector (kelp, vines, amethyst, bamboo, full bee nests,
- *    rotated deepslate), flagging chunks whose count reaches the sensitivity.
+ * Five modes (mostly ports of the strongest sus-chunk detectors from other clients):
+ *  - XENON: fast below-Y15 player-placement detection (non-natural block deep down = placed).
+ *  - TYPES: per-block-type detector (kelp, vines, amethyst, bamboo, bee nests, rotated deepslate).
+ *  - NEW_CHUNKS: Boze NewChunks - a block-update packet carrying FLOWING (non-source) fluid marks
+ *    a freshly GENERATED chunk (fluid ticks only run on generation). New chunks in a straight
+ *    line = someone's active highway/tunnel frontier.
+ *  - OLD_CHUNKS: inverse of NEW_CHUNKS - a full chunk arriving WITH flowing fluid already in it
+ *    was loaded before (someone has been here; the flow was mid-tick when they left).
+ *  - TUNNEL: Boze TunnelESP corridor classifier - flags chunks containing 2-high walkable air
+ *    corridors with solid walls on the perpendicular axis (the signature of player tunnels).
  *
  * Flagged chunks are drawn by the shared {@link ChunkFlagRenderer}.
  */
 public final class SusChunkFinderModule extends Module {
 
-    public enum Mode { XENON, TYPES }
+    public enum Mode { XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL }
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>(
             "mode", "Mode", Mode.XENON, Mode.values())
-        .description("XENON = fast below-Y15 player-placement detection. TYPES = per-block-type detector.")
+        .description("XENON = below-Y15 placement. TYPES = block types. NEW_CHUNKS = freshly generated (packet fluid-tick). OLD_CHUNKS = visited before. TUNNEL = 2x1 corridor shapes.")
         .group("General"));
     private final EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new EnumSetting<>("sensitivity", "Sensitivity",
@@ -135,7 +138,24 @@ public final class SusChunkFinderModule extends Module {
         flagged.clear();
         notified.clear();
         lastScan.clear();
+        newChunks.clear();
+        oldChunks.clear();
+        scanCursorAge.reset();
+        scanCursorTunnel.reset();
         if (persistFlags.get()) loadFlags();
+    }
+
+    @Override
+    protected void onOptionValueChanged(String settingId) {
+        // Mode/sensitivity swap: drop old-mode flags immediately so results don't mix. The
+        // NEW/OLD chunk-age intel survives (it's packet history - a rescan can't rebuild it).
+        if ("mode".equals(settingId) || "sensitivity".equals(settingId)) {
+            flagged.clear();
+            notified.clear();
+            lastScan.clear();
+            scanCursorAge.reset();
+            scanCursorTunnel.reset();
+        }
     }
 
     @Override
@@ -186,12 +206,139 @@ public final class SusChunkFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
-        if (mode.get() == Mode.XENON) {
-            tickXenon(mc);
-        } else {
-            tickTypes(mc);
+        switch (mode.get()) {
+            case XENON -> tickXenon(mc);
+            case TYPES -> tickTypes(mc);
+            case NEW_CHUNKS, OLD_CHUNKS -> tickChunkAge(mc);
+            case TUNNEL -> tickTunnelScan(mc);
         }
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-sus-chunk-finder", flagged, color.get(), tracer.get());
+    }
+
+    // ---- NEW_CHUNKS / OLD_CHUNKS mode (Boze NewChunks port) ----
+
+    /** Chunks seen with flowing fluid in a BLOCK UPDATE (fluid ticking = freshly generated). */
+    private final Set<ChunkPos> newChunks = ConcurrentHashMap.newKeySet();
+    /** Chunks whose FULL DATA arrived already containing flowing fluid (loaded before us). */
+    private final Set<ChunkPos> oldChunks = ConcurrentHashMap.newKeySet();
+
+    @Override
+    public boolean onPacketReceive(net.minecraft.network.protocol.Packet<?> packet) {
+        Mode m = mode.get();
+        if (m != Mode.NEW_CHUNKS && m != Mode.OLD_CHUNKS) return false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return false;
+        // A block UPDATE carrying flowing (non-source) fluid means the server is actively fluid-
+        // ticking that chunk - which only happens during generation: a NEW chunk (Boze).
+        if (packet instanceof net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket bup) {
+            var fs = bup.getBlockState().getFluidState();
+            if (!fs.isEmpty() && !fs.isSource()) {
+                ChunkPos cp = new ChunkPos(bup.getPos().getX() >> 4, bup.getPos().getZ() >> 4);
+                if (!oldChunks.contains(cp)) newChunks.add(cp);
+            }
+        } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket sup) {
+            sup.runUpdates((pos, state) -> {
+                var fs = state.getFluidState();
+                if (!fs.isEmpty() && !fs.isSource()) {
+                    ChunkPos cp = new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
+                    if (!oldChunks.contains(cp)) newChunks.add(cp);
+                }
+            });
+        }
+        return false;
+    }
+
+    /** Full-chunk arrival scan: flowing fluid already IN the chunk data = old chunk (visited). */
+    private void tickChunkAge(Minecraft mc) {
+        ChunkPos center = mc.player.chunkPosition();
+        int radius = scanRadius.get();
+        // Classify a few chunks per tick: full data containing flowing fluid = OLD.
+        for (LevelChunk chunk : scanCursorAge.nextBatch(mc, radius, 5000, chunksPerTick.get())) {
+            ChunkPos pos = chunk.getPos();
+            if (newChunks.contains(pos) || oldChunks.contains(pos)) continue;
+            if (chunkHasFlowingFluid(chunk)) oldChunks.add(pos);
+        }
+        // Render whichever age class the mode wants.
+        flagged.clear();
+        flagged.addAll(mode.get() == Mode.NEW_CHUNKS ? newChunks : oldChunks);
+        int pr = radius * 4; // age intel is worth keeping further out than live scans
+        flagged.removeIf(p -> tooFar(p, center, pr));
+    }
+
+    private final com.autism.seedcracker.finder.ScanCursor scanCursorAge = new com.autism.seedcracker.finder.ScanCursor();
+
+    private static boolean chunkHasFlowingFluid(LevelChunk chunk) {
+        int minY = chunk.getMinY();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int startX = chunk.getPos().getMinBlockX();
+        int startZ = chunk.getPos().getMinBlockZ();
+        for (int s = 0; s < chunk.getSectionsCount(); s++) {
+            var sec = chunk.getSection(s);
+            if (sec.hasOnlyAir()) continue;
+            int baseY = minY + (s << 4);
+            for (int y = 0; y < 16; y++) {
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        var fs = sec.getBlockState(x, y, z).getFluidState();
+                        if (!fs.isEmpty() && !fs.isSource()) return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // ---- TUNNEL mode (Boze TunnelESP corridor classifier) ----
+
+    private final com.autism.seedcracker.finder.ScanCursor scanCursorTunnel = new com.autism.seedcracker.finder.ScanCursor();
+
+    private void tickTunnelScan(Minecraft mc) {
+        ChunkPos center = mc.player.chunkPosition();
+        int radius = scanRadius.get();
+        int need = sensitivity.get().scale(4); // corridor cells needed to flag a chunk
+        for (LevelChunk chunk : scanCursorTunnel.nextBatch(mc, radius, 5000, chunksPerTick.get())) {
+            ChunkPos pos = chunk.getPos();
+            if (countTunnelCells(mc, chunk, need) >= need) {
+                if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
+            } else {
+                flagged.remove(pos);
+            }
+        }
+        int pr = radius + 2;
+        flagged.removeIf(p -> tooFar(p, center, pr));
+        notified.removeIf(p -> tooFar(p, center, pr));
+    }
+
+    /**
+     * Boze method2074 corridor test: a tunnel cell is 2-high walkable air standing on solid
+     * ground where exactly one horizontal axis is open (both directions air) and the other is
+     * walled (both directions solid) - natural caves almost never form that pattern repeatedly.
+     * Only scans below Y50 (surface trenches are farms/creeper holes, not tunnels).
+     */
+    private int countTunnelCells(Minecraft mc, LevelChunk chunk, int enough) {
+        int count = 0;
+        int startX = chunk.getPos().getMinBlockX();
+        int startZ = chunk.getPos().getMinBlockZ();
+        int minY = Math.max(chunk.getMinY() + 1, -60);
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= 50; y++) {
+                    m.set(startX + x, y, startZ + z);
+                    if (!mc.level.getBlockState(m).isAir()) continue;
+                    if (!mc.level.getBlockState(m.above()).isAir()) continue;          // 2-high air
+                    if (mc.level.getBlockState(m.below()).isAir()) continue;           // solid floor
+                    boolean eastOpen = mc.level.getBlockState(m.east()).isAir();
+                    boolean westOpen = mc.level.getBlockState(m.west()).isAir();
+                    boolean northOpen = mc.level.getBlockState(m.north()).isAir();
+                    boolean southOpen = mc.level.getBlockState(m.south()).isAir();
+                    boolean xCorridor = eastOpen && westOpen && !northOpen && !southOpen;
+                    boolean zCorridor = northOpen && southOpen && !eastOpen && !westOpen;
+                    if ((xCorridor || zCorridor) && ++count >= enough) return count;
+                }
+            }
+        }
+        return count;
     }
 
     // ---- XENON mode: fast below-Y15 player-placement detection ----

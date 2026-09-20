@@ -51,10 +51,10 @@ public final class StashFinderModule extends Module {
     }
 
     // ---- settings ----
-    public enum Mode { THRESHOLD, SCORING }
+    public enum Mode { THRESHOLD, SCORING, DONUT }
     private final autismclient.api.module.EnumSetting<Mode> mode = add(new autismclient.api.module.EnumSetting<>(
             "mode", "Mode", Mode.THRESHOLD, Mode.values())
-        .description("THRESHOLD = simple storage-block count per chunk. SCORING = CodeEngine classifier that scores chest clusters as REAL base vs FAKE stash.")
+        .description("THRESHOLD = storage count per chunk. SCORING = REAL-vs-FAKE cluster classifier. DONUT = DonutSMP base profile: spawners x storage x low-Y combo (Radium/4E thresholds).")
         .group("General"));
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
@@ -127,6 +127,15 @@ public final class StashFinderModule extends Module {
     }
 
     @Override
+    protected void onOptionValueChanged(String settingId) {
+        // Mode swap: THRESHOLD/SCORING/DONUT flag different things - drop stale flags at once.
+        if ("mode".equals(settingId) || "sensitivity".equals(settingId)) {
+            flagged.clear();
+            notified.clear();
+        }
+    }
+
+    @Override
     public void onDisable() {
         flagged.clear();
         notified.clear();
@@ -172,6 +181,8 @@ public final class StashFinderModule extends Module {
             // SCORING needs the whole chunk set at once for clustering: keep it on the rescan timer.
             List<LevelChunk> chunks = ChunkScanHelper.loadedChunksAround(mc, radius);
             scanScoring(mc, chunks);
+        } else if (mode.get() == Mode.DONUT) {
+            scanDonut(mc, radius);
         } else {
             // THRESHOLD: incremental scan, a few chunks per tick (no full-volume spike).
             for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
@@ -199,6 +210,44 @@ public final class StashFinderModule extends Module {
         int r = radius + 2;
         flagged.removeIf(p -> tooFar(p, playerChunk, r));
         notified.removeIf(p -> tooFar(p, playerChunk, r));
+    }
+
+    // ========================================================================
+    // DONUT mode: the DonutSMP base profile every donut client converged on
+    // (Radium/4E RTPBaseFinder + TunnelBaseWater thresholds): spawners and
+    // bulk storage BELOW Y0 together. A spawner + a few chests deep down is a
+    // grinder base; 20+ chests alone is a stash room; both = jackpot.
+    // ========================================================================
+    private void scanDonut(Minecraft mc, int radius) {
+        for (LevelChunk chunk : scanCursor.nextBatch(mc, radius, 400, chunksPerTick.get())) {
+            ChunkPos pos = chunk.getPos();
+            int storageDeep = 0;
+            boolean spawner = false;
+            for (var be : chunk.getBlockEntities().values()) {
+                if (be == null) continue;
+                if (be instanceof net.minecraft.world.level.block.entity.SpawnerBlockEntity) {
+                    spawner = true;
+                    continue;
+                }
+                if (be.getBlockPos().getY() > 0) continue; // donut bases live below Y0
+                String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE
+                    .getKey(be.getType()).getPath();
+                if (id.equals("chest") || id.equals("trapped_chest") || id.equals("barrel")
+                    || id.equals("shulker_box") || id.equals("hopper")) storageDeep++;
+            }
+            // Radium/4E: spawner alone = flag; 20+ deep storage = flag; spawner + a few = flag.
+            int bulk = sensitivity.get().scale(20);
+            boolean sus = (spawner && storageDeep >= 3) || storageDeep >= bulk
+                || (spawner && sensitivity.get() == com.autism.seedcracker.finder.FinderSensitivity.HIGH);
+            if (sus) {
+                flagged.add(pos);
+                if (notified.add(pos)) {
+                    onNewFlag(pos, storageDeep + (spawner ? 100 : 0));
+                }
+            } else {
+                flagged.remove(pos);
+            }
+        }
     }
 
     // ========================================================================
