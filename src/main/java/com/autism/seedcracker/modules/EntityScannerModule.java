@@ -30,10 +30,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class EntityScannerModule extends Module {
 
+    /** What counts as base evidence (ports of distinct strategies from the client scans). */
+    public enum Mode {
+        /** Weighted all-entity score (Zelith original). */
+        WEIGHTED,
+        /** Only container/utility entities: minecarts w/ chests-hoppers, item frames, armor stands (MeteorPlus ItemFrameEsp idea). */
+        STORAGE,
+        /** Only tamed/named/leashed animals + villagers - unmistakably player-owned (nyx). */
+        OWNED,
+        /** Item entities: big drop clusters = mined-out area, death spot, or an active farm. */
+        DROPS
+    }
+
     private final Map<ChunkPos, Double> scores = new ConcurrentHashMap<>();
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private int tickCounter = 0;
 
+    private final autismclient.api.module.EnumSetting<Mode> mode = add(
+        new autismclient.api.module.EnumSetting<>("mode", "Mode", Mode.WEIGHTED, Mode.values())
+        .description("WEIGHTED = all entities scored. STORAGE = container/frame/stand entities. OWNED = tamed/named/leashed (player-owned). DROPS = item clusters.")
+        .group("General"));
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
             com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
@@ -62,6 +78,15 @@ public final class EntityScannerModule extends Module {
         scores.clear();
         notified.clear();
         tickCounter = 0;
+    }
+
+    @Override
+    protected void onOptionValueChanged(String settingId) {
+        // Mode swap: old-mode scores are meaningless under the new weights.
+        if ("mode".equals(settingId) || "sensitivity".equals(settingId)) {
+            scores.clear();
+            notified.clear();
+        }
     }
 
     @Override
@@ -94,13 +119,18 @@ public final class EntityScannerModule extends Module {
         scores.keySet().removeIf(c -> Math.abs(c.x() - playerChunk.x()) > r || Math.abs(c.z() - playerChunk.z()) > r);
     }
 
-    /** Weighted entity score for one chunk. */
+    /** Entity score for one chunk under the active mode. */
     private double scoreChunk(Minecraft mc, ChunkPos cpos) {
         double score = 0.0;
         for (Entity e : mc.level.entitiesForRendering()) {
             if (e == null || !e.isAlive() || e == mc.player) continue;
             if (!e.chunkPosition().equals(cpos)) continue;
-            score += weight(e);
+            score += switch (mode.get()) {
+                case WEIGHTED -> weight(e);
+                case STORAGE -> storageWeight(e);
+                case OWNED -> ownedWeight(e);
+                case DROPS -> e instanceof net.minecraft.world.entity.item.ItemEntity ? 5.0 : 0.0;
+            };
         }
         return Math.min(score, 100.0);
     }
@@ -112,6 +142,26 @@ public final class EntityScannerModule extends Module {
         if (e instanceof AbstractVillager) return 10.0;
         if (e instanceof Animal) return 6.0;
         return 4.0;
+    }
+
+    /** Container / utility entities - always player-placed. */
+    private double storageWeight(Entity e) {
+        String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
+        if (id.equals("chest_minecart") || id.equals("hopper_minecart") || id.equals("chest_boat")) return 20.0;
+        if (id.equals("item_frame") || id.equals("glow_item_frame")) return 12.0;
+        if (id.equals("armor_stand")) return 10.0;
+        if (id.equals("leash_knot")) return 10.0;
+        if (e instanceof AbstractMinecart) return 8.0;
+        return 0.0;
+    }
+
+    /** Tamed / named / leashed = unmistakably player-owned. */
+    private double ownedWeight(Entity e) {
+        if (e.hasCustomName()) return 25.0; // name tags are expensive - strong signal
+        if (e instanceof net.minecraft.world.entity.TamableAnimal tam && tam.isTame()) return 20.0;
+        if (e instanceof net.minecraft.world.entity.Mob mob && mob.isLeashed()) return 15.0;
+        if (e instanceof AbstractVillager) return 8.0; // villagers near beds/workstations = moved-in
+        return 0.0;
     }
 
     @Override

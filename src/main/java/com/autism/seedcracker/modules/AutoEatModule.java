@@ -7,7 +7,6 @@ import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
 
@@ -53,15 +52,22 @@ public final class AutoEatModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
-        if (mc.gui.screen() != null) return; // don't swap slots while a GUI is open
+        if (mc.gui.screen() != null) {
+            // GUI opened mid-bite: release use but KEEP the eating state so we resume seamlessly
+            // when it closes (aborting here left the previous slot never restored).
+            if (eating) mc.options.keyUse.setDown(false);
+            return;
+        }
 
         if (eating) {
-            if (!isHungry()) {
+            // Finished (well fed) - only stop once the swallow completes so the last bite counts.
+            if (!isHungry() && !mc.player.isUsingItem()) {
                 stopEating();
                 return;
             }
-            // If the current food ran out, find another; if none, stop.
-            if (!isFood(mc.player.getInventory().getItem(foodSlot))) {
+            // Never hot-swap mid-bite: an in-progress consume is cancelled by a slot change,
+            // wasting the whole animation. Let the current item finish first.
+            if (!mc.player.isUsingItem() && !isFood(mc.player.getInventory().getItem(foodSlot))) {
                 int next = findFoodSlot();
                 if (next == -1) {
                     stopEating();
@@ -77,8 +83,12 @@ public final class AutoEatModule extends Module {
 
     private boolean isHungry() {
         Minecraft mc = Minecraft.getInstance();
-        return mc.player != null && mc.player.getFoodData().getFoodLevel() <= hunger.get()
-            && mc.player.getFoodData().getFoodLevel() < 20; // never force-eat at full hunger
+        if (mc.player == null) return false;
+        int food = mc.player.getFoodData().getFoodLevel();
+        // Hysteresis: start at the threshold, but once eating keep going to (threshold+4, cap 20).
+        // Stopping the instant we tick over the threshold wastes bites and re-triggers constantly.
+        int stopAt = Math.min(20, hunger.get() + 4);
+        return eating ? food < stopAt : (food <= hunger.get() && food < 20);
     }
 
     private void startEating(Minecraft mc) {
@@ -98,10 +108,10 @@ public final class AutoEatModule extends Module {
 
     private void keepEating(Minecraft mc) {
         if (foodSlot < 0 || foodSlot > 8 || mc.gameMode == null) return;
+        // Single input path: hold the real use key and let the vanilla input loop fire the
+        // use-item. Also calling gameMode.useItem() here DOUBLE-fires (key loop + manual packet
+        // in the same tick), which desyncs the consume and can flag packet-order checks.
         mc.options.keyUse.setDown(true);
-        if (!mc.player.isUsingItem()) {
-            mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
-        }
         eating = true;
     }
 

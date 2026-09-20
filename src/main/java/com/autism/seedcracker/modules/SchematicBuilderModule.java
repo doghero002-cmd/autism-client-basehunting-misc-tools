@@ -181,6 +181,8 @@ public final class SchematicBuilderModule extends Module {
             mc.options.keyUp.setDown(false);
             mc.options.keyJump.setDown(false);
             mc.options.keyAttack.setDown(false);
+            mc.options.keyShift.setDown(false); // pendingSneak path may have latched it
+            mc.options.keyUse.setDown(false);
         }
     }
 

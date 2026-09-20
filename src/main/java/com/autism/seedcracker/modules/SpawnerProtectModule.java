@@ -97,6 +97,8 @@ public final class SpawnerProtectModule extends Module {
         cooldownUntil = 0L;
         minedCount = 0;
         posting = false;
+        rotInit = false; // re-seed the rotation smoother from the CURRENT view (no snap from stale state)
+        resetStorage();
         if (findSilkTouchSlot(Minecraft.getInstance()) == -1) {
             warn("Need a Silk Touch pickaxe in hotbar");
             warnedPickaxe = true;
@@ -304,7 +306,8 @@ public final class SpawnerProtectModule extends Module {
         if (mc.gameMode != null && mc.gameMode.isDestroying()) {
             mc.gameMode.stopDestroyBlock();
         }
-        if (sneakMine.get() && mc.options != null) mc.options.keyShift.setDown(false);
+        // Always release sneak (not only when the setting is on - it may have been toggled mid-mine).
+        if (mc.options != null) mc.options.keyShift.setDown(false);
     }
 
     /** Called when no more spawners are reachable; store the haul, then post the webhook notice. */
@@ -354,6 +357,9 @@ public final class SpawnerProtectModule extends Module {
     private boolean tickStorage(Minecraft mc) {
         if (storageStage == StorageStage.IDLE || storageStage == StorageStage.DONE) return false;
         if (mc.player == null || mc.gameMode == null) { resetStorage(); return false; }
+        // Sneak must be OFF here: sneak+use on a placed shulker places a block against it
+        // instead of opening its GUI, which dead-ends the fill stage.
+        if (mc.options != null) mc.options.keyShift.setDown(false);
         storageTicks++;
         int wait = 4; // ticks between actions (legit pacing)
         if (storageTicks < wait) return true;
@@ -371,7 +377,7 @@ public final class SpawnerProtectModule extends Module {
                         net.minecraft.core.Direction.UP, spot, false));
                 if (mc.level.getBlockState(spot).getBlock().toString().contains("shulker_box")) {
                     placedShulkerPos = spot;
-                    storageStage = StorageStage.FILL_SHULKER;
+                    storageStage = StorageStage.OPEN_SHULKER_GUI; // must OPEN it before filling
                 } else {
                     // Placement failed (spot occupied/blocked): give up cleanly.
                     resetStorage();
