@@ -20,7 +20,7 @@ Everything lives in the module menu under these tabs:
 | **Entity** | EntityScanner, AntiTrap, BoneDropper, SpawnerProtect (silk-touch + webhook). |
 | **Fake** | FakePay, FakePayments, FakeRoles (fake DonutSMP rank/nametag in chat, incl. custom rank text + colour), FakeScoreboard HUD. (i broke all of these) 💀 |
 | **Render** | AutoRender, PaperRig (dispenser RNG), Amethyst ESP (per-geode boxes), Bedrock Hole ESP, Hole ESP, RegionMap HUD (CodeEngine 9×9 region grid). |
-| **Movement** | Flight+ (elytra-boost fly). |
+| **Movement** | tunnel base finder, rtp base finder |
 | **Trading** | AH Flipper — scans the auction house for underpriced flips (packet mode, or live API with a key). **AH Sniper** — buys a target item the instant it's listed at/under your price (manual GUI or API mode). |
 | **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, **AutoMine** (Xenon), SwingSpeed, CoordSnapper, FakePlayer, AutoLog, AutoTool, TPASpammer, TabDetector, WeatherNotifier, HomeSetter, SkinChanger. |
 
