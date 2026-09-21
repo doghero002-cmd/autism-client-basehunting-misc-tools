@@ -166,6 +166,7 @@ public final class TunnelBaseWaterModule extends Module {
         buyStage = BuyStage.NONE; buyWait = 0; stuckTicks = 0; lastCoords = null;
         isBackup = false; mendingGraceTicks = 0; pearlReset = true; shouldCloseInventory = false;
         preferredSide = 0; detourStartPos = null; hazardCommitTicks = 0; noFoodCooldown = 0;
+        diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0; scanTicks = 0;
         resetMiningTick = 0; resetUseTick = 0; wasScreenOpen = false; jumped = false;
         look.reset();
         stuck.reset();
@@ -194,7 +195,7 @@ public final class TunnelBaseWaterModule extends Module {
         if (mc.options != null) stopMovement(mc);
         state = State.NONE; backup = State.NONE; isRotating = false; rotCallback = null;
         isBackup = false; backupDirection = null; preferredSide = 0; detourStartPos = null;
-        hazardCommitTicks = 0;
+        hazardCommitTicks = 0; diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0;
         stuck.reset();
     }
 
@@ -264,8 +265,34 @@ public final class TunnelBaseWaterModule extends Module {
             shouldCloseInventory = false;
         }
 
-        scanForBase(mc);
-        if (!isEnabled()) return; // scanForBase may have disconnected
+        // Base scan every 10 ticks, not every tick: a full render-distance block-entity sweep is
+        // ~hundreds of chunk lookups, and a base can't appear/vanish inside half a second.
+        if (++scanTicks >= 10) {
+            scanTicks = 0;
+            scanForBase(mc);
+            if (!isEnabled()) return; // scanForBase may have disconnected
+        }
+
+        // Survival reflex: actually IN lava (commit gap, hidden source, flow front). Overrides the
+        // whole state machine - float up + back out, then flip detour side and re-route.
+        if (mc.player.isInLava()) lavaEscapeTicks = 10;
+        if (lavaEscapeTicks > 0) {
+            lavaEscapeTicks--;
+            updateMining(mc, false);
+            updateUsage(mc, false);
+            mc.options.keyUp.setDown(false);
+            mc.options.keyDown.setDown(true);
+            mc.options.keyJump.setDown(true);
+            if (lavaEscapeTicks == 0 && !mc.player.isInLava()) {
+                mc.options.keyDown.setDown(false);
+                mc.options.keyJump.setDown(false);
+                hazardCommitTicks = 0;
+                preferredSide = -preferredSide;
+                if (state == State.MINING || state == State.GOABOVEHAZARD) avoidHazard(mc, true);
+            }
+            return;
+        }
+        mc.options.keyDown.setDown(false);
 
         // Grim SpeedA predictor: pause movement while a speed flag is imminent (buffer drains).
         if (FlagDetectorModule.speedFlagImminent()) {
@@ -408,7 +435,26 @@ public final class TunnelBaseWaterModule extends Module {
             }
         } else { stuckTicks = 0; lastCoords = cur; }
 
-        tryJumpStep(mc);
+        if (!diagonalDetour) tryJumpStep(mc);
+
+        if (diagonalDetour) {
+            // Hold the 45° camera (mend/eat interludes rotate it back to cardinal).
+            if (!isRotating && Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - diagYaw)) > 10f) {
+                rotateTo(diagYaw, dirValues(currentDirection)[1], null);
+            }
+            // One turn back: resume the cardinal heading once we've cut past the hazard.
+            // Manhattan >= 3 because each diagonal step adds 2 (1 forward + 1 sideways).
+            boolean movedAside = detourStartPos == null
+                || detourStartPos.distManhattan(mc.player.blockPosition()) >= 3;
+            if (movedAside && !checkHazardDirection(mc, currentDirection, 8)) {
+                diagonalDetour = false;
+                diagSide = null;
+                detourStartPos = null;
+                hazardCommitTicks = 10;
+                float[] v = dirValues(currentDirection);
+                rotateTo(v[0], v[1], null);
+            }
+        }
 
         if (isBackup && backupDirection != null) {
             // Hysteresis against turn ping-pong: only resume the heading after we've actually
@@ -436,7 +482,8 @@ public final class TunnelBaseWaterModule extends Module {
             || mc.level.getBlockState(headFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock;
 
         mc.options.keyUp.setDown(!fallingAhead);
-        laneCenterCorrection(mc);
+        if (diagonalDetour) { mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false); }
+        else laneCenterCorrection(mc);
 
         if (mode.get() == MiningMode.STANDING) {
             if (mc.hitResult instanceof BlockHitResult hit) {
@@ -447,7 +494,10 @@ public final class TunnelBaseWaterModule extends Module {
         } else {
             updateMining(mc, true);
         }
-        if (checkHazardDirection(mc, currentDirection, 0)) avoidHazard(mc, true);
+        boolean laneHot = diagonalDetour
+            ? checkHazardDiagonal(mc, currentDirection, diagSide, 0)
+            : checkHazardDirection(mc, currentDirection, 0);
+        if (laneHot) avoidHazard(mc, true);
     }
 
     /** Re-aim precisely at the centre of the head-level block in front (stuck-recovery step). */
@@ -494,11 +544,28 @@ public final class TunnelBaseWaterModule extends Module {
     private int hazardCommitTicks = 0; // lock a hazard-turn decision so we don't flip-flop
     private int preferredSide = 0;     // sticky detour side: -1 left, +1 right (0 = pick fresh)
     private BlockPos detourStartPos = null; // where the current detour began
+    private int lavaEscapeTicks = 0;   // survival reflex: back out of lava we're standing in
+    private int scanTicks = 0;         // base-scan throttle
+    private boolean diagonalDetour = false; // 45° detour: one turn out, one turn back (no 90° staircase)
+    private Direction diagSide = null;      // side the diagonal leans toward
+    private float diagYaw = 0f;             // camera yaw held while the diagonal runs
 
     private void avoidHazard(Minecraft mc, boolean markBackup) {
         // If we recently committed to a turn, hold it for a few ticks instead of re-deciding every
-        // tick (the left<->right oscillation that looks like a stuck loop).
-        if (hazardCommitTicks > 0) { hazardCommitTicks--; return; }
+        // tick (the left<->right oscillation that looks like a stuck loop). The lock still gets an
+        // emergency brake: if the committed lane went hot at point-blank range (a flow front moved
+        // in behind the original scan), drop the commit and re-decide NOW instead of walking blind.
+        if (hazardCommitTicks > 0) {
+            boolean hot = diagonalDetour
+                ? checkHazardDiagonal(mc, currentDirection, diagSide, -2)
+                : checkHazardDirection(mc, currentDirection, -3);
+            if (!hot) { hazardCommitTicks--; return; }
+            hazardCommitTicks = 0;
+        }
+        // Re-deciding cancels any diagonal in progress (it may re-enter on the other side).
+        boolean wasDiagonal = diagonalDetour;
+        diagonalDetour = false;
+        diagSide = null;
         // True tunnel heading: while detouring, currentDirection is the sidestep, not the heading.
         Direction heading = (isBackup && backupDirection != null) ? backupDirection : currentDirection;
         Direction left = dirLeft(heading), right = dirRight(heading);
@@ -508,14 +575,47 @@ public final class TunnelBaseWaterModule extends Module {
         Direction firstSide = preferredSide > 0 ? right : left;
         Direction otherSide = preferredSide > 0 ? left : right;
 
+        // Coming off a detour with the heading clear again: resume it outright (shortest path).
+        if ((isBackup || wasDiagonal) && !checkHazardDirection(mc, heading, 8)) {
+            isBackup = false;
+            detourStartPos = null;
+            currentDirection = heading;
+            hazardCommitTicks = 10;
+            float[] rv = dirValues(heading);
+            rotateTo(rv[0], rv[1], null);
+            return;
+        }
+
+        // Prefer a single 45° diagonal past the hazard over the 90° sidestep staircase: one turn
+        // out, one turn back, instead of a camera turn at every lake edge.
+        Direction[] diagSides = preferredSide > 0 ? new Direction[]{ right, left } : new Direction[]{ left, right };
+        for (Direction d : diagSides) {
+            if (checkHazardDiagonal(mc, heading, d, 2)) continue;
+            if (detourStartPos == null) detourStartPos = mc.player.blockPosition();
+            isBackup = false;
+            backupDirection = null;
+            currentDirection = heading;
+            diagonalDetour = true;
+            diagSide = d;
+            preferredSide = (d == right) ? 1 : -1;
+            hazardCommitTicks = 10;
+            float[] dv = dirValues(heading);
+            diagYaw = net.minecraft.util.Mth.wrapDegrees(dv[0] + (d == right ? 45f : -45f));
+            rotateTo(diagYaw, dv[1], null);
+            return;
+        }
+
+        // Strict scans FIRST (deep-clear lanes preferred), short scans as the fallback. A longer
+        // scan checks a superset of blocks, so short-then-long made the long passes dead code.
         Direction[] cands; int[] scans;
         if (isBackup) {
-            // Detour lane just got blocked: try resuming the heading first, then the sides.
+            // Detour lane just got blocked: try resuming the heading first (same 8-extra scan the
+            // mining-loop hysteresis uses), then the sides.
             cands = new Direction[]{ heading, firstSide, otherSide, firstSide, otherSide };
-            scans = new int[]{ 0, 5, 5, 12, 12 };
+            scans = new int[]{ 8, 12, 12, 5, 5 };
         } else {
             cands = new Direction[]{ firstSide, otherSide, firstSide, otherSide };
-            scans = new int[]{ 5, 5, 12, 12 };
+            scans = new int[]{ 12, 12, 5, 5 };
         }
         for (int i = 0; i < cands.length; i++) {
             Direction d = cands[i];
@@ -554,15 +654,6 @@ public final class TunnelBaseWaterModule extends Module {
         com.autism.seedcracker.modules.FlagDetectorModule.report("HAZARD_BOXED", "TunnelBaseWater",
             "fully boxed by lava at " + mc.player.blockPosition());
         stopMovement(mc);
-    }
-
-    /** True if there's lava/water directly below (so towering down would dig into it). */
-    private boolean checkHazardBelow(Minecraft mc) {
-        BlockPos pp = mc.player.blockPosition();
-        for (int i = 1; i <= 4; i++) {
-            if (isLavaOrWater(mc.level.getBlockState(pp.below(i)).getBlock())) return true;
-        }
-        return false;
     }
 
     private int jumpCooldown = 0;
@@ -1133,7 +1224,12 @@ public final class TunnelBaseWaterModule extends Module {
                     if (y < py && st.isAir() && x == 0) {
                         BlockPos down = pos.below();
                         while (mc.level.getBlockState(down).isAir() && down.getY() > mc.level.getMinY()) down = down.below();
-                        if (isFluid(mc.level.getBlockState(down))) return true;
+                        net.minecraft.world.level.block.state.BlockState floor = mc.level.getBlockState(down);
+                        if (isFluid(floor)) return true;
+                        // Dry drops count too: >3 blocks = fall damage / cave fall off the tunnel
+                        // line, and a magma/contact-hazard landing hurts at any depth.
+                        if (pos.getY() - down.getY() > 3) return true;
+                        if (isContactHazard(floor.getBlock())) return true;
                     }
                     // Any gravity block above head height in our lane will fall on us when disturbed.
                     if (y > py && x == 0
@@ -1144,11 +1240,58 @@ public final class TunnelBaseWaterModule extends Module {
         return false;
     }
 
+    /** Staircase-corridor scan for a 45° detour: cells (i,i-1) and (i,i) per step, same checks as the cardinal scan. */
+    private boolean checkHazardDiagonal(Minecraft mc, Direction heading, Direction side, int extra) {
+        if (heading == null || side == null) return false;
+        BlockPos pp = mc.player.blockPosition();
+        int py = pp.getY();
+        int minY = py - 1;
+        int maxY = switch (mode.get()) {
+            case STANDING -> py + 2;
+            case CRAWL -> py + 1;
+            default -> py + 3;
+        };
+        int steps = Math.max(1, 4 + extra);
+        for (int i = 1; i <= steps; i++) {
+            BlockPos lead = pp.relative(heading, i).relative(side, i);
+            BlockPos cut = pp.relative(heading, i).relative(side, i - 1);
+            for (BlockPos base : new BlockPos[]{ cut, lead }) {
+                for (int y = minY; y <= maxY; y++) {
+                    BlockPos pos = new BlockPos(base.getX(), y, base.getZ());
+                    net.minecraft.world.level.block.state.BlockState st = mc.level.getBlockState(pos);
+                    if (isFluid(st)) return true;
+                    if (isContactHazard(st.getBlock())) return true;
+                    if (y < py && st.isAir()) {
+                        BlockPos down = pos.below();
+                        while (mc.level.getBlockState(down).isAir() && down.getY() > mc.level.getMinY()) down = down.below();
+                        net.minecraft.world.level.block.state.BlockState floor = mc.level.getBlockState(down);
+                        if (isFluid(floor)) return true;
+                        if (pos.getY() - down.getY() > 3) return true;
+                        if (isContactHazard(floor.getBlock())) return true;
+                    }
+                    if (y > py && st.getBlock() instanceof net.minecraft.world.level.block.FallingBlock) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static final Direction[] SHAFT_SIDES = { Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST };
+
     private boolean checkHazardAbove(Minecraft mc) {
+        // Evaluates the shaft the tower is ABOUT TO DIG, so no "solid roof shields it" early-out:
+        // the dig opens every level, and a solid block at level 2 doesn't shield the gravel or the
+        // lava side-pocket at level 3 (both flow into the fresh shaft the moment it's opened).
+        BlockPos pp = mc.player.blockPosition();
         for (int i = 1; i <= 4; i++) {
-            net.minecraft.world.level.block.state.BlockState st = mc.level.getBlockState(mc.player.blockPosition().above(i));
+            BlockPos up = pp.above(i);
+            net.minecraft.world.level.block.state.BlockState st = mc.level.getBlockState(up);
             if (isFluid(st) || st.getBlock() instanceof net.minecraft.world.level.block.FallingBlock) return true;
-            if (!st.isAir()) break; // solid roof shields anything higher
+            if (i <= 3) {
+                for (Direction d : SHAFT_SIDES) {
+                    if (isFluid(mc.level.getBlockState(up.relative(d)))) return true;
+                }
+            }
         }
         return false;
     }
