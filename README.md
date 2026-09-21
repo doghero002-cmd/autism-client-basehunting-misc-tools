@@ -11,18 +11,17 @@ misc utilities. It loads as its own jar alongside the AUTISM client.
 
 ## What's inside
 
-Everything lives in the module menu under these tabs:
+The addon currently includes these modules:
 
 | Tab | What it does |
 | --- | --- |
-| **SeedCracker** | Crack the world seed from structures/biomes (SeedCrackerX), with a seed + progress HUD. Fully configurable in the GUI. |
-| **Finders** | Chunk scanners that flag hidden bases: Stash (count **or** SCORING classifier), Chunk, Spawner, SusChunk, Activity, Growth, **PrimeChunk** (fluid-flow NewChunks) finders, plus the AI **Tunnel Base Finder** (digs a hazard-aware tunnel and alerts on bases) and the **Base Log Browser** (browse/delete logged bases). |
-| **Entity** | EntityScanner, AntiTrap, BoneDropper, SpawnerProtect (silk-touch + webhook). |
-| **Fake** | FakePay, FakePayments, FakeRoles (fake DonutSMP rank/nametag in chat, incl. custom rank text + colour), FakeScoreboard HUD. (i broke all of these) 💀 |
-| **Render** | AutoRender, PaperRig (dispenser RNG), Amethyst ESP (per-geode boxes), Bedrock Hole ESP, Hole ESP, RegionMap HUD (CodeEngine 9×9 region grid). |
-| **Movement** | tunnel base finder, rtp base finder |
-| **Trading** | AH Flipper — scans the auction house for underpriced flips (packet mode, or live API with a key). **AH Sniper** — buys a target item the instant it's listed at/under your price (manual GUI or API mode). |
-| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, **AutoMine** (Xenon), SwingSpeed, CoordSnapper, FakePlayer, AutoLog, AutoTool, TPASpammer, TabDetector, WeatherNotifier, HomeSetter, SkinChanger. |
+| **Core** | **Seedcracker** (SeedCrackerX seed cracking), **Bedrock Finder**, **Donut RTP Stash Finder**, and **Relog Loader**. |
+| **Finders** | Stash, Chunk, Spawner, SusChunk, SeedRay, Chunk Waypoints, Finder Overlay, Player Chunks, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Base Webhook, Chunk Keeper, Base Log Browser, Tunnel Base Finder, Tunnel Base Water, Nether Tunnel Finder, and Structure Detector. |
+| **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, and Spawner Protect. |
+| **Fake** | FakePay, FakePayments, and FakeRoles. |
+| **Render** | AutoRender, PaperRig, and Scoreboard Hider. |
+| **Trading** | AH Flipper, AH Sniper, Shop Buyer, and AH Sell. |
+| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter, Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Hole ESP, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, and Name Protect. |
 
 Plus two DonutSMP stash tools:
 
