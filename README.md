@@ -30,6 +30,8 @@ Plus two DonutSMP stash tools:
 - **Relog Loader** — digs down, relogs to force the server to resend chunks, then flies so
   ESP can read the region.
 
+  also use water tunnel base finder its so much better at avoiding flags.
+
 
 
 ## Requirements
