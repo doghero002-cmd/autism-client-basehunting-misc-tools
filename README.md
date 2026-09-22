@@ -27,7 +27,7 @@ utility modules. It loads as its own jar alongside the AUTISM client.
 
 | FIND | CRACK | SCAN | AUTOMATE |
 | :---: | :---: | :---: | :---: |
-| Base and stash discovery | Seed and terrain analysis | ESP, overlays, and radar | RTP, Baritone, and utility tools |
+| Base and stash discovery | Seed and terrain analysis | ESP, overlays, and radar | RTP, Baritone, and utility/macro tools |
 
 </div>
 
