@@ -44,6 +44,20 @@ public final class FlagDetectorModule extends Module {
         .description("Log disconnect/kick reasons (anti-cheat / flying / spam).").group("Detect"));
     private final BoolSetting chat = add(new BoolSetting("chat-alerts", "Chat alerts", true)
         .description("Also echo flags to chat so you see them live.").group("General"));
+    private final BoolSetting hud = add(new BoolSetting("hud-counter", "HUD counter", true)
+        .description("Show a live flag/setback counter panel on screen.").group("HUD"));
+    private final BoolSetting hudOnlyInGame = add(new BoolSetting("hud-only-in-game", "HUD only in game", true)
+        .description("Hide the panel on menus.").group("HUD").visibleWhen(() -> hud.get()));
+    private final BoolSetting hudSession = add(new BoolSetting("hud-session", "HUD session time", true)
+        .description("Show how long telemetry has been recording.").group("HUD").visibleWhen(() -> hud.get()));
+    private final autismclient.api.module.IntSetting hudX = add(new autismclient.api.module.IntSetting("hud-x", "HUD X", 4, 0, 4000, 1)
+        .description("Panel X position.").group("HUD").visibleWhen(() -> hud.get()));
+    private final autismclient.api.module.IntSetting hudY = add(new autismclient.api.module.IntSetting("hud-y", "HUD Y", 4, 0, 4000, 1)
+        .description("Panel Y position.").group("HUD").visibleWhen(() -> hud.get()));
+    private final autismclient.api.module.IntSetting hudWidth = add(new autismclient.api.module.IntSetting("hud-width", "HUD width", 152, 110, 240, 2)
+        .description("Panel width.").group("HUD").visibleWhen(() -> hud.get()));
+    private final autismclient.api.module.ColorSetting hudAccent = add(new autismclient.api.module.ColorSetting("hud-accent", "HUD accent", 0xFFFF6C6C)
+        .description("Panel accent color.").group("HUD").visibleWhen(() -> hud.get()));
     private final BoolSetting onlyWhileAutomating = add(new BoolSetting("only-automating", "Only while automating", false)
         .description("Only log setbacks while an automation module (tunnel/build/mine) is likely running (less noise).").group("Detect"));
     private final BoolSetting rtpGrace = add(new BoolSetting("rtp-grace", "RTP grace period", true)
@@ -296,6 +310,7 @@ public final class FlagDetectorModule extends Module {
         long now = System.currentTimeMillis();
         if (now - lastSetbackLogMs < 2000) return;
         lastSetbackLogMs = now;
+        lastSetbackDist = dist;
 
         log(mc, "SETBACK", "rubber-band dist=" + String.format(java.util.Locale.ROOT, "%.2f", dist)
             + " from=" + fmt(from) + " to=" + fmt(target)
@@ -357,8 +372,84 @@ public final class FlagDetectorModule extends Module {
 
     private void log(Minecraft mc, String category, String detail) {
         FlagLog.flag(category, "FlagDetector", detail);
+        tally(category);
         if (chat.get()) {
             AutismClientMessaging.sendPrefixed("§c[Flag] §7" + category + " §f" + detail);
+        }
+    }
+
+    // ---- live HUD counters (tallied on every real flag, decayed over a 60s window) ----
+    private static final java.util.Deque<long[]> EVENT_WINDOW = new java.util.ArrayDeque<>();
+    private static final long WINDOW_MS = 60_000L;
+    private static volatile int totalSetbacks, totalRotations, totalKicks, totalPredicts;
+    private static volatile long sessionStartMs = -1L;
+    private static volatile double lastSetbackDist = -1.0D;
+
+    // category encoding for the sliding window deque
+    private static final int C_SETBACK = 0, C_ROTATION = 1, C_KICK = 2, C_PREDICT = 3;
+
+    private static void tally(String category) {
+        if (category == null) return;
+        long now = System.currentTimeMillis();
+        int code;
+        switch (category) {
+            case "SETBACK" -> { totalSetbacks++; code = C_SETBACK; }
+            case "ROTATION" -> { totalRotations++; code = C_ROTATION; }
+            case "KICK" -> { totalKicks++; code = C_KICK; }
+            case "PREDICT" -> { totalPredicts++; code = C_PREDICT; }
+            default -> { return; }
+        }
+        synchronized (EVENT_WINDOW) {
+            if (sessionStartMs < 0L) sessionStartMs = now;
+            EVENT_WINDOW.addLast(new long[]{now, code});
+            while (!EVENT_WINDOW.isEmpty() && now - EVENT_WINDOW.peekFirst()[0] > WINDOW_MS) EVENT_WINDOW.pollFirst();
+        }
+    }
+
+    /** Live snapshot for the bypass-telemetry HUD. */
+    public static HudStats hudStats() {
+        long now = System.currentTimeMillis();
+        int wSetback = 0, wRotation = 0, wKick = 0, wPredict = 0;
+        synchronized (EVENT_WINDOW) {
+            while (!EVENT_WINDOW.isEmpty() && now - EVENT_WINDOW.peekFirst()[0] > WINDOW_MS) EVENT_WINDOW.pollFirst();
+            for (long[] e : EVENT_WINDOW) {
+                switch ((int) e[1]) {
+                    case C_SETBACK -> wSetback++;
+                    case C_ROTATION -> wRotation++;
+                    case C_KICK -> wKick++;
+                    case C_PREDICT -> wPredict++;
+                }
+            }
+        }
+        long sessionElapsed = sessionStartMs < 0L ? 0L : now - sessionStartMs;
+        return new HudStats(totalSetbacks, totalRotations, totalKicks, totalPredicts,
+            wSetback, wRotation, wKick, wPredict, sessionElapsed, lastSetbackDist,
+            speedFlagImminent());
+    }
+
+    public static void resetHudStats() {
+        synchronized (EVENT_WINDOW) {
+            EVENT_WINDOW.clear();
+            totalSetbacks = 0;
+            totalRotations = 0;
+            totalKicks = 0;
+            totalPredicts = 0;
+            sessionStartMs = -1L;
+            lastSetbackDist = -1.0D;
+        }
+    }
+
+    public record HudStats(int totalSetbacks, int totalRotations, int totalKicks, int totalPredicts,
+                           int wSetbacks, int wRotations, int wKicks, int wPredicts,
+                           long sessionElapsedMs, double lastSetbackDist, boolean speedImminent) {
+        public int windowAll() { return wSetbacks + wRotations + wKicks + wPredicts; }
+        public int totalAll() { return totalSetbacks + totalRotations + totalKicks + totalPredicts; }
+        public int heat() {
+            int w = windowAll();
+            if (w == 0) return 0;
+            if (w < 3) return 1;
+            if (w < 8) return 2;
+            return 3;
         }
     }
 
@@ -396,5 +487,84 @@ public final class FlagDetectorModule extends Module {
 
     @Override public String info() {
         return "log: flag-log.txt";
+    }
+
+    // ---- HUD panel rendering (called from the InGameHud mixin) ----
+
+    /** Render the bypass-telemetry panel. No-op unless the module + hud option are on. */
+    public static void renderHud(net.minecraft.client.gui.GuiGraphicsExtractor context) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) return;
+        var mod = autismclient.modules.ModuleRegistry.get(SeedcrackerAddon.ID + ":flag-detector");
+        if (!(mod instanceof FlagDetectorModule fd) || !fd.isEnabled() || !fd.hud.get()) return;
+        if (fd.hudOnlyInGame.get() && (mc.player == null || mc.getConnection() == null)) return;
+        if (mc.gui != null && mc.gui.hud.isHidden()) return;
+        if (autismclient.modules.PackHideState.isActive()) return;
+
+        HudStats s = hudStats();
+        int width = fd.hudWidth.get();
+        int contentWidth = width - 12;
+        java.util.List<autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row> rows = new java.util.ArrayList<>();
+
+        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            trimHud(mc.font, "last 60s: " + s.windowAll() + "  total: " + s.totalAll(), contentWidth), 0xFFE8E8E8));
+        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            trimHud(mc.font, "setbacks: " + s.wSetbacks() + " (" + s.totalSetbacks() + ")", contentWidth), 0xFFFF8A80));
+        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            trimHud(mc.font, "rot-corr: " + s.wRotations() + " (" + s.totalRotations() + ")", contentWidth), 0xFFFFCC80));
+        if (s.totalKicks() > 0) {
+            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+                trimHud(mc.font, "kicks: " + s.wKicks() + " (" + s.totalKicks() + ")", contentWidth), 0xFFEF9A9A));
+        }
+        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            trimHud(mc.font, "speed-pred: " + s.wPredicts() + " (" + s.totalPredicts() + ")", contentWidth), 0xFFFFFF8D));
+        if (s.lastSetbackDist() >= 0.0D) {
+            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+                trimHud(mc.font, "last setback: " + String.format(java.util.Locale.ROOT, "%.2f", s.lastSetbackDist()) + "b", contentWidth),
+                0xFFCE93D8));
+        }
+        int heat = s.heat();
+        StringBuilder bar = new StringBuilder("heat [");
+        for (int i = 0; i < 4; i++) bar.append(i < heat ? '#' : '-');
+        bar.append(']');
+        if (s.speedImminent()) bar.append(" !");
+        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            trimHud(mc.font, bar.toString(), contentWidth), heatColor(heat, s.speedImminent())));
+        if (fd.hudSession.get()) {
+            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+                trimHud(mc.font, "session: " + formatElapsed(s.sessionElapsedMs()), contentWidth), 0xFFB0BEC5));
+        }
+
+        String title = trimHud(mc.font, "BYPASS TELEMETRY", contentWidth);
+        autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.render(
+            context, mc.font, fd.hudX.get(), fd.hudY.get(), width, title, rows, fd.hudAccent.get());
+    }
+
+    private static int heatColor(int heat, boolean imminent) {
+        if (imminent) return 0xFFE57373;
+        return switch (heat) {
+            case 0 -> 0xFFA5D6A7;
+            case 1 -> 0xFFFFF59D;
+            case 2 -> 0xFFFFB74D;
+            default -> 0xFFE57373;
+        };
+    }
+
+    private static String trimHud(net.minecraft.client.gui.Font font, String text, int maxWidth) {
+        if (font.width(text) <= maxWidth) return text;
+        String ellipsis = "..";
+        while (!text.isEmpty() && font.width(text + ellipsis) > maxWidth) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text + ellipsis;
+    }
+
+    private static String formatElapsed(long ms) {
+        long totalSec = Math.max(0L, ms / 1000L);
+        long h = totalSec / 3600L;
+        long m = (totalSec % 3600L) / 60L;
+        long sec = totalSec % 60L;
+        return h > 0L ? String.format(java.util.Locale.ROOT, "%dh %02dm", h, m)
+            : String.format(java.util.Locale.ROOT, "%dm %02ds", m, sec);
     }
 }

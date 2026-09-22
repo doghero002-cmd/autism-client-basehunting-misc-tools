@@ -73,6 +73,10 @@ public final class ChunkFinderModule extends Module {
             "growth", "Long dripstone/vine + grown kelp", true)
         .description("Flag unusually long dripstone/vines and fully-grown kelp.")
         .group("Signals"));
+    private final BoolSetting detectGeode = add(new BoolSetting(
+            "geode", "Geode/bee anomalies", true)
+        .description("Flag 22+ budding amethyst or 10+ clusters (silk-touch moved geode / farm) and bee nests deep underground (moved with silk touch).")
+        .group("Signals"));
     private final BoolSetting ignoreItemChunks = add(new BoolSetting(
             "ignore-item-chunks", "Skip farm chunks (items/XP)", true)
         .description("Skip chunks with many dropped items or XP orbs (active farms).")
@@ -204,6 +208,7 @@ public final class ChunkFinderModule extends Module {
 
     private static final class Analysis {
         int rotated = 0;
+        int budding = 0, clusters = 0, deepBees = 0;
         boolean longDripstone, longVine, grownKelp, dioriteVein, obsidianVein;
         BlockPos susPos;
     }
@@ -241,6 +246,21 @@ public final class ChunkFinderModule extends Module {
                     if (y >= 0 && y <= 16 && state.is(Blocks.DEEPSLATE) && state.hasProperty(BlockStateProperties.AXIS)) {
                         if (state.getValue(BlockStateProperties.AXIS) != Direction.Axis.Y) {
                             a.rotated++;
+                            if (a.susPos == null) a.susPos = m.immutable();
+                        }
+                    }
+
+                    // Geode anomalies (Water ChunkFinderV2): budding amethyst / cluster density,
+                    // plus bee nests deep underground (only get there via silk touch).
+                    if (detectGeode.get()) {
+                        if (state.is(Blocks.BUDDING_AMETHYST)) {
+                            a.budding++;
+                            if (a.susPos == null) a.susPos = m.immutable();
+                        } else if (state.is(Blocks.AMETHYST_CLUSTER)) {
+                            a.clusters++;
+                            if (a.susPos == null) a.susPos = m.immutable();
+                        } else if (y <= 40 && (state.is(Blocks.BEE_NEST) || state.is(Blocks.BEEHIVE))) {
+                            a.deepBees++;
                             if (a.susPos == null) a.susPos = m.immutable();
                         }
                     }
@@ -353,6 +373,11 @@ public final class ChunkFinderModule extends Module {
         if (a.grownKelp) reasons.add("GrownKelp");
         if (a.dioriteVein) reasons.add("DioriteVein");
         if (a.obsidianVein) reasons.add("ObsidianVein");
+        if (detectGeode.get()) {
+            if (a.budding >= sensitivity.get().scale(22)) reasons.add("Budding:" + a.budding);
+            if (a.clusters >= sensitivity.get().scale(10)) reasons.add("Clusters:" + a.clusters);
+            if (a.deepBees >= 1) reasons.add("DeepBees:" + a.deepBees);
+        }
 
         if (!reasons.isEmpty()) {
             if (flagged.add(pos) && notified.add(pos)) {

@@ -74,49 +74,63 @@ public final class BlockEspRenderer {
                 if (feed.blocks.isEmpty()) continue;
                 int lineArgb = feed.argb;
                 int fillArgb = (feed.argb & 0x00FFFFFF) | 0x33000000;
+                // Snapshot the set: the module swaps feed.blocks on its own tick thread.
+                java.util.List<BlockPos> blocks = new java.util.ArrayList<>(feed.blocks);
+                boolean fill = feed.fill;
 
-                BlockPos nearest = null;
-                double nearestDist = Double.MAX_VALUE;
-                for (BlockPos pos : feed.blocks) {
-                    AABB box = new AABB(
-                        pos.getX() - origin.x, pos.getY() - origin.y, pos.getZ() - origin.z,
-                        pos.getX() + 1 - origin.x, pos.getY() + 1 - origin.y, pos.getZ() + 1 - origin.z)
-                        .inflate(INFLATE);
+                // ONE geometry submit per feed (a lambda per box at 1000s of boxes was the
+                // per-box overhead that made massive storage fields drop frames / stop rendering).
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
+                        for (BlockPos pos : blocks) {
+                            outlineBox(pose, buffer, boxAt(pos, origin), lineArgb);
+                        }
+                    });
+                if (fill) {
                     context.submitNodeCollector().submitCustomGeometry(poseStack,
-                        AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> outlineBox(pose, buffer, box, lineArgb));
-                    if (feed.fill) {
-                        context.submitNodeCollector().submitCustomGeometry(poseStack,
-                            AutismRenderTypes.storageEspFillSeeThrough(), (pose, buffer) -> fillBox(pose, buffer, box, fillArgb));
-                    }
-                    if (feed.tracer) {
-                        double d = pos.distSqr(new BlockPos((int) origin.x, (int) origin.y, (int) origin.z));
-                        if (d < nearestDist) { nearestDist = d; nearest = pos; }
-                    }
+                        AutismRenderTypes.storageEspFillSeeThrough(), (pose, buffer) -> {
+                            for (BlockPos pos : blocks) {
+                                fillBox(pose, buffer, boxAt(pos, origin), fillArgb);
+                            }
+                        });
                 }
 
-                if (feed.tracer && nearest != null) {
-                    Vec3 centre = new Vec3(
-                        nearest.getX() + 0.5 - origin.x,
-                        nearest.getY() + 0.5 - origin.y,
-                        nearest.getZ() + 0.5 - origin.z);
-                    context.submitNodeCollector().submitCustomGeometry(poseStack,
-                        AutismRenderTypes.storageEspLinesSeeThrough(),
-                        (pose, buffer) -> AutismWorldGeometry.line(pose, buffer, 0, 0, 0,
-                            centre.x, centre.y, centre.z, lineArgb, LINE_WIDTH));
+                if (feed.tracer) {
+                    BlockPos nearest = null;
+                    double nearestDist = Double.MAX_VALUE;
+                    BlockPos eye = new BlockPos((int) origin.x, (int) origin.y, (int) origin.z);
+                    for (BlockPos pos : blocks) {
+                        double d = pos.distSqr(eye);
+                        if (d < nearestDist) { nearestDist = d; nearest = pos; }
+                    }
+                    if (nearest != null) {
+                        Vec3 centre = new Vec3(
+                            nearest.getX() + 0.5 - origin.x,
+                            nearest.getY() + 0.5 - origin.y,
+                            nearest.getZ() + 0.5 - origin.z);
+                        context.submitNodeCollector().submitCustomGeometry(poseStack,
+                            AutismRenderTypes.storageEspLinesSeeThrough(),
+                            (pose, buffer) -> AutismWorldGeometry.line(pose, buffer, 0, 0, 0,
+                                centre.x, centre.y, centre.z, lineArgb, LINE_WIDTH));
+                    }
                 }
             }
 
-            // Bounding boxes (e.g. per-geode outlines).
+            // Bounding boxes (e.g. per-geode outlines / storage-recorder ghosts) - batched too.
             BOX_FEEDS.entrySet().removeIf(e -> now - e.getValue().lastFeedMs > TTL_MS);
             for (BoxFeed bf : BOX_FEEDS.values()) {
-                if (bf.boxes == null) continue;
-                for (AABB b : bf.boxes) {
-                    AABB rel = new AABB(
-                        b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,
-                        b.maxX - origin.x, b.maxY - origin.y, b.maxZ - origin.z).inflate(INFLATE);
-                    context.submitNodeCollector().submitCustomGeometry(poseStack,
-                        AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> outlineBox(pose, buffer, rel, bf.argb));
-                }
+                if (bf.boxes == null || bf.boxes.isEmpty()) continue;
+                java.util.List<AABB> boxes = bf.boxes;
+                int argb = bf.argb;
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
+                        for (AABB b : boxes) {
+                            AABB rel = new AABB(
+                                b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,
+                                b.maxX - origin.x, b.maxY - origin.y, b.maxZ - origin.z).inflate(INFLATE);
+                            outlineBox(pose, buffer, rel, argb);
+                        }
+                    });
             }
         });
     }
@@ -158,6 +172,13 @@ public final class BlockEspRenderer {
     /** Clear a module's single bounding box. */
     public static void clearBox(String moduleId) {
         if (moduleId != null) BOX_FEEDS.remove(moduleId);
+    }
+
+    private static AABB boxAt(BlockPos pos, Vec3 origin) {
+        return new AABB(
+            pos.getX() - origin.x, pos.getY() - origin.y, pos.getZ() - origin.z,
+            pos.getX() + 1 - origin.x, pos.getY() + 1 - origin.y, pos.getZ() + 1 - origin.z)
+            .inflate(INFLATE);
     }
 
     private static void outlineBox(PoseStack.Pose pose, VertexConsumer buffer, AABB box, int color) {
