@@ -66,7 +66,31 @@ This addon combines a handful of different modules into one package so you can u
 - **Donut RTP Stash Finder** — RTPs around the map, then digs near 0,0 and searches for stash blocks using a Baritone “legit / smooth movement” profile. Results are logged to `bases.txt`.
 - **Relog Loader** — Digs down, relogs to force the server to resend chunks, then flies so ESP can read the region more reliably.
 
-  also use water tunnel base finder its so much better at avoiding flags.
+> For tunnel base hunting specifically, the water tunnel base finder is often the safer and better option for avoiding flags.
+
+## Recommended modules by task
+
+### Recommended modules for stash finding
+
+- **Stash Finder**
+- **Relog Loader**
+- **Prime Chunk Finder** (Medium)
+- **Auto Render**
+- **Elytra Warner**
+- **Auto Firework**
+- **Spectator Protector**
+- **Amethyst ESP**
+- **Storage ESP**
+- **Spawner ESP**
+- **Chunk Keeper**
+
+### Recommended modules for tunnel base hunting
+
+- **Tunnel Base Finder** (Water / Dogs mode)
+- **Storage ESP**
+- **Prime Chunk Finder**
+- **Finder Overlay**
+- **Amethyst ESP**
 
 ## Quick Start
 
