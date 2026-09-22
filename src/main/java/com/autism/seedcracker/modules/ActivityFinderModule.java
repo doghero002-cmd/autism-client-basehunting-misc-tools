@@ -49,7 +49,7 @@ public final class ActivityFinderModule extends Module {
     }
 
     private final autismclient.api.module.EnumSetting<Mode> mode = add(
-        new autismclient.api.module.EnumSetting<>("mode", "Mode", Mode.ALL, Mode.values())
+        new autismclient.api.module.EnumSetting<>("mode", "Mode", Mode.STORAGE, Mode.values())
         .description("ALL = any block entity. STORAGE = chests/shulkers (loot). UTILITY = furnaces/brewing (lived-in). REDSTONE = hoppers/dispensers (farms/vaults).")
         .group("General"));
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
@@ -58,7 +58,7 @@ public final class ActivityFinderModule extends Module {
         .description("HIGH/MEDIUM = one block entity below Y flags. LOW = need 2+ (a single lone chest can be a dungeon).")
         .group("General"));
     private final IntSetting yLevel = add(new IntSetting(
-            "y-level", "Y level", 16, -64, 320, 1)
+            "y-level", "Y level", 32, -64, 320, 1)
         .description("Only flag chunks whose block-entity activity is at or below this Y level.")
         .group("General"));
     private final IntSetting scanRadius = add(new IntSetting(
@@ -78,7 +78,7 @@ public final class ActivityFinderModule extends Module {
         .description("Draw a tracer line from the camera to each flagged chunk.")
         .group("Render"));
     private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
         .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
         .group("Performance"));
 

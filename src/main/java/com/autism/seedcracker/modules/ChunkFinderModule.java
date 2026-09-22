@@ -54,11 +54,11 @@ public final class ChunkFinderModule extends Module {
 
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
-            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+            com.autism.seedcracker.finder.FinderSensitivity.HIGH, com.autism.seedcracker.finder.FinderSensitivity.values())
         .description("Scales all signal thresholds: HIGH = shorter veins/fewer blocks flag (more noise), LOW = doubled (only unmistakable).")
         .group("General"));
     private final IntSetting scanRadius = add(new IntSetting(
-            "scan-radius", "Scan radius (chunks)", 4, 1, 12, 1)
+            "scan-radius", "Scan radius (chunks)", 6, 1, 12, 1)
         .description("Chunk bubble around the player scanned.")
         .group("General"));
     private final IntSetting rotatedThreshold = add(new IntSetting(

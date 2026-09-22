@@ -35,19 +35,19 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 public final class LightSourceFinderModule extends Module {
 
     private final EnumSetting<FinderSensitivity> sensitivity = add(new EnumSetting<>(
-            "sensitivity", "Sensitivity", FinderSensitivity.MEDIUM, FinderSensitivity.values())
+            "sensitivity", "Sensitivity", FinderSensitivity.HIGH, FinderSensitivity.values())
         .description("HIGH = half the light-count threshold (more finds). LOW = double (only heavily lit areas).")
         .group("General"));
     private final IntSetting yLevel = add(new IntSetting("y-level", "Max Y level", 40, -64, 320, 1)
         .description("Only count light sources at or below this Y (underground light = player light).")
         .group("General"));
-    private final IntSetting threshold = add(new IntSetting("threshold", "Light count", 3, 1, 64, 1)
+    private final IntSetting threshold = add(new IntSetting("threshold", "Light count", 2, 1, 64, 1)
         .description("Player-type light sources in a chunk needed to flag it.")
         .group("General"));
-    private final IntSetting scanRadius = add(new IntSetting("scan-radius", "Scan radius (chunks)", 5, 1, 12, 1)
+    private final IntSetting scanRadius = add(new IntSetting("scan-radius", "Scan radius (chunks)", 6, 1, 12, 1)
         .description("Chunk bubble around the player scanned.")
         .group("General"));
-    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 1, 1, 16, 1)
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 16, 1)
         .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
         .group("Performance"));
     private final BoolSetting notify = add(new BoolSetting("notification", "Notification", true)
