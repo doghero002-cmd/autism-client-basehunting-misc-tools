@@ -35,6 +35,7 @@ public final class RelogLoaderModule extends Module {
 
     private Phase phase = Phase.IDLE;
     private int phaseTicks = 0;
+    private int teardownTicks = 0;
     private ServerData server;
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Mode", Mode.RELOG, Mode.values())
@@ -47,8 +48,8 @@ public final class RelogLoaderModule extends Module {
         .description("Y level to wait for before triggering.")
         .group("Relog")
         .visibleWhen(() -> waitForY.get()));
-    private final IntSetting disconnectWait = add(new IntSetting("disconnect-wait", "Disconnect wait (s)", 2, 0, 60, 1)
-        .description("RELOG: seconds to stay disconnected before rejoining.")
+    private final IntSetting disconnectWait = add(new IntSetting("disconnect-wait", "Disconnect wait (s)", 5, 3, 60, 1)
+        .description("RELOG: seconds to stay disconnected before rejoining. Under ~3s the server/proxy hasn't deregistered your session yet and the rejoin bounces with 'already online'.")
         .group("Relog")
         .visibleWhen(() -> mode.get() == Mode.RELOG));
     private final IntSetting reconnectWait = add(new IntSetting("reconnect-wait", "Rejoin wait (s)", 5, 1, 120, 1)
@@ -107,7 +108,9 @@ public final class RelogLoaderModule extends Module {
             AutismClientMessaging.sendPrefixed("§7Relog Loader: relogging...");
             if (RelogHelper.disconnect()) {
                 phase = Phase.DISCONNECT_WAIT;
-                phaseTicks = disconnectWait.get() * 20;
+                // Clamp in code too: saved configs from older versions may carry 0-2s.
+                phaseTicks = Math.max(disconnectWait.get(), 3) * 20;
+                teardownTicks = 0;
             } else {
                 setEnabledSilently(false);
             }
@@ -126,7 +129,17 @@ public final class RelogLoaderModule extends Module {
                 if ((int) mc.player.getY() <= targetY.get()) trigger(mc);
             }
             case DISCONNECT_WAIT -> {
-                // We are worldless here: count down regardless so the reconnect actually fires.
+                // The wait only starts once the connection is actually torn down: counting from
+                // the disconnect CALL meant rejoining while the server/proxy still had the old
+                // session live - it bounced us with "you are already connected".
+                if (mc.getConnection() != null || mc.level != null) {
+                    if (++teardownTicks > 200) { // 10s: disconnect never completed, bail out
+                        AutismClientMessaging.sendPrefixed("§cRelog Loader: disconnect never completed - aborting.");
+                        phase = Phase.DONE;
+                        setEnabledSilently(false);
+                    }
+                    return;
+                }
                 if (phaseTicks > 0) { phaseTicks--; return; }
                 RelogHelper.reconnect(server);
                 phase = Phase.RECONNECT_WAIT;

@@ -47,6 +47,9 @@ public final class StorageRecorderModule extends Module {
     private final IntSetting maxRender = add(new IntSetting("max-render", "Max rendered boxes", 2048, 64, 8192, 64)
         .description("Nearest-first cap on rendered boxes (keeps FPS stable on huge records).")
         .group("Render"));
+    private final BoolSetting syncEsp = add(new BoolSetting("sync-esp", "Match Storage ESP", true)
+        .description("Auto-use the client Storage ESP module's selected block types AND per-type colours for recording + rendering. Off (or Storage ESP missing) = builtin chest/barrel/shulker/hopper list with the colours above.")
+        .group("Record"));
     private final BoolSetting spawners = add(new BoolSetting("spawners", "Record spawners", true)
         .description("Record monster spawners too.")
         .group("Record"));
@@ -68,6 +71,82 @@ public final class StorageRecorderModule extends Module {
 
     private static final byte KIND_STORAGE = 0;
     private static final byte KIND_SPAWNER = 1;
+    /** ESP-synced kinds: KIND_ESP_BASE + colour-class index (class order mirrors the client's ColorSet). */
+    private static final byte KIND_ESP_BASE = 10;
+
+    // ---- Storage ESP sync (targets + colours mirrored from the client's storage-esp module) ----
+    private static final String[] ESP_COLOR_OPTIONS = {
+        "trapped-chest-color", "chest-color", "ender-chest-color", "barrel-color", "shulker-color",
+        "hopper-color", "dispenser-color", "furnace-color", "crafter-color", "other-color"
+    };
+    private static final int[] ESP_COLOR_DEFAULTS = {
+        0xCCFF2020, 0xCCFFA000, 0xCC7800FF, 0xCCFFA000, 0xCCB766FF,
+        0xCC7C8AFF, 0xCCB04848, 0xCCCCB266, 0xCCD8AE6B, 0xFF8C8C8C
+    };
+    private final int[] espColors = ESP_COLOR_DEFAULTS.clone();
+    private java.util.Map<Block, Byte> espKinds = java.util.Map.of();
+    private boolean espShulkers = false;
+    private boolean espAvailable = false;
+    private long espRefreshAtMs = 0;
+
+    /** Re-read the Storage ESP module's target list + colours (throttled to 2x/s). */
+    private void refreshEspSync() {
+        long now = System.currentTimeMillis();
+        if (now < espRefreshAtMs) return;
+        espRefreshAtMs = now + 500;
+        espAvailable = false;
+        if (!syncEsp.get()) return;
+        try {
+            autismclient.modules.Module esp = autismclient.modules.ModuleRegistry.get("storage-esp");
+            if (esp == null) return;
+            for (int i = 0; i < ESP_COLOR_OPTIONS.length; i++) {
+                espColors[i] = autismclient.modules.ModuleRenderUtil.color(esp, ESP_COLOR_OPTIONS[i], ESP_COLOR_DEFAULTS[i]);
+            }
+            String list = esp.value("storage-list");
+            java.util.Map<Block, Byte> kinds = new java.util.HashMap<>();
+            boolean shulkers = false;
+            if (list != null) {
+                for (String raw : list.split("\\|")) {
+                    switch (raw.trim().toLowerCase(java.util.Locale.ROOT)) {
+                        case "minecraft:trapped_chest" -> kinds.put(Blocks.TRAPPED_CHEST, (byte) (KIND_ESP_BASE));
+                        case "minecraft:chest" -> kinds.put(Blocks.CHEST, (byte) (KIND_ESP_BASE + 1));
+                        case "minecraft:ender_chest" -> kinds.put(Blocks.ENDER_CHEST, (byte) (KIND_ESP_BASE + 2));
+                        case "minecraft:barrel" -> kinds.put(Blocks.BARREL, (byte) (KIND_ESP_BASE + 3));
+                        case "minecraft:shulker_box" -> shulkers = true;
+                        case "minecraft:hopper" -> kinds.put(Blocks.HOPPER, (byte) (KIND_ESP_BASE + 5));
+                        case "minecraft:dispenser" -> kinds.put(Blocks.DISPENSER, (byte) (KIND_ESP_BASE + 6));
+                        case "minecraft:dropper" -> kinds.put(Blocks.DROPPER, (byte) (KIND_ESP_BASE + 6));
+                        case "minecraft:furnace" -> kinds.put(Blocks.FURNACE, (byte) (KIND_ESP_BASE + 7));
+                        case "minecraft:smoker" -> kinds.put(Blocks.SMOKER, (byte) (KIND_ESP_BASE + 7));
+                        case "minecraft:blast_furnace" -> kinds.put(Blocks.BLAST_FURNACE, (byte) (KIND_ESP_BASE + 7));
+                        case "minecraft:brewing_stand" -> kinds.put(Blocks.BREWING_STAND, (byte) (KIND_ESP_BASE + 7));
+                        case "minecraft:crafter" -> kinds.put(Blocks.CRAFTER, (byte) (KIND_ESP_BASE + 8));
+                        case "minecraft:decorated_pot" -> kinds.put(Blocks.DECORATED_POT, (byte) (KIND_ESP_BASE + 8));
+                        case "minecraft:chiseled_bookshelf" -> kinds.put(Blocks.CHISELED_BOOKSHELF, (byte) (KIND_ESP_BASE + 8));
+                        case "minecraft:campfire" -> {
+                            kinds.put(Blocks.CAMPFIRE, (byte) (KIND_ESP_BASE + 8));
+                            kinds.put(Blocks.SOUL_CAMPFIRE, (byte) (KIND_ESP_BASE + 8));
+                        }
+                        default -> { } // entity targets (minecarts/boats) - not block entities, skip
+                    }
+                }
+            }
+            espKinds = kinds;
+            espShulkers = shulkers;
+            espAvailable = true;
+        } catch (Throwable ignored) {
+            espAvailable = false;
+        }
+    }
+
+    /** True when the block matches the active target set (ESP-synced or builtin). */
+    private boolean matchesTargets(Block b) {
+        if (espAvailable) {
+            if (b instanceof net.minecraft.world.level.block.ShulkerBoxBlock) return espShulkers;
+            return espKinds.containsKey(b);
+        }
+        return isStorageBlock(b);
+    }
 
     public StorageRecorderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":storage-recorder", "Storage Recorder", category,
@@ -90,10 +169,17 @@ public final class StorageRecorderModule extends Module {
         if (persist.get()) saveRecord();
         record.clear();
         loadedKey = null;
-        cachedLive = null;
-        cachedGhost = null;
+        cachedFeeds = null;
+        clearFeeds();
+    }
+
+    private void clearFeeds() {
         BlockEspRenderer.clear(id() + ":live");
         BlockEspRenderer.clear(id() + ":ghost");
+        for (int i = 0; i < espColors.length; i++) {
+            BlockEspRenderer.clear(id() + ":live-" + i);
+            BlockEspRenderer.clear(id() + ":ghost-" + i);
+        }
     }
 
     @Override
@@ -113,22 +199,23 @@ public final class StorageRecorderModule extends Module {
         if (!key.equals(loadedKey)) {
             if (loadedKey != null && persist.get()) saveRecord();
             record.clear();
-            cachedLive = null;
-            cachedGhost = null;
+            cachedFeeds = null;
             loadedKey = key;
             if (persist.get()) loadRecordFile();
         }
 
+        refreshEspSync();
         sweepChunks(mc);
         // Re-split/sort every 5 ticks (boxes are static; the live/ghost split changes on
         // chunk-load timescales) but FEED every tick - the renderer TTL is 300ms and a single
         // slow tick past a 5-tick feed gap would flicker the boxes.
-        if (++renderTicks >= 5 || cachedLive == null) {
+        if (++renderTicks >= 5 || cachedFeeds == null) {
             renderTicks = 0;
             rebuildRenderLists(mc);
         }
-        BlockEspRenderer.feedBoxes(id() + ":live", cachedLive, liveColor.get());
-        BlockEspRenderer.feedBoxes(id() + ":ghost", cachedGhost, ghostColor.get());
+        for (FeedGroup g : cachedFeeds) {
+            BlockEspRenderer.feedBoxes(id() + ":" + g.key, g.boxes, g.argb);
+        }
 
         // Debounced autosave (records grow while flying/tunneling; don't write every tick).
         if (persist.get() && dirtyAtMs != 0L && System.currentTimeMillis() - dirtyAtMs > 10_000L) {
@@ -138,8 +225,14 @@ public final class StorageRecorderModule extends Module {
     }
 
     private int renderTicks = 0;
-    private List<AABB> cachedLive;
-    private List<AABB> cachedGhost;
+    private List<FeedGroup> cachedFeeds;
+
+    private static final class FeedGroup {
+        final String key;
+        final List<AABB> boxes = new ArrayList<>();
+        final int argb;
+        FeedGroup(String key, int argb) { this.key = key; this.argb = argb; }
+    }
 
     /** Rolling sweep: scanChunks loaded chunks per tick, recording + pruning against reality. */
     private void sweepChunks(Minecraft mc) {
@@ -173,7 +266,7 @@ public final class StorageRecorderModule extends Module {
             LevelChunk chunk = swept.get(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4));
             if (chunk == null) return false;
             Block b = chunk.getBlockState(pos).getBlock();
-            boolean gone = !isStorageBlock(b) && !(spawners.get() && b == Blocks.SPAWNER);
+            boolean gone = !matchesTargets(b) && !(spawners.get() && b == Blocks.SPAWNER);
             if (gone) dirtyAtMs = System.currentTimeMillis();
             return gone;
         });
@@ -183,6 +276,13 @@ public final class StorageRecorderModule extends Module {
         if (be == null) return -1;
         if (be instanceof SpawnerBlockEntity) return spawners.get() ? KIND_SPAWNER : -1;
         Block b = be.getBlockState().getBlock();
+        if (espAvailable) {
+            if (b instanceof net.minecraft.world.level.block.ShulkerBoxBlock) {
+                return espShulkers ? (byte) (KIND_ESP_BASE + 4) : -1;
+            }
+            Byte k = espKinds.get(b);
+            return k != null ? k : -1;
+        }
         return isStorageBlock(b) ? KIND_STORAGE : -1;
     }
 
@@ -192,33 +292,43 @@ public final class StorageRecorderModule extends Module {
             || b instanceof net.minecraft.world.level.block.ShulkerBoxBlock;
     }
 
-    /** Split the record into live (loaded chunk) and ghost (unloaded) boxes, nearest-first capped. */
+    /** Split the record into per-colour live/ghost feed groups, nearest-first capped. */
     private void rebuildRenderLists(Minecraft mc) {
         if (record.isEmpty()) {
-            cachedLive = List.of();
-            cachedGhost = List.of();
+            cachedFeeds = List.of();
             return;
         }
         BlockPos eye = mc.player.blockPosition();
         int cap = maxRender.get();
-        List<long[]> sorted = new ArrayList<>(record.size()); // [distSq, packedPos]
-        for (Long packed : record.keySet()) {
-            BlockPos pos = BlockPos.of(packed);
-            sorted.add(new long[]{ (long) pos.distSqr(eye), packed });
+        List<long[]> sorted = new ArrayList<>(record.size()); // [distSq, packedPos, kind]
+        for (Map.Entry<Long, Byte> e : record.entrySet()) {
+            BlockPos pos = BlockPos.of(e.getKey());
+            sorted.add(new long[]{ (long) pos.distSqr(eye), e.getKey(), e.getValue() });
         }
         sorted.sort(java.util.Comparator.comparingLong(a -> a[0]));
 
-        List<AABB> live = new ArrayList<>();
-        List<AABB> ghost = new ArrayList<>();
+        java.util.Map<String, FeedGroup> groups = new java.util.LinkedHashMap<>();
         boolean showGhosts = ghosts.get();
         for (int i = 0; i < sorted.size() && i < cap; i++) {
-            BlockPos pos = BlockPos.of(sorted.get(i)[1]);
+            long[] row = sorted.get(i);
+            BlockPos pos = BlockPos.of(row[1]);
+            byte kind = (byte) row[2];
             boolean loaded = mc.level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4);
-            if (loaded) live.add(new AABB(pos));
-            else if (showGhosts) ghost.add(new AABB(pos));
+            if (!loaded && !showGhosts) continue;
+            String gkey;
+            int argb;
+            if (espAvailable && kind >= KIND_ESP_BASE) {
+                int cls = Math.min(kind - KIND_ESP_BASE, espColors.length - 1);
+                // Ghosts reuse the ESP hue, dimmed, so types stay tellable-apart when unloaded.
+                gkey = (loaded ? "live-" : "ghost-") + cls;
+                argb = loaded ? espColors[cls] : ((espColors[cls] & 0x00FFFFFF) | 0x66000000);
+            } else {
+                gkey = loaded ? "live" : "ghost";
+                argb = loaded ? liveColor.get() : ghostColor.get();
+            }
+            groups.computeIfAbsent(gkey, k -> new FeedGroup(k, argb)).boxes.add(new AABB(pos));
         }
-        cachedLive = live;
-        cachedGhost = ghost;
+        cachedFeeds = List.copyOf(groups.values());
     }
 
     // ---- persistence ----
@@ -265,13 +375,11 @@ public final class StorageRecorderModule extends Module {
 
     private void clearRecord() {
         record.clear();
-        cachedLive = null;
-        cachedGhost = null;
+        cachedFeeds = null;
         if (loadedKey != null) {
             try { java.nio.file.Files.deleteIfExists(recordFile()); } catch (Throwable ignored) {}
         }
-        BlockEspRenderer.clear(id() + ":live");
-        BlockEspRenderer.clear(id() + ":ghost");
+        clearFeeds();
         AutismClientMessaging.sendPrefixed("Storage Recorder: record cleared.");
     }
 
