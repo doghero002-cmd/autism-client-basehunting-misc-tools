@@ -54,8 +54,8 @@ public final class HoleTunnelStairsEspModule extends Module {
     private final ColorSetting holeColor = add(new ColorSetting("hole-color", "Hole colour", 0xFFFF4040).group("Render"));
     private final ColorSetting tunnelColor = add(new ColorSetting("tunnel-color", "Tunnel colour", 0xFF4060FF).group("Render"));
     private final ColorSetting stairColor = add(new ColorSetting("stair-color", "Staircase colour", 0xFFFF40FF).group("Render"));
-    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
-        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).").group("Performance"));
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.").group("Performance"));
 
     private final List<AABB> holes = new ArrayList<>();
     private final List<AABB> holes3x1 = new ArrayList<>();

@@ -26,7 +26,10 @@ import net.minecraft.world.level.chunk.LevelChunk;
 /**
  * Sus Chunk Finder.
  *
- * Five modes (mostly ports of the strongest sus-chunk detectors from other clients):
+ * Modes (mostly ports of the strongest sus-chunk detectors from other clients):
+ *  - DOGS: our own score-based detector (default) - independent underground signals (deep kelp,
+ *    underground vines, rotated deepslate, flat mined rooms, storage blocks) must corroborate
+ *    before a chunk flags, so no single natural quirk can false-flag.
  *  - XENON: fast below-Y15 player-placement detection (non-natural block deep down = placed).
  *  - TYPES: per-block-type detector (kelp, vines, amethyst, bamboo, bee nests, rotated deepslate).
  *  - NEW_CHUNKS: Boze NewChunks - a block-update packet carrying FLOWING (non-source) fluid marks
@@ -41,17 +44,43 @@ import net.minecraft.world.level.chunk.LevelChunk;
  */
 public final class SusChunkFinderModule extends Module {
 
-    public enum Mode { WATER, XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL, ACTIVITY, SIGNAL }
+    public enum Mode { DOGS, WATER, XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL, ACTIVITY, SIGNAL }
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>(
-            "mode", "Mode", Mode.WATER, Mode.values())
-        .description("WATER (default) = Water-client detector: 49+ vine columns, max-age kelp, rotated deepslate, big deep caves. XENON = below-Y15 placement. TYPES = block types. NEW_CHUNKS = freshly generated (packet fluid-tick). OLD_CHUNKS = visited before. TUNNEL = 2x1 corridors. ACTIVITY = load/unload cycling (another player's render bubble). SIGNAL = loaded chunks beyond the server's render radius (someone else streams them).")
+            "mode", "Mode", Mode.DOGS, Mode.values())
+        .description("DOGS (default) = our score-based detector: independent underground signals (deep kelp, underground vines, rotated deepslate, flat mined rooms, storage) must corroborate before flagging. WATER = raw Water-client detector (noisier: worldgen kelp ages + natural caves false-flag). XENON = below-Y15 placement. TYPES = block types. NEW_CHUNKS = freshly generated (packet fluid-tick). OLD_CHUNKS = visited before. TUNNEL = 2x1 corridors. ACTIVITY = load/unload cycling (another player's render bubble). SIGNAL = loaded chunks beyond the server's render radius (someone else streams them).")
         .group("General"));
     private final EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new EnumSetting<>("sensitivity", "Sensitivity",
             com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
         .description("XENON: player-only blocks (shulker/hopper/furnace/crafting...) flag at 1 (LOW: 2). Structure-prone blocks (torch/chest/rail/spawner/obsidian) need HIGH 2 / MEDIUM 4 / LOW 6. TYPES: scales the per-type min counts.")
         .group("General"));
+
+    // DOGS-mode settings: independent signals add points; corroboration required to flag.
+    private final IntSetting dogsNeedScore = add(new IntSetting("dogs-need-score", "Score to flag", 3, 1, 10, 1)
+        .description("Points needed to flag. Player-only storage below Y50 = 3 (instant). Underground vines / deep kelp / rotated deepslate / flat mined room = 2 each (any two flag). Lone chest/spawner = 1 and is structure-vetoed.")
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS));
+    private final BoolSetting dogsStorage = add(new BoolSetting("dogs-storage", "Storage blocks", true)
+        .description("Shulker/hopper/barrel/furnace/enchanting table... below Y50 flags instantly. A plain chest/spawner only adds 1 point and is skipped inside natural structures.")
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS));
+    private final BoolSetting dogsVines = add(new BoolSetting("dogs-vines", "Underground vines", true)
+        .description("A vertical vine run below Y45: vines never generate down there, players drop them into shafts. (Surface jungle vines are ignored, unlike WATER mode.)")
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS));
+    private final IntSetting dogsVineLen = add(new IntSetting("dogs-vine-length", "Vine run", 8, 3, 64, 1)
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS && dogsVines.get()));
+    private final BoolSetting dogsKelp = add(new BoolSetting("dogs-kelp", "Deep kelp", true)
+        .description("Any kelp below Y24: oceans never reach that deep, so it's a player water tunnel or farm. (Replaces WATER's kelp-age check - worldgen kelp spawns with random high ages, the #1 false flag.)")
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS));
+    private final BoolSetting dogsDeepslate = add(new BoolSetting("dogs-deepslate", "Rotated deepslate", true)
+        .description("Sideways-axis deepslate, skipped when the chunk matches an ancient-city/stronghold signature (structure templates place rotated blocks too - another WATER false flag).")
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS));
+    private final IntSetting dogsDeepslateCount = add(new IntSetting("dogs-deepslate-count", "Rotated count", 3, 1, 50, 1)
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS && dogsDeepslate.get()));
+    private final BoolSetting dogsRoom = add(new BoolSetting("dogs-room", "Flat mined rooms", true)
+        .description("Many walkable cells on ONE flat Y level below Y20: players mine flat floors, natural caves don't. (Replaces WATER's big-cave flood fill, which flagged every 1.18 cave system.)")
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS));
+    private final IntSetting dogsRoomSize = add(new IntSetting("dogs-room-size", "Room floor cells", 30, 10, 128, 2)
+        .group("Dogs").visibleWhen(() -> mode.get() == Mode.DOGS && dogsRoom.get()));
 
     // WATER-mode channels (Water client SusChunkFinder port: each detector its own toggle+threshold).
     private final BoolSetting waterVines = add(new BoolSetting("water-vines", "Long vines", true)
@@ -102,7 +131,7 @@ public final class SusChunkFinderModule extends Module {
         .group("General"));
     private final IntSetting rescanMs = add(new IntSetting(
             "rescan-ms", "Rescan (ms)", 1000, 250, 10000, 250)
-        .description("How often each chunk is re-scanned (XENON mode).")
+        .description("How often each chunk is re-scanned (XENON). DOGS/WATER re-scan at 10x this (their signals barely change; re-scanning every second was an FPS sink).")
         .group("General"));
     private final ColorSetting color = add(new ColorSetting(
             "color", "Chunk colour", 0x50FF5050)
@@ -121,9 +150,9 @@ public final class SusChunkFinderModule extends Module {
         .description("XENON: don't flag spawners/blocks inside dungeons or trial chambers (they aren't player bases).")
         .group("General"));
     private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
-        .description("How many chunks to scan per tick (TYPES mode). Lower = less FPS impact (spread over more seconds); higher = faster full scan.")
-        .group("Performance"));
+            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("Chunks scanned per tick in every scan mode (DOGS/WATER/XENON/TYPES; SIGNAL gets 4x since its check is cheap). 1 = smoothest FPS, higher = faster full sweep.")
+        .group("General"));
 
     // TYPES-mode per-type toggles + per-type min-count sliders.
     private final BoolSetting kelp = add(new BoolSetting("kelp", "Kelp", true).group("Types"));
@@ -255,6 +284,7 @@ public final class SusChunkFinderModule extends Module {
         if (mc.level == null || mc.player == null) return;
 
         switch (mode.get()) {
+            case DOGS -> tickDogs(mc);
             case WATER -> tickWater(mc);
             case XENON -> tickXenon(mc);
             case TYPES -> tickTypes(mc);
@@ -464,7 +494,7 @@ public final class SusChunkFinderModule extends Module {
                 ChunkPos pos = new ChunkPos(cx, cz);
 
                 Long last = lastScan.get(pos);
-                if (last != null && now - last < rescanMs.get()) continue;
+                if (last != null && now - last < rescanMs.get() * 10L) continue;
                 lastScan.put(pos, now);
 
                 LevelChunk chunk = mc.level.getChunk(cx, cz);
@@ -491,59 +521,29 @@ public final class SusChunkFinderModule extends Module {
         var sens = sensitivity.get();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
 
-        // Long vine columns (top-down run count).
-        if (waterVines.get()) {
-            int req = sens.scale(waterVineLength.get());
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    int len = 0;
-                    for (int y = maxY; y >= Math.max(minY, 30); y--) {
-                        m.set(startX + x, y, startZ + z);
-                        if (chunk.getBlockState(m).is(Blocks.VINE)) {
-                            if (++len >= req) return true;
-                        } else {
-                            len = 0;
-                        }
-                    }
-                }
-            }
+        // Long vine columns (top-down run count; section palette walk with maybeHas fast-skip).
+        if (waterVines.get()
+            && vineRunHit(chunk, sens.scale(waterVineLength.get()), maxY, Math.max(minY, 30))) {
+            return true;
         }
 
-        // Max-age kelp (AGE blockstate property; natural kelp almost never near max).
+        // Max-age kelp (AGE blockstate property; NOTE worldgen kelp also rolls high ages - noisy).
         if (waterKelp.get()) {
             int req = Math.min(25, waterKelpAge.get());
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int y = minY; y <= Math.min(maxY, 62); y++) {
-                        m.set(startX + x, y, startZ + z);
-                        BlockState s = chunk.getBlockState(m);
-                        if (!s.is(Blocks.KELP)) continue;
-                        if (s.hasProperty(net.minecraft.world.level.block.KelpBlock.AGE)
-                            && s.getValue(net.minecraft.world.level.block.KelpBlock.AGE) >= req) {
-                            return true;
-                        }
-                    }
-                }
+            if (com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk,
+                    s -> s.is(Blocks.KELP)
+                        && s.hasProperty(net.minecraft.world.level.block.KelpBlock.AGE)
+                        && s.getValue(net.minecraft.world.level.block.KelpBlock.AGE) >= req, 1) >= 1) {
+                return true;
             }
         }
 
-        // Rotated (sideways-axis) deepslate: players place it rotated, worldgen never does.
+        // Rotated (sideways-axis) deepslate: players place it rotated, plain worldgen never does.
         if (waterDeepslate.get()) {
             int req = sens.scale(waterDeepslateCount.get());
-            int count = 0;
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int y = minY; y <= Math.min(maxY, 60); y++) {
-                        m.set(startX + x, y, startZ + z);
-                        BlockState s = chunk.getBlockState(m);
-                        if (s.is(Blocks.DEEPSLATE)
-                            && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)
-                            && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS) != net.minecraft.core.Direction.Axis.Y
-                            && ++count >= req) {
-                            return true;
-                        }
-                    }
-                }
+            if (com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk,
+                    SusChunkFinderModule::isRotatedDeepslate, req) >= req) {
+                return true;
             }
         }
 
@@ -587,6 +587,190 @@ public final class SusChunkFinderModule extends Module {
             if (bestSize / 25 >= reqPts) return true;
         }
 
+        return false;
+    }
+
+    // ---- DOGS mode: our own score-based detector (WATER's ideas, corroboration required) ----
+
+    private void tickDogs(Minecraft mc) {
+        long now = System.currentTimeMillis();
+        int radius = scanRadius.get();
+        ChunkPos center = mc.player.chunkPosition();
+
+        int budget = chunksPerTick.get();
+        outer:
+        for (int dx = -radius; dx <= radius && budget > 0; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                int cx = center.x() + dx;
+                int cz = center.z() + dz;
+                if (!mc.level.hasChunk(cx, cz)) continue;
+                ChunkPos pos = new ChunkPos(cx, cz);
+
+                Long last = lastScan.get(pos);
+                if (last != null && now - last < rescanMs.get() * 10L) continue;
+                lastScan.put(pos, now);
+
+                LevelChunk chunk = mc.level.getChunk(cx, cz);
+                if (scanDogsChunk(mc, chunk)) {
+                    if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
+                } else {
+                    flagged.remove(pos);
+                }
+                if (--budget <= 0) break outer;
+            }
+        }
+
+        int pr = radius + 1;
+        flagged.removeIf(p -> tooFar(p, center, pr));
+        notified.removeIf(p -> tooFar(p, center, pr));
+        lastScan.keySet().removeIf(p -> tooFar(p, center, pr));
+    }
+
+    /** Score-based: each independent signal adds points, {@code dogsNeedScore} points flag. */
+    private boolean scanDogsChunk(Minecraft mc, LevelChunk chunk) {
+        var sens = sensitivity.get();
+        int need = dogsNeedScore.get();
+        int score = 0;
+        Boolean natural = null; // lazy: the structure scan is the expensive part
+
+        // Player storage below Y50 (block-entity map lookup: near-free).
+        if (dogsStorage.get()) {
+            boolean strong = false, weak = false;
+            for (var e : chunk.getBlockEntities().entrySet()) {
+                if (e.getKey().getY() > 50) continue;
+                Block b = e.getValue().getBlockState().getBlock();
+                if (placementWeight(b) >= 2) { strong = true; break; }
+                if (b == Blocks.CHEST || b == Blocks.SPAWNER) weak = true;
+            }
+            if (strong) {
+                score += 3;
+            } else if (weak) {
+                if (natural == null) natural = isNaturalStructure(mc, chunk.getPos());
+                if (!natural) score += 1;
+            }
+            if (score >= need) return true;
+        }
+
+        // Vertical vine run below Y45: vines never generate that deep, players drop them into shafts.
+        if (dogsVines.get() && vineRunHit(chunk, dogsVineLen.get(), 45, chunk.getMinY())) {
+            score += 2;
+            if (score >= need) return true;
+        }
+
+        // Kelp below Y24: oceans never reach that deep - player water tunnel or farm.
+        if (dogsKelp.get() && kelpBelowY(chunk, 24)) {
+            score += 2;
+            if (score >= need) return true;
+        }
+
+        // Rotated deepslate, vetoed near ancient-city/stronghold signatures (templates rotate blocks).
+        if (dogsDeepslate.get()) {
+            int req = sens.scale(dogsDeepslateCount.get());
+            if (com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk,
+                    SusChunkFinderModule::isRotatedDeepslate, req) >= req) {
+                if (natural == null) natural = isNaturalStructure(mc, chunk.getPos());
+                if (!natural) {
+                    score += 2;
+                    if (score >= need) return true;
+                }
+            }
+        }
+
+        // Flat mined-out floor below Y20: players mine flat floors, natural caves don't.
+        if (dogsRoom.get() && flatRoomHit(chunk, sens.scale(dogsRoomSize.get()))) {
+            score += 2;
+        }
+
+        return score >= need;
+    }
+
+    private static boolean isRotatedDeepslate(BlockState s) {
+        return s.is(Blocks.DEEPSLATE)
+            && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS)
+            && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.AXIS) != net.minecraft.core.Direction.Axis.Y;
+    }
+
+    /**
+     * True when some column has a vertical VINE run of at least {@code need} between yLo..yHi.
+     * Section palette walk, top to bottom: skipped sections (all-air / provably vineless via
+     * maybeHas) reset every column's run - the column is broken there anyway.
+     */
+    private static boolean vineRunHit(LevelChunk chunk, int need, int yHi, int yLo) {
+        net.minecraft.world.level.chunk.LevelChunkSection[] sections = chunk.getSections();
+        int minY = chunk.getMinY();
+        int[] runs = new int[256];
+        for (int s = sections.length - 1; s >= 0; s--) {
+            int base = minY + (s << 4);
+            if (base > yHi) continue;
+            if (base + 15 < yLo) break;
+            var sec = sections[s];
+            if (sec == null || sec.hasOnlyAir() || !sec.maybeHas(st -> st.is(Blocks.VINE))) {
+                java.util.Arrays.fill(runs, 0);
+                continue;
+            }
+            int top = Math.min(15, yHi - base);
+            int bot = Math.max(0, yLo - base);
+            for (int y = top; y >= bot; y--) {
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        int ci = (x << 4) | z;
+                        if (sec.getBlockState(x, y, z).is(Blocks.VINE)) {
+                            if (++runs[ci] >= need) return true;
+                        } else {
+                            runs[ci] = 0;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Any kelp at or below {@code yCutoff} (section palette walk with maybeHas fast-skip). */
+    private static boolean kelpBelowY(LevelChunk chunk, int yCutoff) {
+        net.minecraft.world.level.chunk.LevelChunkSection[] sections = chunk.getSections();
+        int minY = chunk.getMinY();
+        java.util.function.Predicate<BlockState> p = st -> st.is(Blocks.KELP) || st.is(Blocks.KELP_PLANT);
+        for (int s = 0; s < sections.length; s++) {
+            int base = minY + (s << 4);
+            if (base > yCutoff) break;
+            var sec = sections[s];
+            if (sec == null || sec.hasOnlyAir() || !sec.maybeHas(p)) continue;
+            int top = Math.min(15, yCutoff - base);
+            for (int y = 0; y <= top; y++) {
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        if (p.test(sec.getBlockState(x, y, z))) return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /** >= need walkable cells (air + air above + solid floor) on ONE Y level below Y20. */
+    private static boolean flatRoomHit(LevelChunk chunk, int need) {
+        int minY = chunk.getMinY();
+        int lo = Math.max(minY + 1, -60);
+        int hi = 20;
+        if (hi <= lo) return false;
+        int startX = chunk.getPos().getMinBlockX();
+        int startZ = chunk.getPos().getMinBlockZ();
+        int[] perY = new int[hi - lo + 1];
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                // Rolling window: one read per Y instead of three.
+                boolean below = !chunk.getBlockState(m.set(startX + x, lo - 1, startZ + z)).isAir();
+                boolean cur = chunk.getBlockState(m.set(startX + x, lo, startZ + z)).isAir();
+                for (int y = lo; y <= hi; y++) {
+                    boolean above = chunk.getBlockState(m.set(startX + x, y + 1, startZ + z)).isAir();
+                    if (below && cur && above && ++perY[y - lo] >= need) return true;
+                    below = !cur;
+                    cur = above;
+                }
+            }
+        }
         return false;
     }
 

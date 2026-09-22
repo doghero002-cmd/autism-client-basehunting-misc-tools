@@ -52,8 +52,8 @@ public final class NetherTunnelFinderModule extends Module {
         .description("Draw a tracer line to each flagged chunk.").group("Render"));
     private final BoolSetting notify = add(new BoolSetting("notify", "Notifications", true)
         .description("Toast + chat ping when a tunnel is found.").group("General"));
-    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
-        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).").group("Performance"));
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.").group("Performance"));
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     private final Set<ChunkPos> flagged = new HashSet<>();
