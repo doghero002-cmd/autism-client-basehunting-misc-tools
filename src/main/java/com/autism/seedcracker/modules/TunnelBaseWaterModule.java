@@ -705,22 +705,37 @@ public final class TunnelBaseWaterModule extends Module {
     }
 
     private int jumpCooldown = 0;
+    private int stepPersistTicks = 0;
 
     private void tryJumpStep(Minecraft mc) {
         if (jumpCooldown > 0) { jumpCooldown--; return; }
         BlockPos down = mc.player.blockPosition().relative(currentDirection);
         BlockPos up = down.above(), up2 = up.above(), up3 = mc.player.blockPosition().above(2);
         Block stepBlock = mc.level.getBlockState(down).getBlock();
-        if (isContactHazard(stepBlock)) return; // never step onto magma etc.
+        if (isContactHazard(stepBlock)) { stepPersistTicks = 0; return; } // never step onto magma etc.
         // Fences/walls/gates are 1.5 blocks tall: a normal jump can't clear them, so hopping at
         // one just bounces forever. Mine through instead (fall through to normal mining).
         if (stepBlock instanceof net.minecraft.world.level.block.FenceBlock
             || stepBlock instanceof net.minecraft.world.level.block.WallBlock
-            || stepBlock instanceof net.minecraft.world.level.block.FenceGateBlock) return;
+            || stepBlock instanceof net.minecraft.world.level.block.FenceGateBlock) { stepPersistTicks = 0; return; }
         if (!isAir(mc, down) && isAir(mc, up) && isAir(mc, up2) && isAir(mc, up3)) {
+            // A 2-tall gap is broken top->bottom, so mid-break the head block is already air while
+            // the feet block is still solid - identical shape to a step-up. Don't hop onto a block
+            // we're about to (or currently) mine: skip while it's the crosshair target, and require
+            // the shape to persist a few ticks (real staircase terrain persists; a mid-break
+            // column clears in ticks). AMETHYST mode false-jumped constantly without this.
+            if (mc.hitResult instanceof BlockHitResult hit
+                && hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(down)) {
+                stepPersistTicks = 0;
+                return;
+            }
+            if (++stepPersistTicks < 4) return;
             mc.options.keyJump.setDown(true);
             jumped = true;
+            stepPersistTicks = 0;
             jumpCooldown = 4; // don't jump-spam every tick (jitter) - one hop per few ticks
+        } else {
+            stepPersistTicks = 0;
         }
     }
 
