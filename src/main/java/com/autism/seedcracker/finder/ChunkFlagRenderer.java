@@ -137,7 +137,12 @@ public final class ChunkFlagRenderer {
             // Marker Y: fixed (Chunk Waypoints) or a band just under the camera (default).
             double displayY = fixedYEnabled ? fixedY : Math.floor(origin.y) - 1.0;
 
-            // Draw hotspot markers once per chunk (not per module entry).
+            // Accumulate geometry, then submit ONCE per render type: 4 submits per flagged
+            // chunk per frame was the frame-time cost once dozens of chunks were flagged.
+            java.util.List<java.util.function.BiConsumer<PoseStack.Pose, VertexConsumer>> fillOps = new java.util.ArrayList<>();
+            java.util.List<java.util.function.BiConsumer<PoseStack.Pose, VertexConsumer>> lineOps = new java.util.ArrayList<>();
+
+            // Hotspot markers once per chunk (not per module entry).
             for (ChunkPos hpos : hotspots) {
                 double hMinX = hpos.getMinBlockX() - origin.x;
                 double hMinZ = hpos.getMinBlockZ() - origin.z;
@@ -147,18 +152,16 @@ public final class ChunkFlagRenderer {
                 int hot = 0xFFFFA020;
                 int hotFill = 0x30FFA020;
                 AABB hbox = new AABB(hMinX, hMinY, hMinZ, hMinX + 16, hMinY + BOX_HEIGHT * 2, hMinZ + 16).inflate(INFLATE);
-                context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspFillSeeThrough(), (pose, buffer) -> fillBox(pose, buffer, hbox, hotFill));
-                context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
-                        cornerBrackets(pose, buffer, hbox, hot);
-                        double apexY = hbox.maxY + 48;
-                        line(pose, buffer, hbox.minX, hbox.maxY, hbox.minZ, hcx, apexY, hcz, hot);
-                        line(pose, buffer, hbox.maxX, hbox.maxY, hbox.minZ, hcx, apexY, hcz, hot);
-                        line(pose, buffer, hbox.maxX, hbox.maxY, hbox.maxZ, hcx, apexY, hcz, hot);
-                        line(pose, buffer, hbox.minX, hbox.maxY, hbox.maxZ, hcx, apexY, hcz, hot);
-                        line(pose, buffer, hcx, beamMinY, hcz, hcx, beamMaxY, hcz, 0xCCFFFFFF);
-                    });
+                fillOps.add((pose, buffer) -> fillBox(pose, buffer, hbox, hotFill));
+                lineOps.add((pose, buffer) -> {
+                    cornerBrackets(pose, buffer, hbox, hot);
+                    double apexY = hbox.maxY + 48;
+                    line(pose, buffer, hbox.minX, hbox.maxY, hbox.minZ, hcx, apexY, hcz, hot);
+                    line(pose, buffer, hbox.maxX, hbox.maxY, hbox.minZ, hcx, apexY, hcz, hot);
+                    line(pose, buffer, hbox.maxX, hbox.maxY, hbox.maxZ, hcx, apexY, hcz, hot);
+                    line(pose, buffer, hbox.minX, hbox.maxY, hbox.maxZ, hcx, apexY, hcz, hot);
+                    line(pose, buffer, hcx, beamMinY, hcz, hcx, beamMaxY, hcz, 0xCCFFFFFF);
+                });
             }
 
             for (Map.Entry<Key, Entry> e : ENTRIES.entrySet()) {
@@ -173,29 +176,32 @@ public final class ChunkFlagRenderer {
                 AABB box = new AABB(minX, minY, minZ, minX + 16, minY + BOX_HEIGHT, minZ + 16).inflate(INFLATE);
 
                 int fillArgb = (argb & 0x00FFFFFF) | 0x2E000000; // translucent fill derived from line colour
-                context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspFillSeeThrough(), (pose, buffer) -> fillBox(pose, buffer, box, fillArgb));
+                fillOps.add((pose, buffer) -> fillBox(pose, buffer, box, fillArgb));
 
-                // Corner-bracket outline (premium "target" look) instead of a plain full box.
-                context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> cornerBrackets(pose, buffer, box, argb));
-
-                // A tall beacon column through the chunk centre so flagged bases are visible from
-                // far away and through terrain - reads as a clear "something is here" marker.
+                // Corner brackets + beacon column + optional tracer, all in the one line batch.
                 double cx = pos.getMinBlockX() + 8 - origin.x;
                 double cz = pos.getMinBlockZ() + 8 - origin.z;
                 int beaconArgb = (argb & 0x00FFFFFF) | 0x66000000; // softer than the outline
-                context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) ->
-                        line(pose, buffer, cx, beamMinY, cz, cx, beamMaxY, cz, beaconArgb));
+                boolean tracer = entry.tracer;
+                lineOps.add((pose, buffer) -> {
+                    cornerBrackets(pose, buffer, box, argb);
+                    line(pose, buffer, cx, beamMinY, cz, cx, beamMaxY, cz, beaconArgb);
+                    if (tracer) {
+                        AutismWorldGeometry.line(pose, buffer, 0, 0, 0,
+                            cx, displayY + BOX_HEIGHT * 0.5 - origin.y, cz, argb, LINE_WIDTH);
+                    }
+                });
+            }
 
-                if (entry.tracer) {
-                    Vec3 centre = new Vec3(cx, displayY + BOX_HEIGHT * 0.5 - origin.y, cz);
-                    context.submitNodeCollector().submitCustomGeometry(poseStack,
-                        AutismRenderTypes.storageEspLinesSeeThrough(),
-                        (pose, buffer) -> AutismWorldGeometry.line(pose, buffer, 0, 0, 0,
-                            centre.x, centre.y, centre.z, argb, LINE_WIDTH));
-                }
+            if (!fillOps.isEmpty()) {
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    AutismRenderTypes.storageEspFillSeeThrough(),
+                    (pose, buffer) -> { for (var op : fillOps) op.accept(pose, buffer); });
+            }
+            if (!lineOps.isEmpty()) {
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    AutismRenderTypes.storageEspLinesSeeThrough(),
+                    (pose, buffer) -> { for (var op : lineOps) op.accept(pose, buffer); });
             }
         });
     }

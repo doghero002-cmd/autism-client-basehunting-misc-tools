@@ -102,17 +102,26 @@ public final class HeatMapRadarModule extends Module {
         feedRenderer(mc, cp);
     }
 
+    private Set<ChunkPos> shownCache = new HashSet<>();
+    private int shownRebuildTicks = 0;
+
     private void feedRenderer(Minecraft mc, ChunkPos center) {
-        int r = renderRadius.get();
-        Set<ChunkPos> shown = new HashSet<>();
-        for (Map.Entry<Long, Long> e : visited.entrySet()) {
-            int x = unpackX(e.getKey());
-            int z = unpackZ(e.getKey());
-            if (Math.abs(x - center.x()) > r || Math.abs(z - center.z()) > r) continue;
-            if (x == center.x() && z == center.z()) continue; // current chunk marker is just noise
-            shown.add(new ChunkPos(x, z));
+        // Rebuild twice a second: the visited map grows huge over long sessions and re-walking
+        // it every tick was measurable; markers only need ~0.5s freshness.
+        if (--shownRebuildTicks <= 0) {
+            shownRebuildTicks = 10;
+            int r = renderRadius.get();
+            Set<ChunkPos> shown = new HashSet<>();
+            for (Map.Entry<Long, Long> e : visited.entrySet()) {
+                int x = unpackX(e.getKey());
+                int z = unpackZ(e.getKey());
+                if (Math.abs(x - center.x()) > r || Math.abs(z - center.z()) > r) continue;
+                if (x == center.x() && z == center.z()) continue; // current chunk marker is just noise
+                shown.add(new ChunkPos(x, z));
+            }
+            shownCache = shown;
         }
-        ChunkFlagRenderer.feed(id(), shown, color.get(), tracer.get());
+        ChunkFlagRenderer.feed(id(), shownCache, color.get(), tracer.get());
     }
 
     @Override
