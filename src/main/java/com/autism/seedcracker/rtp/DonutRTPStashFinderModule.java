@@ -47,7 +47,7 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class DonutRTPStashFinderModule extends Module {
 
     public enum Mode { SEARCH, SAVE_AND_RTP }
-    public enum ScanMode { DETECT_ONLY, BARITONE_MINE }
+    public enum ScanMode { DETECT_ONLY, BARITONE_MINE, WATER_MINE }
     public enum RegionMode { ROTATE_ALL, SPECIFIC }
 
     /** Maps a friendly region choice to the engine's RtpRegion. */
@@ -91,6 +91,9 @@ public final class DonutRTPStashFinderModule extends Module {
     private final IntSetting rtpCooldown = add(new IntSetting("rtp-cooldown", "RTP cooldown (s)", 5, 1, 600, 1)
         .description("Seconds to wait after an RTP before checking position / re-RTPing.")
         .group("RTP"));
+    private final IntSetting minCoord = add(new IntSetting("min-coord", "Min coord (abs, k)", 0, 0, 2000, 10)
+        .description("Skip landings closer than this many THOUSAND blocks (|x| or |z|): far coords = older, un-picked regions. 0 = off (Water RTPMiner coord filter).")
+        .group("RTP"));
     private final IntSetting threshold = add(new IntSetting("threshold", "Distance threshold", 50000, 0, 300000, 1000)
         .description("Run the base search when closer than this to 0,0 (uses max of |x|,|z|). DonutSMP world border is 300000.")
         .group("RTP"));
@@ -116,8 +119,16 @@ public final class DonutRTPStashFinderModule extends Module {
         .description("SEARCH digs/searches for stash blocks. SAVE_AND_RTP logs a found base and RTPs away.")
         .group("Behaviour"));
     private final EnumSetting<ScanMode> scanMode = add(new EnumSetting<>("scan-mode", "Search method", ScanMode.DETECT_ONLY, ScanMode.values())
-        .description("DETECT_ONLY scans loaded chunks. BARITONE_MINE digs down and mines toward the target blocks.")
+        .description("DETECT_ONLY scans loaded chunks. BARITONE_MINE digs down and mines toward the target blocks. WATER_MINE = raw Water-client RTPMiner movement: look-down dig to the target Y, then straight-line key-input mining (no Baritone). WARNING: raw bot movement - may flag anti-cheats.")
         .group("Behaviour"));
+    private final IntSetting waterTargetY = add(new IntSetting("water-target-y", "Water target Y", -55, -62, -30, 1)
+        .description("WATER_MINE: Y level to dig down to before tunneling (Water default -55).")
+        .group("Behaviour")
+        .visibleWhen(() -> scanMode.get() == ScanMode.WATER_MINE));
+    private final IntSetting waterObsidianSlot = add(new IntSetting("water-obsidian-slot", "Obsidian slot", 2, 1, 9, 1)
+        .description("WATER_MINE: hotbar slot with obsidian for Y-recovery pillaring.")
+        .group("Behaviour")
+        .visibleWhen(() -> scanMode.get() == ScanMode.WATER_MINE));
     private final StringListSetting targetBlocks = add(new StringListSetting("target-blocks", "Target blocks",
             "minecraft:chest|minecraft:barrel|minecraft:shulker_box|minecraft:hopper|minecraft:trapped_chest|minecraft:ender_chest")
         .description("Block ids (| separated) that count as a stash/base.")
@@ -270,6 +281,8 @@ public final class DonutRTPStashFinderModule extends Module {
     public void onDisable() {
         if (controller != null) controller.stop();
         stopBaritone();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.options != null) waterReleaseKeys(mc);
         wandering = false;
         phase = Phase.RTP;
         ACTIVE = false;
@@ -341,6 +354,13 @@ public final class DonutRTPStashFinderModule extends Module {
         loggedThisLanding = false;
         if (mc.player == null || mc.level == null) return;
 
+        // Coord filter (Water RTPMiner): skip landings too close to spawn axes - far coords are
+        // older, less-picked regions. The engine just RTPs again.
+        if (minCoord.get() > 0) {
+            double absCoord = Math.max(Math.abs(mc.player.getX()), Math.abs(mc.player.getZ()));
+            if (absCoord < minCoord.get() * 1000.0) return;
+        }
+
         // SAVE_AND_RTP never lingers: log if a base is here, then let the engine RTP again.
         if (mode.get() == Mode.SAVE_AND_RTP) {
             if (distFromSpawn(mc) < threshold.get()) {
@@ -363,7 +383,15 @@ public final class DonutRTPStashFinderModule extends Module {
         wanderCenterZ = mc.player.getZ();
         wandering = false;
         reachedDepth = false;
-        if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
+        if (scanMode.get() == ScanMode.WATER_MINE) {
+            waterState = WaterMineState.DESCEND;
+            net.minecraft.core.Direction[] horizontals = {
+                net.minecraft.core.Direction.NORTH, net.minecraft.core.Direction.SOUTH,
+                net.minecraft.core.Direction.WEST, net.minecraft.core.Direction.EAST };
+            waterMineDir = horizontals[WANDER_RNG.nextInt(horizontals.length)];
+            waterPlaceAttempts = 0;
+            AutismClientMessaging.sendPrefixed("§7Water-mining down to Y=" + waterTargetY.get() + ", then tunneling " + waterMineDir.getName() + "... (raw movement - watch for flags)");
+        } else if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
             applyBaritoneSettings();
             // Dig down to the deepslate level first; tickWander handles the descent until reachedDepth.
             AutismCompatManager.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
@@ -371,6 +399,122 @@ public final class DonutRTPStashFinderModule extends Module {
         } else {
             AutismClientMessaging.sendPrefixed("§7Searching around " + (int) wanderCenterX + ", " + (int) wanderCenterZ + "...");
         }
+    }
+
+    // ---- WATER_MINE: raw Water-client RTPMiner movement (look-down dig + straight key-input tunnel) ----
+
+    private enum WaterMineState { DESCEND, MINE, Y_RECOVERY }
+
+    private WaterMineState waterState = WaterMineState.DESCEND;
+    private net.minecraft.core.Direction waterMineDir = net.minecraft.core.Direction.NORTH;
+    private int waterPlaceAttempts = 0;
+
+    private void tickWaterMine(Minecraft mc) {
+        if (mc.player == null || mc.level == null || mc.options == null) return;
+
+        // Fell below the floor: recover before anything else (Water Y_RECOVERY).
+        if (mc.player.getY() < -62 && waterState != WaterMineState.Y_RECOVERY) {
+            waterState = WaterMineState.Y_RECOVERY;
+            waterPlaceAttempts = 0;
+        }
+
+        switch (waterState) {
+            case DESCEND -> waterDescend(mc);
+            case MINE -> waterMine(mc);
+            case Y_RECOVERY -> waterRecover(mc);
+        }
+    }
+
+    /** Look 85° down + hold attack; gravity does the descending (Water handleDescend). */
+    private void waterDescend(Minecraft mc) {
+        double target = waterTargetY.get();
+        if (mc.player.getY() <= target + 1.5) {
+            waterReleaseKeys(mc);
+            waterState = WaterMineState.MINE;
+            return;
+        }
+        mc.player.setXRot(85f);
+        mc.options.keyAttack.setDown(true);
+        mc.options.keyUp.setDown(false);
+        mc.options.keyShift.setDown(false);
+        mc.options.keyJump.setDown(false);
+    }
+
+    /** Straight-line key-input tunnel at the target Y (Water handleAmethystMine). */
+    private void waterMine(Minecraft mc) {
+        double y = mc.player.getY();
+        double target = waterTargetY.get();
+        if (y < target - 2) { waterState = WaterMineState.Y_RECOVERY; return; }
+        if (y > target + 2.5) { waterState = WaterMineState.DESCEND; return; }
+
+        // Gravel overhead: stop and chew it before it suffocates us (Water gravel check).
+        BlockPos above = mc.player.blockPosition().above();
+        if (mc.level.getBlockState(above).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+            || mc.level.getBlockState(above.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) {
+            mc.player.setXRot(-80f);
+            mc.options.keyAttack.setDown(true);
+            mc.options.keyUp.setDown(false);
+            return;
+        }
+
+        // Face the tunnel direction (raw snap within 5° like Water), then mine + walk.
+        float targetYaw = switch (waterMineDir) {
+            case NORTH -> 180f; case SOUTH -> 0f; case WEST -> 90f; case EAST -> 270f; default -> 0f;
+        };
+        if (Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - targetYaw)) > 5f) {
+            mc.player.setYRot(targetYaw);
+            mc.player.setXRot(0f);
+            return;
+        }
+        mc.player.setXRot(0f);
+        mc.options.keyAttack.setDown(true);
+        mc.options.keyUp.setDown(true);
+        mc.options.keyShift.setDown(false);
+        mc.options.keyJump.setDown(false);
+    }
+
+    /** Place obsidian below + jump until back at the target Y (Water handleYRecovery). */
+    private void waterRecover(Minecraft mc) {
+        double target = waterTargetY.get();
+        if (mc.player.getY() >= target - 1) {
+            waterState = WaterMineState.MINE;
+            waterPlaceAttempts = 0;
+            waterReleaseKeys(mc);
+            return;
+        }
+        waterReleaseKeys(mc);
+
+        int oSlot = waterObsidianSlot.get() - 1;
+        var obs = mc.player.getInventory().getItem(oSlot);
+        if (obs.is(net.minecraft.world.item.Items.OBSIDIAN) && mc.gameMode != null) {
+            com.autism.seedcracker.util.InvSync.select(mc, oSlot);
+            mc.player.setXRot(89f);
+            BlockPos below = mc.player.blockPosition().below();
+            BlockState bs = mc.level.getBlockState(below);
+            if (bs.isAir() || !bs.getFluidState().isEmpty()) {
+                mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(
+                        net.minecraft.world.phys.Vec3.atCenterOf(below),
+                        net.minecraft.core.Direction.UP, below, false));
+            }
+            mc.options.keyJump.setDown(true);
+        } else {
+            mc.options.keyJump.setDown(true);
+        }
+
+        // Gave up recovering: back to the engine for a fresh RTP (Water resetSession).
+        if (++waterPlaceAttempts > 80) {
+            waterPlaceAttempts = 0;
+            waterReleaseKeys(mc);
+            phase = Phase.RTP;
+        }
+    }
+
+    private void waterReleaseKeys(Minecraft mc) {
+        mc.options.keyAttack.setDown(false);
+        mc.options.keyUp.setDown(false);
+        mc.options.keyShift.setDown(false);
+        mc.options.keyJump.setDown(false);
     }
 
     /** Builds the engine's per-tick environment observation from Minecraft, or null when not ready. */
@@ -616,12 +760,14 @@ public final class DonutRTPStashFinderModule extends Module {
             }
             if (System.currentTimeMillis() >= searchEndMs) {
                 stopBaritone();
+                if (scanMode.get() == ScanMode.WATER_MINE) waterReleaseKeys(mc);
                 wandering = false;
                 phase = Phase.RTP;
                 AutismClientMessaging.sendPrefixed("§7Search time up, RTPing again.");
             } else {
                 // Wander within the bubble while searching (Baritone moves us to cover ground).
                 if (scanMode.get() == ScanMode.BARITONE_MINE) tickWander(mc);
+                else if (scanMode.get() == ScanMode.WATER_MINE) tickWaterMine(mc);
                 // Still searching: park the engine so it doesn't RTP away mid-search.
                 return;
             }

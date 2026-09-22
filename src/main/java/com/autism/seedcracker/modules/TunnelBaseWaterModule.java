@@ -92,6 +92,12 @@ public final class TunnelBaseWaterModule extends Module {
     private final BoolSetting turnWhileWalking = add(new BoolSetting("turn-while-walking", "Turn while walking", true)
         .description("Keep walking while turning to a new direction (looks less bot-like than stop-turn-go).")
         .group("Movement"));
+    private final BoolSetting manualSteer = add(new BoolSetting("manual-steer", "Steer with mouse", true)
+        .description("Turn the tunnel by looking: turn your camera past ~35 degrees and the tunnel adopts that direction instead of forcing itself back straight.")
+        .group("Movement"));
+    private final BoolSetting backgroundRun = add(new BoolSetting("background-run", "Run while tabbed out", true)
+        .description("Keep tunneling while the window is unfocused: blocks the pause menu on alt-tab and auto-closes it if it slipped in.")
+        .group("General"));
     private final BoolSetting kickOnFind = add(new BoolSetting("kick-on-find", "Kick on base find", true)
         .description("Disconnect when a base is found. OFF = play a sound + keep going (you loot it yourself).")
         .group("Find"));
@@ -160,6 +166,10 @@ public final class TunnelBaseWaterModule extends Module {
     public void onEnable() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) { setEnabledSilently(false); return; }
+        if (backgroundRun.get() && mc.options != null) {
+            savedPauseOnLostFocus = mc.options.pauseOnLostFocus;
+            mc.options.pauseOnLostFocus = false;
+        }
         state = State.NONE; backup = State.NONE; isRotating = false; rotCallback = null;
         phase = Phase.DIG; phaseStartTime = 0; towerRotationDone = false; towerBasePos = null;
         yRecoveryRotationDone = false; yRecoveryBasePos = null; mendStage = MendStage.ENSURE;
@@ -193,11 +203,17 @@ public final class TunnelBaseWaterModule extends Module {
     public void onDisable() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) stopMovement(mc);
+        if (savedPauseOnLostFocus != null && mc.options != null) {
+            mc.options.pauseOnLostFocus = savedPauseOnLostFocus;
+            savedPauseOnLostFocus = null;
+        }
         state = State.NONE; backup = State.NONE; isRotating = false; rotCallback = null;
         isBackup = false; backupDirection = null; preferredSide = 0; detourStartPos = null;
         hazardCommitTicks = 0; diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0;
         stuck.reset();
     }
+
+    private Boolean savedPauseOnLostFocus = null;
 
     @Override
     public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false); }
@@ -259,6 +275,23 @@ public final class TunnelBaseWaterModule extends Module {
 
         if (jumped) { jumped = false; mc.options.keyJump.setDown(false); }
         tickRotation(mc);
+
+        // Tabbed out: keep the vanilla option pinned off while running and dismiss a pause menu
+        // that opened before enable (single-player esc pause still freezes the integrated server,
+        // but on DonutSMP the pause screen just blocks input - closing it keeps the bot mining).
+        if (backgroundRun.get()) {
+            if (savedPauseOnLostFocus == null) {
+                savedPauseOnLostFocus = mc.options.pauseOnLostFocus;
+                mc.options.pauseOnLostFocus = false;
+            }
+            if (mc.gui.screen() instanceof net.minecraft.client.gui.screens.PauseScreen
+                && mc.getWindow() != null && !mc.getWindow().isFocused()) {
+                mc.gui.setScreen(null);
+            }
+        } else if (savedPauseOnLostFocus != null) {
+            mc.options.pauseOnLostFocus = savedPauseOnLostFocus;
+            savedPauseOnLostFocus = null;
+        }
 
         if (shouldCloseInventory) {
             if (mc.gui.screen() instanceof InventoryScreen) mc.gui.setScreen(null);
@@ -407,6 +440,21 @@ public final class TunnelBaseWaterModule extends Module {
         // Turn while walking: don't freeze movement just because a rotation is in flight (that
         // stop-turn-go pattern is a bot tell). Only skip if turnWhileWalking is off.
         if (isRotating && !turnWhileWalking.get()) { stopMovement(mc); return; }
+        // Manual steering: the player turned the camera well off the tunnel heading (and the module
+        // isn't mid-rotation, so it wasn't us) - adopt where they look as the new heading instead of
+        // dragging the view back. Detours are cancelled; hazard logic re-runs on the new lane below.
+        if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
+            Direction lookDir = mc.player.getDirection();
+            float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(
+                mc.player.getYRot() - dirValues(currentDirection)[0]));
+            if (lookDir != currentDirection && dev > 35f) {
+                currentDirection = lookDir;
+                isBackup = false; backupDirection = null; detourStartPos = null;
+                preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0;
+                float[] v = dirValues(lookDir);
+                rotateTo(v[0], v[1], null); // settle onto the cardinal grid
+            }
+        }
         if (mc.player.blockPosition().getY() < MIN_Y_LEVEL) {
             state = State.YRECOVERY; yRecoveryBasePos = null; yRecoveryRotationDone = false;
             phase = Phase.DIG; phaseStartTime = System.currentTimeMillis();

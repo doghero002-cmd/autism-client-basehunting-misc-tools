@@ -147,6 +147,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new AutoRenderModule(catRender));
         AutismAddons.modules().register(new PaperRigModule(catRender));
         AutismAddons.modules().register(new ScoreboardHiderModule(catRender));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.StorageRecorderModule(catRender));
         AutismAddons.modules().register(new FakePayModule(catFake));
         AutismAddons.modules().register(new FakePaymentsModule(catFake));
         AutismAddons.modules().register(new FakeRolesModule(catFake));
@@ -178,6 +179,9 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new com.autism.seedcracker.modules.CoordinateProtectorModule(catDogsMisc));
         AutismAddons.modules().register(new com.autism.seedcracker.modules.AutoStoreModule(catDogsMisc));
         AutismAddons.modules().register(new com.autism.seedcracker.modules.AutoSmeltModule(catDogsMisc));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.ChestStealerModule(catDogsMisc));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.AutoReplenishModule(catDogsMisc));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.BalanceTagsModule(catDogsMisc));
         AutismAddons.modules().register(new AutoToolModule(catDogsMisc));
         AutismAddons.modules().register(new TPASpammerModule(catDogsMisc));
         AutismAddons.modules().register(new TabDetectorModule(catDogsMisc));

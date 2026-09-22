@@ -10,6 +10,7 @@
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
     "FakeRolesChatMixin",
+    "HudFlagTelemetryMixin",
     "HudScoreboardMixin",
     "LocalPlayerMixin",
     "ModuleLifecycleMixin",
