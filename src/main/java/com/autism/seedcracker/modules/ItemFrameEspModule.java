@@ -66,7 +66,12 @@ public final class ItemFrameEspModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        Set<Item> wanted = parseItems();
+        // Registry parse of the item list is settings-driven; re-parse twice a second, not per tick.
+        if (--itemsReparseTicks <= 0) {
+            itemsReparseTicks = 10;
+            cachedWanted = parseItems();
+        }
+        Set<Item> wanted = cachedWanted;
         boolean inEnd = mc.level.dimension() == net.minecraft.world.level.Level.END;
 
         Set<BlockPos> matches = new HashSet<>();
@@ -90,6 +95,9 @@ public final class ItemFrameEspModule extends Module {
 
         BlockEspRenderer.feed(id(), matches, color.get(), tracers.get(), true);
     }
+
+    private Set<Item> cachedWanted = new HashSet<>();
+    private int itemsReparseTicks = 0;
 
     private Set<Item> parseItems() {
         Set<Item> out = new HashSet<>();

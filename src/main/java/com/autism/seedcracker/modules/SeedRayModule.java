@@ -72,6 +72,8 @@ public final class SeedRayModule extends Module {
     private long worldSeed = 0;
     private boolean haveSeed = false;
     private int cursor = 0;
+    private int compareTicks = 0;
+    private boolean haveComparedOnce = false;
 
     public SeedRayModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":seed-ray", "Seed Ray", category,
@@ -85,6 +87,8 @@ public final class SeedRayModule extends Module {
         notified.clear();
         renderBlocks.clear();
         haveSeed = false;
+        compareTicks = 0;
+        haveComparedOnce = false;
         resolveSeed();
         if (!haveSeed) {
             AutismClientMessaging.sendPrefixed("§e[SeedRay] §fNo cracked seed yet - run the seed cracker first (module stays on and picks it up).");
@@ -131,19 +135,37 @@ public final class SeedRayModule extends Module {
         ChunkPos center = mc.player.chunkPosition();
         int r = range.get();
         // Simulate 1 chunk per tick (each is a few hundred rng rolls - cheap but not free).
-        List<ChunkPos> targets = new ArrayList<>();
-        for (int dx = -r; dx <= r; dx++)
-            for (int dz = -r; dz <= r; dz++)
-                targets.add(new ChunkPos(center.x() + dx, center.z() + dz));
-        if (!targets.isEmpty()) {
-            ChunkPos pos = targets.get(cursor++ % targets.size());
+        int side = r * 2 + 1;
+        int total = side * side;
+        {
+            int idx = cursor++ % total;
+            ChunkPos pos = new ChunkPos(center.x() + idx % side - r, center.z() + idx / side - r);
             long key = key(pos);
             if (!simulated.containsKey(key) && mc.level.hasChunk(pos.x(), pos.z())) {
                 simulated.put(key, simulateChunk(mc, pos));
             }
         }
 
-        // Compare + render.
+        // Compare every 10 ticks: the vein-vs-world diff walks every predicted block with a
+        // registry string lookup - per tick it was a steady FPS sink. Feeds stay per-tick
+        // (renderer TTL) using the cached results.
+        if (haveComparedOnce && ++compareTicks < 10) {
+            if (render.get()) BlockEspRenderer.feed(id(), renderBlocks, oreColor.get(), false, false);
+            com.autism.seedcracker.finder.ChunkFlagRenderer.feed(id(), flagged, flagColor.get(), false);
+            return;
+        }
+        compareTicks = 0;
+        haveComparedOnce = true;
+
+        // Prune simulations for chunks far outside the bubble (unbounded growth over a session).
+        int keep = r + 8;
+        simulated.keySet().removeIf(k -> {
+            long kv = k;
+            int kx = (int) kv;
+            int kz = (int) (kv >> 32);
+            return Math.abs(kx - center.x()) > keep || Math.abs(kz - center.z()) > keep;
+        });
+
         renderBlocks.clear();
         flagged.clear();
         for (int dx = -r; dx <= r; dx++) {
