@@ -30,11 +30,8 @@ import net.minecraft.world.level.material.FluidState;
  */
 public final class PrimeChunkFinderModule extends Module {
 
-    public enum Sensitivity { HIGH, MEDIUM, LOW }
-
-    private final autismclient.api.module.EnumSetting<Sensitivity> sensitivity = add(
-        new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity", Sensitivity.MEDIUM, Sensitivity.values())
-        .description("HIGH = flag on the least evidence (more false positives). MEDIUM = ignore chunk-border flows (source may just be in the next chunk). LOW = also ignore surface flows (natural waterfalls) and need 2x threshold.")
+    private final IntSetting sensitivity = add(new IntSetting("sensitivity", "Sensitivity", 40, 0, 100, 1)
+        .description("Higher values flag weaker fluid-flow evidence. At 40, chunk-border flows are ignored; low values also ignore surface flows and require more evidence.")
         .group("Detect"));
     private final IntSetting minDistance = add(new IntSetting("min-distance", "Min distance from spawn", 200, 0, 10000, 50)
         .description("Ignore chunks closer than this to 0,0.").group("Detect"));
@@ -52,7 +49,7 @@ public final class PrimeChunkFinderModule extends Module {
     private final Set<Long> flagged = ConcurrentHashMap.newKeySet();
     private final Set<Long> scanned = ConcurrentHashMap.newKeySet();
     private int cursor = 0;
-    private Sensitivity lastSensitivity = null;
+    private int lastSensitivity = -1;
 
     public PrimeChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":prime-chunk-finder", "Prime Chunk Finder", category,
@@ -135,14 +132,13 @@ public final class PrimeChunkFinderModule extends Module {
         LevelChunkSection[] sections = chunk.getSections();
         if (sections == null || sections.length == 0) return;
 
-        Sensitivity sens = sensitivity.get();
-        // LOW doubles the evidence needed on top of its filters.
-        int need = Math.max(1, threshold.get()) * (sens == Sensitivity.LOW ? 2 : 1);
-        // MEDIUM/LOW: skip flows at the chunk border - their source is often just in the
-        // neighbouring chunk, which this per-chunk scan can't see (classic false positive).
-        boolean skipBorder = sens != Sensitivity.HIGH;
-        // LOW: skip flows above sea level-ish - natural surface waterfalls/springs dominate there.
-        int maxSurfaceY = sens == Sensitivity.LOW ? 50 : Integer.MAX_VALUE;
+        int sensitivityValue = sensitivity.get();
+        // 40 is the medium profile: border flows are ignored and the configured threshold is
+        // unchanged. Higher values widen the detector; lower values suppress natural surface flow
+        // and require additional evidence.
+        int need = Math.max(1, (int) Math.ceil(threshold.get() * (1.4 - sensitivityValue / 100.0)));
+        boolean skipBorder = sensitivityValue < 60;
+        int maxSurfaceY = sensitivityValue < 20 ? 50 : Integer.MAX_VALUE;
         int minSectionY = chunk.getMinSectionY();
 
         int count = 0;

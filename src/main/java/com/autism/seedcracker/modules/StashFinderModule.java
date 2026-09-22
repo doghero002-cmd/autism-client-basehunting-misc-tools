@@ -53,12 +53,12 @@ public final class StashFinderModule extends Module {
     // ---- settings ----
     public enum Mode { THRESHOLD, SCORING, DONUT }
     private final autismclient.api.module.EnumSetting<Mode> mode = add(new autismclient.api.module.EnumSetting<>(
-            "mode", "Mode", Mode.THRESHOLD, Mode.values())
+            "mode", "Mode", Mode.DONUT, Mode.values())
         .description("THRESHOLD = storage count per chunk. SCORING = REAL-vs-FAKE cluster classifier. DONUT = DonutSMP base profile: spawners x storage x low-Y combo (Radium/4E thresholds).")
         .group("General"));
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
-            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+            com.autism.seedcracker.finder.FinderSensitivity.HIGH, com.autism.seedcracker.finder.FinderSensitivity.values())
         .description("THRESHOLD: HIGH = half the storage count flags, LOW = double. SCORING: shifts the real/ambiguous score gates.")
         .group("General"));
     private final IntSetting threshold = add(new IntSetting(
@@ -87,7 +87,7 @@ public final class StashFinderModule extends Module {
         .group("Scoring")
         .visibleWhen(() -> mode.get() == Mode.SCORING));
     private final IntSetting scanRadius = add(new IntSetting(
-            "scan-radius", "Scan radius (chunks)", 4, 1, 12, 1)
+            "scan-radius", "Scan radius (chunks)", 6, 1, 12, 1)
         .description("Chunk bubble around the player scanned for stashes.")
         .group("General"));
     private final ColorSetting color = add(new ColorSetting(
@@ -103,7 +103,7 @@ public final class StashFinderModule extends Module {
         .description("Toast + chat ping when a stash chunk is found.")
         .group("General"));
     private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
         .description("THRESHOLD mode: how many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
         .group("Performance"));
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();

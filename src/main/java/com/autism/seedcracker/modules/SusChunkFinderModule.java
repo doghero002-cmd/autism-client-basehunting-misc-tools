@@ -52,7 +52,7 @@ public final class SusChunkFinderModule extends Module {
         .group("General"));
     private final EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new EnumSetting<>("sensitivity", "Sensitivity",
-            com.autism.seedcracker.finder.FinderSensitivity.MEDIUM, com.autism.seedcracker.finder.FinderSensitivity.values())
+            com.autism.seedcracker.finder.FinderSensitivity.HIGH, com.autism.seedcracker.finder.FinderSensitivity.values())
         .description("XENON: player-only blocks (shulker/hopper/furnace/crafting...) flag at 1 (LOW: 2). Structure-prone blocks (torch/chest/rail/spawner/obsidian) need HIGH 2 / MEDIUM 4 / LOW 6. TYPES: scales the per-type min counts.")
         .group("General"));
 
@@ -126,7 +126,7 @@ public final class SusChunkFinderModule extends Module {
         .group("Signal").visibleWhen(() -> mode.get() == Mode.SIGNAL));
 
     private final IntSetting scanRadius = add(new IntSetting(
-            "scan-radius", "Scan radius (chunks)", 4, 1, 16, 1)
+            "scan-radius", "Scan radius (chunks)", 6, 1, 16, 1)
         .description("Chunk bubble around the player scanned.")
         .group("General"));
     private final IntSetting rescanMs = add(new IntSetting(
@@ -150,7 +150,7 @@ public final class SusChunkFinderModule extends Module {
         .description("XENON: don't flag spawners/blocks inside dungeons or trial chambers (they aren't player bases).")
         .group("General"));
     private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
         .description("Chunks scanned per tick in every scan mode (DOGS/WATER/XENON/TYPES; SIGNAL gets 4x since its check is cheap). 1 = smoothest FPS, higher = faster full sweep.")
         .group("General"));
 
