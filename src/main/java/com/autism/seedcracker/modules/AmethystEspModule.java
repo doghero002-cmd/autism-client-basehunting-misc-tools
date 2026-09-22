@@ -66,6 +66,9 @@ public final class AmethystEspModule extends Module {
     private final Set<Long> notified = ConcurrentHashMap.newKeySet();
     private int cursor = 0;
     private long enableTimeMs = 0;
+    private long nextPassAtMs = 0;
+    private java.util.List<net.minecraft.world.phys.AABB> cachedBoxes = java.util.List.of();
+    private int boxRebuildTicks = 0;
 
     public AmethystEspModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":amethyst-esp", "Amethyst ESP", category,
@@ -79,6 +82,9 @@ public final class AmethystEspModule extends Module {
         notified.clear();
         cursor = 0;
         enableTimeMs = System.currentTimeMillis();
+        nextPassAtMs = 0;
+        cachedBoxes = java.util.List.of();
+        boxRebuildTicks = 0;
     }
 
     @Override
@@ -100,19 +106,22 @@ public final class AmethystEspModule extends Module {
         // Respect the configurable rescan delay (lets chunks finish loading before scanning).
         if (System.currentTimeMillis() - enableTimeMs < rescanMs.get()) return;
 
-        // Spread the chunk scan across ticks (a few chunks per tick, round-robin over the bubble).
+        // Spread the chunk scan across ticks (round-robin over the bubble); after a completed
+        // pass, idle 5s - geodes don't move, so continuous re-sweeping was pure FPS waste.
         int range = simDistance.get();
         ChunkPos centre = mc.player.chunkPosition();
         int side = range * 2 + 1;
         int total = side * side;
-        for (int i = 0; i < 8; i++) {
-            int idx = cursor % total;
-            cursor = (cursor + 1) % total;
-            int dx = idx % side - range;
-            int dz = idx / side - range;
-            int cx = centre.x() + dx, cz = centre.z() + dz;
-            if (!mc.level.hasChunk(cx, cz)) continue;
-            scanChunk(mc.level.getChunk(cx, cz));
+        if (cursor != 0 || System.currentTimeMillis() >= nextPassAtMs) {
+            for (int i = 0; i < 4; i++) {
+                int idx = cursor % total;
+                cursor = (idx + 1) % total;
+                int dx = idx % side - range;
+                int dz = idx / side - range;
+                int cx = centre.x() + dx, cz = centre.z() + dz;
+                if (mc.level.hasChunk(cx, cz)) scanChunk(mc.level.getChunk(cx, cz));
+                if (cursor == 0) { nextPassAtMs = System.currentTimeMillis() + 5000; break; }
+            }
         }
 
         // Prune out-of-range chunks (and their chat-alert keys, so re-entering range re-alerts
@@ -136,11 +145,15 @@ public final class AmethystEspModule extends Module {
             BlockEspRenderer.feed(SeedcrackerAddon.ID + ":amethyst-esp", all, color.get(), tracer.get(), fill.get());
         }
 
-        // Geode boxes: one bounding box per connected amethyst cluster.
+        // Geode boxes: one bounding box per connected amethyst cluster (flood fill - cached,
+        // recomputed twice a second instead of every tick).
         if (geodeBox.get()) {
-            java.util.List<net.minecraft.world.phys.AABB> boxes = computeGeodeBoxes();
-            if (!boxes.isEmpty()) {
-                BlockEspRenderer.feedBoxes(SeedcrackerAddon.ID + ":amethyst-esp", boxes, color.get());
+            if (--boxRebuildTicks <= 0) {
+                boxRebuildTicks = 10;
+                cachedBoxes = computeGeodeBoxes();
+            }
+            if (!cachedBoxes.isEmpty()) {
+                BlockEspRenderer.feedBoxes(SeedcrackerAddon.ID + ":amethyst-esp", cachedBoxes, color.get());
             } else {
                 BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":amethyst-esp");
             }
@@ -192,21 +205,20 @@ public final class AmethystEspModule extends Module {
         ChunkPos pos = chunk.getPos();
         long key = ((long) pos.x() << 32) | (pos.z() & 0xffffffffL);
         Set<BlockPos> found = new HashSet<>();
-        int baseX = pos.getMinBlockX();
-        int baseZ = pos.getMinBlockZ();
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = -64; y <= MAX_Y; y++) {
-                    BlockPos p = new BlockPos(baseX + x, y, baseZ + z);
-                    BlockState st = chunk.getBlockState(p);
-                    // Detect the amethyst blocks themselves (amethyst block / budding amethyst),
-                    // which DonutSMP still sends, not just the buds/clusters it hides at distance.
-                    if (isAmethystBlock(st) || (isAmethystCluster(st) && hasGeodeNearby(chunk, p))) {
-                        found.add(p.immutable());
-                    }
+        // Section palette walk with maybeHas fast-skip: amethyst is rare, so nearly every
+        // section skips without a single block read (the old walk was ~29k reads + BlockPos
+        // allocations per chunk, repeated forever).
+        com.autism.seedcracker.finder.ChunkScanHelper.forEachBlockInChunk(chunk,
+            st -> isAmethystBlock(st) || isAmethystCluster(st),
+            p -> {
+                if (p.getY() > MAX_Y) return;
+                BlockState st = chunk.getBlockState(p);
+                // Detect the amethyst blocks themselves (amethyst block / budding amethyst),
+                // which DonutSMP still sends, not just the buds/clusters it hides at distance.
+                if (isAmethystBlock(st) || (isAmethystCluster(st) && hasGeodeNearby(chunk, p))) {
+                    found.add(p);
                 }
-            }
-        }
+            });
         if (found.size() >= minCluster.get()) {
             flagged.put(key, found);
             if (chatAlert.get() && notified.add(key)) {

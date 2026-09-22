@@ -101,7 +101,8 @@ public final class BedrockHoleEspModule extends Module {
             int sideY = rangeY * 2 + 1;
             int processed = 0;
             int minHoleSize = minHole.get();
-            while (scanIndex < totalVolume && processed < 32768) {
+            // 8k positions/tick: 32k world lookups per tick was a steady FPS drain mid-pass.
+            while (scanIndex < totalVolume && processed < 8192) {
                 int idx = scanIndex++;
                 int dy = idx / sideX % sideY;
                 int dx = idx % sideX;

@@ -110,6 +110,10 @@ public final class HoleEspModule extends Module {
             return Math.abs(kx - pcx) > r + 1 || Math.abs(kz - pcz) > r + 1;
         });
 
+        // Budget: 2 chunks per pass. The old loop scanned EVERY missing chunk in one tick, so
+        // entering new terrain (or enabling) froze a frame on millions of block reads.
+        int budget = 2;
+        outer:
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
                 int cx = pcx + dx, cz = pcz + dz;
@@ -117,21 +121,36 @@ public final class HoleEspModule extends Module {
                 long key = ((long) cx << 32) | (cz & 0xffffffffL);
                 if (chunkHoles.containsKey(key)) continue;
                 chunkHoles.put(key, scanChunk(mc, cx, cz));
+                if (--budget <= 0) break outer;
             }
         }
     }
 
     private Set<Hole> scanChunk(Minecraft mc, int cx, int cz) {
         Set<Hole> out = ConcurrentHashMap.newKeySet();
+        net.minecraft.world.level.chunk.LevelChunk chunk = mc.level.getChunk(cx, cz);
         int minY = mc.level.getMinY();
         int maxY = mc.level.getMaxY();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int baseX = cx << 4, baseZ = cz << 4;
 
+        // Sky cut: a hole top needs solid walls, which the surface heightmap bounds - no point
+        // walking the ~200 empty Y levels above the terrain.
+        int surfaceCap = minY;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                for (int y = minY + 1; y < maxY - 1; y++) {
+                int h = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+                if (h > surfaceCap) surfaceCap = h;
+            }
+        }
+        int yHi = Math.min(surfaceCap + 1, maxY - 1);
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY + 1; y < yHi; y++) {
                     pos.set(baseX + x, y, baseZ + z);
+                    // Cheap chunk-local air pre-filter before the multi-read wall checks.
+                    if (!chunk.getBlockState(pos).isAir()) continue;
                     checkHole(mc, pos, out, true);   // 1x1
                     checkHole(mc, pos, out, false);  // 3x1
                 }
@@ -262,26 +281,34 @@ public final class HoleEspModule extends Module {
             int pcx = mc.player.chunkPosition().x();
             int pcz = mc.player.chunkPosition().z();
 
+            if (!drawOutline) return;
+            // Collect visible holes, then ONE geometry submit (a submit per hole per frame was
+            // measurable with hole-riddled terrain).
+            java.util.List<AABB> boxes = new java.util.ArrayList<>();
+            java.util.List<Integer> colors = new java.util.ArrayList<>();
+            // "Deep" is derived from the configured min-depth (2x) so the colour band always
+            // makes sense regardless of the min-depth setting.
+            int deepThreshold = Math.max(10, self.minDepth.get() * 2);
             for (Map.Entry<Long, Set<Hole>> e : self.chunkHoles.entrySet()) {
                 long key = e.getKey();
                 int kx = (int) (key >> 32);
                 int kz = (int) (key & 0xffffffffL);
                 if (Math.abs(kx - pcx) > drawRange || Math.abs(kz - pcz) > drawRange) continue;
                 for (Hole hole : e.getValue()) {
-                    // "Deep" is derived from the configured min-depth (2x) so the colour band
-                    // always makes sense regardless of the min-depth setting.
-                    int deepThreshold = Math.max(10, minDepth.get() * 2);
-                    int color = hole.depth >= deepThreshold ? DEEP : (hole.is1x1 ? SAFE : UNSAFE);
                     AABB b = hole.box;
-                    AABB rel = new AABB(
+                    boxes.add(new AABB(
                         b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,
-                        b.maxX - origin.x, b.maxY - origin.y, b.maxZ - origin.z);
-                    if (drawOutline) {
-                        context.submitNodeCollector().submitCustomGeometry(poseStack,
-                            AutismRenderTypes.storageEspLinesSeeThrough(),
-                            (pose, buffer) -> outlineBox(pose, buffer, rel, color));
-                    }
+                        b.maxX - origin.x, b.maxY - origin.y, b.maxZ - origin.z));
+                    colors.add(hole.depth >= deepThreshold ? DEEP : (hole.is1x1 ? SAFE : UNSAFE));
                 }
+            }
+            if (!boxes.isEmpty()) {
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
+                        for (int i = 0; i < boxes.size(); i++) {
+                            outlineBox(pose, buffer, boxes.get(i), colors.get(i));
+                        }
+                    });
             }
         });
     }
