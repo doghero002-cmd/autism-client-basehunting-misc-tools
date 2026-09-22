@@ -60,8 +60,8 @@ public final class GrowthFinderModule extends Module {
         .description("Draw a tracer line from the camera to each flagged chunk.")
         .group("Render"));
     private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
-        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).")
+            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
         .group("Performance"));
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private final BoolSetting notify = add(new BoolSetting(

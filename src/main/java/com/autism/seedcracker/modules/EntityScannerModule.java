@@ -64,8 +64,8 @@ public final class EntityScannerModule extends Module {
     private final IntSetting maxNotify = add(new IntSetting("max-notify", "Max notify", 3, 1, 10, 1)
         .description("Max notifications per scan pass.")
         .group("General"));
-    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
-        .description("How many chunks to scan per tick (lower = less lag, spread over more seconds).").group("Performance"));
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.").group("Performance"));
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     public EntityScannerModule(autismclient.modules.ModuleCategory category) {

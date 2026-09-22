@@ -103,8 +103,8 @@ public final class StashFinderModule extends Module {
         .description("Toast + chat ping when a stash chunk is found.")
         .group("General"));
     private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 2, 1, 32, 1)
-        .description("THRESHOLD mode: how many chunks to scan per tick (lower = less lag, spread over more seconds).")
+            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("THRESHOLD mode: how many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
         .group("Performance"));
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
