@@ -86,7 +86,8 @@ public class DataStorage {
         if (!this.timeMachine.isRunning) {
             this.baseSeedData.dump();
             this.biomeSeedData.dump();
-            blockUpdateQueue.tick();
+            // blockUpdateQueue.tick() removed: nothing enqueues (dead feature), and tick()
+            // sends ABORT_DESTROY packets + starts a Thread if a queue ever appeared.
 
             this.timeMachine.isRunning = true;
 

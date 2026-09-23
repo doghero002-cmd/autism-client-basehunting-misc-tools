@@ -1,5 +1,6 @@
 package kaptainwutax.seedcrackerX.cracker.storage;
 
+import com.seedfinding.mcbiome.source.NetherBiomeSource;
 import com.seedfinding.mcbiome.source.OverworldBiomeSource;
 import com.seedfinding.mccore.rand.ChunkRand;
 import com.seedfinding.mccore.rand.seed.PillarSeed;
@@ -81,7 +82,9 @@ public class TimeMachine {
             long seed = worldSeeds.stream().findFirst().get();
             SeedCracker.entrypoints.forEach(entrypoint -> entrypoint.pushWorldSeed(seed));
             Minecraft client = Minecraft.getInstance();
-            if (Config.get().databaseSubmits && client.getConnection().getOnlinePlayers().size() > 10 &&
+            // getConnection() is null on the title screen - seed-found fires there all the time.
+            if (Config.get().databaseSubmits && client.getConnection() != null
+                    && client.getConnection().getOnlinePlayers().size() > 10 &&
                     !client.getConnection().getConnection().isMemoryConnection()) {
                 Component text = Database.joinFakeServerForAuth();
                 if (text == null) {
@@ -345,21 +348,12 @@ public class TimeMachine {
         MCVersion version = Config.get().getVersion();
         for (long structureSeed : this.structureSeeds) {
             for (long worldSeed : StructureSeed.toRandomWorldSeeds(structureSeed)) {
-                OverworldBiomeSource source = new OverworldBiomeSource(version, worldSeed);
-
-                boolean matches = true;
-
-                for (DataStorage.Entry<BiomeData> e : this.dataStorage.biomeSeedData) {
-                    if (!e.data.test(source)) {
-                        matches = false;
-                        break;
-                    }
+                if (!biomesMatch(version, worldSeed)) {
+                    if (this.shouldTerminate) return false;
+                    continue;
                 }
-
-                if (matches) {
-                    this.worldSeeds.add(worldSeed);
-                    Log.printSeed("tmachine.foundWorldSeed", worldSeed);
-                }
+                this.worldSeeds.add(worldSeed);
+                Log.printSeed("tmachine.foundWorldSeed", worldSeed);
                 if (this.shouldTerminate) {
                     return false;
                 }
@@ -373,16 +367,7 @@ public class TimeMachine {
             for (long upperBits = 0; upperBits < 1 << 16 && !this.shouldTerminate; upperBits++) {
                 long worldSeed = (upperBits << 48) | structureSeed;
 
-                OverworldBiomeSource source = new OverworldBiomeSource(version, worldSeed);
-
-                boolean matches = true;
-
-                for (DataStorage.Entry<BiomeData> e : this.dataStorage.biomeSeedData) {
-                    if (!e.data.test(source)) {
-                        matches = false;
-                        break;
-                    }
-                }
+                boolean matches = biomesMatch(version, worldSeed);
 
                 if (matches) {
                     this.worldSeeds.add(worldSeed);
@@ -416,6 +401,22 @@ public class TimeMachine {
 
         }
 
+        return true;
+    }
+
+    /** Tests every stored biome sample against the right dimension's source for this seed. */
+    private boolean biomesMatch(MCVersion version, long worldSeed) {
+        OverworldBiomeSource overworld = null;
+        NetherBiomeSource nether = null;
+        for (DataStorage.Entry<BiomeData> e : this.dataStorage.biomeSeedData) {
+            if (e.data.nether) {
+                if (nether == null) nether = new NetherBiomeSource(version, worldSeed);
+                if (!e.data.test(nether)) return false;
+            } else {
+                if (overworld == null) overworld = new OverworldBiomeSource(version, worldSeed);
+                if (!e.data.test(overworld)) return false;
+            }
+        }
         return true;
     }
 

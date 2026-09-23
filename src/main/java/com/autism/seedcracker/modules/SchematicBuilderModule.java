@@ -72,6 +72,10 @@ public final class SchematicBuilderModule extends Module {
         .description("Toggle on to set the build origin to the block you're looking at (or your feet).").group("File"));
     private final BoolSetting build = add(new BoolSetting("build", "Auto-build", false)
         .description("Start / stop auto-building.").group("Build"));
+    public enum BuildOrder { ADAPTIVE, LAYERED }
+    private final EnumSetting<BuildOrder> buildOrder = add(new EnumSetting<>("build-order", "Build order", BuildOrder.ADAPTIVE, BuildOrder.values())
+        .description("ADAPTIVE = advance at 95% of a layer (skips unreachable spots, faster). LAYERED = strict printer: a layer must be 100% placed before the next starts (keeps retrying misses).")
+        .group("Build"));
     private final IntSetting placeDelay = add(new IntSetting("place-delay", "Place delay (ticks)", 2, 0, 20, 1)
         .description("Ticks to wait between block placements.").group("Build"));
     private final IntSetting rotationSteps = add(new IntSetting("rotation", "Rotate schematic", 0, 0, 3, 1)
@@ -118,6 +122,7 @@ public final class SchematicBuilderModule extends Module {
     private int minY, maxY;
     private boolean loaded = false;
     private int currentLayer = 0;
+    private int layerRetries = 0;
     private final List<BlockPlaceTask> layerTasks = new ArrayList<>();
     private int layerIndex = 0;
     private int placeCooldown = 0;
@@ -236,6 +241,7 @@ public final class SchematicBuilderModule extends Module {
         }
         placed.clear();
         currentLayer = minY;
+        layerRetries = 0;
         currentPath.clear();
         pathIndex = 0;
         tempBlocks.clear();
@@ -258,8 +264,21 @@ public final class SchematicBuilderModule extends Module {
             for (BlockPlaceTask t : layerTasks) {
                 if (mc.level.getBlockState(t.worldPos).equals(t.state)) placedInLayer++;
             }
-            if (placedInLayer >= (int) (layerTasks.size() * 0.95) || placedInLayer == layerTasks.size()) {
+            boolean advance;
+            if (buildOrder.get() == BuildOrder.LAYERED) {
+                // Strict printer: the layer must be COMPLETE before the next starts. Retry passes
+                // are capped so an unplaceable spot (bedrock hole, mob cage) can't loop forever.
+                advance = placedInLayer == layerTasks.size() || ++layerRetries > 8;
+                if (advance && placedInLayer < layerTasks.size()) {
+                    msg(mc, "Layer " + (currentLayer - minY + 1) + ": " + (layerTasks.size() - placedInLayer)
+                        + " spot(s) unplaceable after 8 passes - moving on.");
+                }
+            } else {
+                advance = placedInLayer >= (int) (layerTasks.size() * 0.95) || placedInLayer == layerTasks.size();
+            }
+            if (advance) {
                 currentLayer++;
+                layerRetries = 0;
                 rebuildLayerTasks();
             } else {
                 rebuildLayerTasks(); // retry the missed ones

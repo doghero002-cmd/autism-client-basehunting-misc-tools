@@ -69,6 +69,11 @@ dependencies {
     implementation(sqlite)
     include(sqlite)
 
+    // JOCL (OpenCL bindings) for the in-game GPU bedrock cracker; natives self-extract at runtime.
+    val jocl = "org.jocl:jocl:2.0.5"
+    implementation(jocl)
+    include(jocl)
+
     // latticg (Java Random reversal)
     val latticg = "com.seedfinding:latticg:${property("latticg_version")}"
     implementation(latticg)

@@ -36,6 +36,7 @@ public final class RelogLoaderModule extends Module {
     private Phase phase = Phase.IDLE;
     private int phaseTicks = 0;
     private int teardownTicks = 0;
+    private int reconnectTicks = 0;
     private ServerData server;
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Mode", Mode.RELOG, Mode.values())
@@ -144,10 +145,21 @@ public final class RelogLoaderModule extends Module {
                 RelogHelper.reconnect(server);
                 phase = Phase.RECONNECT_WAIT;
                 phaseTicks = reconnectWait.get() * 20;
+                reconnectTicks = 0;
             }
             case RECONNECT_WAIT -> {
                 // Wait while rejoining + chunks resend. Only count down once back in a world.
-                if (mc.player == null || mc.level == null) return;
+                if (mc.player == null || mc.level == null) {
+                    // Timeout: the rejoin bounced (already-online, kick, ban) - don't sit on the
+                    // multiplayer screen showing "rejoining" forever.
+                    if (++reconnectTicks > 1200) { // 60s
+                        AutismClientMessaging.sendPrefixed("§cRelog Loader: rejoin never landed (bounced/kicked?) - aborting.");
+                        phase = Phase.DONE;
+                        setEnabledSilently(false);
+                    }
+                    return;
+                }
+                reconnectTicks = 0;
                 if (phaseTicks > 0) { phaseTicks--; return; }
                 AutismClientMessaging.sendPrefixed("§aRelog Loader: relogged, chunks resent. Done.");
                 phase = Phase.DONE;
