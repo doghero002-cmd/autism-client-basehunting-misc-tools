@@ -133,6 +133,7 @@ public abstract class Finder {
         PILLAGER_OUTPOST(OutpostFinder::create, Category.STRUCTURES, Config.get().outpost, "finder.outposts"),
         IGLOO(IglooFinder::create, Category.STRUCTURES, Config.get().igloo, "finder.igloo"),
         TRIAL_CHAMBERS(TrialChambersFinder::create, Category.STRUCTURES, Config.get().trialChambers, "finder.trialChambers"),
+        NETHER_FOSSIL(NetherFossilFinder::create, Category.STRUCTURES, Config.get().netherFossil, "finder.netherFossils"),
 
         END_PILLARS(EndPillarsFinder::create, Category.DECORATORS, Config.get().endPillars, "finder.endPillars"),
         END_GATEWAY(EndGatewayFinder::create, Category.DECORATORS, Config.get().endGateway, "finder.endGateways"),
@@ -141,7 +142,8 @@ public abstract class Finder {
         DESERT_WELL(DesertWellFinder::create, Category.DECORATORS, Config.get().desertWell, "finder.desertWells"),
         WARPED_FUNGUS(WarpedFungusFinder::create, Category.DECORATORS, Config.get().warpedFungus, "finder.warpedFungus"),
 
-        BIOME(BiomeFinder::create, Category.BIOMES, Config.get().biome, "finder.biomes");
+        BIOME(BiomeFinder::create, Category.BIOMES, Config.get().biome, "finder.biomes"),
+        NETHER_BIOME(NetherBiomeFinder::create, Category.BIOMES, Config.get().netherBiome, "finder.netherBiomes");
 
         public final FinderBuilder finderBuilder;
         public final String nameKey;

@@ -178,8 +178,8 @@ public final class SeedRayModule extends Module {
                     int present = 0, gone = 0;
                     for (BlockPos bp : vein) {
                         var st = mc.level.getBlockState(bp);
-                        String bid = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath();
-                        boolean isOre = bid.contains("_ore") || bid.equals("ancient_debris");
+                        boolean isOre = !st.isAir() && st.getFluidState().isEmpty()
+                            && isOreBlock(st);
                         if (isOre) present++;
                         else if (st.isAir() || !st.getFluidState().isEmpty()) gone++;
                         // solid non-ore (stone etc) = our prediction missed; ignore, don't count either way
@@ -187,8 +187,7 @@ public final class SeedRayModule extends Module {
                     if (present > 0 && render.get()) {
                         for (BlockPos bp : vein) {
                             var st = mc.level.getBlockState(bp);
-                            String bid = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath();
-                            if (bid.contains("_ore") || bid.equals("ancient_debris")) renderBlocks.add(bp);
+                            if (!st.isAir() && isOreBlock(st)) renderBlocks.add(bp);
                         }
                     }
                     // Vein counts as "mined" when most of its predicted blocks are now air.
@@ -211,6 +210,19 @@ public final class SeedRayModule extends Module {
 
     private static long key(ChunkPos pos) {
         return (long) pos.x() + ((long) pos.z() << 32);
+    }
+
+    /** Ore predicate without the registry string round-trip (the old getKey().contains("_ore")). */
+    private static boolean isOreBlock(net.minecraft.world.level.block.state.BlockState st) {
+        var b = st.getBlock();
+        return b == net.minecraft.world.level.block.Blocks.DIAMOND_ORE
+            || b == net.minecraft.world.level.block.Blocks.DEEPSLATE_DIAMOND_ORE
+            || b == net.minecraft.world.level.block.Blocks.GOLD_ORE
+            || b == net.minecraft.world.level.block.Blocks.DEEPSLATE_GOLD_ORE
+            || b == net.minecraft.world.level.block.Blocks.NETHER_GOLD_ORE
+            || b == net.minecraft.world.level.block.Blocks.IRON_ORE
+            || b == net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE
+            || b == net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS;
     }
 
     // ---- vanilla ore populate simulation (Kiwi SeedRay doMathOnChunk, Mojang names) ----

@@ -68,7 +68,13 @@ public final class ChestStealerModule extends Module {
         if (menu == null || menu instanceof InventoryMenu) return; // no container open
         if (mc.gui.screen() == null) return; // menu desync guard: only act while the screen is up
 
-        int containerSlots = menu.slots.size() - 36; // last 36 slots are always the player inv
+        // Don't assume "last 36 slots = player inv": custom menus break that. Count from the
+        // front while slots still point at the CONTAINER, stop at the first player-inventory slot.
+        int containerSlots = 0;
+        for (int i = 0; i < menu.slots.size(); i++) {
+            if (menu.slots.get(i).container == mc.player.getInventory()) break;
+            containerSlots++;
+        }
         if (containerSlots <= 0) return;
         if (requireChest.get() && !hasStorageRows(containerSlots)) return;
 

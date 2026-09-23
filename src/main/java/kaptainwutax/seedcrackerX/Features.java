@@ -10,6 +10,7 @@ import com.seedfinding.mcfeature.structure.EndCity;
 import com.seedfinding.mcfeature.structure.Igloo;
 import com.seedfinding.mcfeature.structure.JunglePyramid;
 import com.seedfinding.mcfeature.structure.Monument;
+import com.seedfinding.mcfeature.structure.NetherFossil;
 import com.seedfinding.mcfeature.structure.PillagerOutpost;
 import com.seedfinding.mcfeature.structure.RegionStructure;
 import com.seedfinding.mcfeature.structure.Shipwreck;
@@ -38,6 +39,7 @@ public class Features {
     public static PillagerOutpost PILLAGER_OUTPOST;
     public static Igloo IGLOO;
     public static TrialChambers TRIAL_CHAMBERS;
+    public static NetherFossil NETHER_FOSSIL;
 
     public static EndGateway END_GATEWAY;
     public static DesertWell DESERT_WELL;
@@ -59,6 +61,7 @@ public class Features {
         PILLAGER_OUTPOST = safe(STRUCTURE_TYPES, Finder.Type.PILLAGER_OUTPOST, () -> new PillagerOutpost(version));
         IGLOO = safe(STRUCTURE_TYPES, Finder.Type.IGLOO, () -> new Igloo(version));
         TRIAL_CHAMBERS = safe(STRUCTURE_TYPES, Finder.Type.TRIAL_CHAMBERS, () -> new TrialChambers(version));
+        NETHER_FOSSIL = safe(STRUCTURE_TYPES, Finder.Type.NETHER_FOSSIL, () -> new NetherFossil(version));
 
         END_GATEWAY = safe(Finder.Type.END_GATEWAY, () -> new EndGateway(version));
         DESERT_WELL = safe(Finder.Type.DESERT_WELL, () -> new DesertWell(version));

@@ -300,11 +300,17 @@ public final class StorageRecorderModule extends Module {
         }
         BlockPos eye = mc.player.blockPosition();
         int cap = maxRender.get();
-        List<long[]> sorted = new ArrayList<>(record.size()); // [distSq, packedPos, kind]
+        // Nearest-N selection via a max-heap of size cap - O(n log cap), not a full O(n log n) sort
+        // with a huge transient array on long sessions.
+        java.util.PriorityQueue<long[]> nearest = new java.util.PriorityQueue<>(
+            cap + 1, java.util.Comparator.comparingLong(a -> -a[0]));
         for (Map.Entry<Long, Byte> e : record.entrySet()) {
             BlockPos pos = BlockPos.of(e.getKey());
-            sorted.add(new long[]{ (long) pos.distSqr(eye), e.getKey(), e.getValue() });
+            long d = (long) pos.distSqr(eye);
+            if (nearest.size() < cap) nearest.offer(new long[]{d, e.getKey(), e.getValue()});
+            else if (d < nearest.peek()[0]) { nearest.poll(); nearest.offer(new long[]{d, e.getKey(), e.getValue()}); }
         }
+        List<long[]> sorted = new ArrayList<>(nearest);
         sorted.sort(java.util.Comparator.comparingLong(a -> a[0]));
 
         java.util.Map<String, FeedGroup> groups = new java.util.LinkedHashMap<>();

@@ -36,6 +36,8 @@ public class Config {
     public FeatureToggle emeraldOre = new FeatureToggle(false);
     public FeatureToggle desertWell = new FeatureToggle(false);
     public FeatureToggle warpedFungus = new FeatureToggle(false);
+    public FeatureToggle netherFossil = new FeatureToggle(true);
+    public FeatureToggle netherBiome = new FeatureToggle(false);
     public FeatureToggle biome = new FeatureToggle(false);
     public RenderType render = RenderType.XRAY;
     public boolean active = true;

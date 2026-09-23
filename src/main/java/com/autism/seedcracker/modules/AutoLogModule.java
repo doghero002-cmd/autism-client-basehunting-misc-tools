@@ -68,6 +68,7 @@ public final class AutoLogModule extends Module {
         .group("General"));
 
     private float lastHealth = -1.0f;
+    private float lastRawHealth = -1.0f;
     private boolean loggedOut = false;
 
     public AutoLogModule(autismclient.modules.ModuleCategory category) {
@@ -78,6 +79,7 @@ public final class AutoLogModule extends Module {
     @Override
     public void onEnable() {
         lastHealth = -1.0f;
+        lastRawHealth = -1.0f;
         loggedOut = false;
     }
 
@@ -86,6 +88,7 @@ public final class AutoLogModule extends Module {
         // We left the world (usually because we just disconnected ourselves); reset state.
         loggedOut = false;
         lastHealth = -1.0f;
+        lastRawHealth = -1.0f;
     }
 
     @Override
@@ -103,8 +106,10 @@ public final class AutoLogModule extends Module {
             reason = "low health (" + (int) Math.ceil(total) + ")";
         }
 
-        // Took damage this tick (health decreased).
-        if (reason == null && onDamage.get() && lastHealth >= 0.0f && total + 0.001f < lastHealth) {
+        // Took damage this tick: the HEALTH portion dropped (absorption naturally decays, so a
+        // total-health drop alone would false-trigger when a totem/absorption effect expires).
+        if (reason == null && onDamage.get() && lastHealth >= 0.0f
+            && mc.player.getHealth() + 0.001f < lastRawHealth) {
             reason = "took damage";
         }
 
@@ -143,6 +148,7 @@ public final class AutoLogModule extends Module {
         }
 
         lastHealth = total;
+        lastRawHealth = mc.player.getHealth();
 
         if (reason != null) {
             loggedOut = true;

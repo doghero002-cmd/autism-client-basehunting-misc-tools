@@ -55,6 +55,10 @@ public class FinderQueue {
         // or chunk re-send doesn't re-flood the finder pool. This is the main chunk-loading lag fix.
         long key = ((long) chunkPos.x() << 32) | (chunkPos.z() & 0xffffffffL);
         if (!queuedChunks.add(key)) return;
+        // Backpressure: when the pool is saturated, skip this chunk rather than pile a task per
+        // active finder type onto an unbounded queue (the flying-fast hitch source).
+        if (SERVICE instanceof java.util.concurrent.ThreadPoolExecutor tpe
+            && tpe.getQueue().size() > 256) return;
 
         getActiveFinderTypes().forEach(type -> {
             SERVICE.submit(() -> {

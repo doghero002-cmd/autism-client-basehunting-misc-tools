@@ -15,7 +15,8 @@
     "LocalPlayerMixin",
     "ModuleLifecycleMixin",
     "MouseHandlerAccessor",
-    "MouseHandlerMixin"
+    "MouseHandlerMixin",
+    "TranslateChatMixin"
   ],
   "injectors": {
     "defaultRequire": 1

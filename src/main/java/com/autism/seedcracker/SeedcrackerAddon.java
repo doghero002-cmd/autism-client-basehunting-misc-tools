@@ -192,6 +192,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new RegionMapModule(catDogsMisc));
         AutismAddons.modules().register(new SchematicBuilderModule(catDogsMisc));
         AutismAddons.modules().register(new ElytraWarnerModule(catDogsMisc));
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.TranslateModule(catDogsMisc));
 
         // ESP (moved to the Dogs tab).
         AutismAddons.modules().register(new HoleEspModule(catDogsMisc));
@@ -208,6 +209,8 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());
+        AutismAddons.commands().register(new com.autism.seedcracker.commands.TextureCrackCommand());
+        AutismAddons.commands().register(new com.autism.seedcracker.commands.CrossCheckCommand());
         AutismAddons.commands().register(new HeatConfirmCommand());
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());

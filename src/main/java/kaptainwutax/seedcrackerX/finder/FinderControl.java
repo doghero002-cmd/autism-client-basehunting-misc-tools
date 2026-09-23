@@ -1,5 +1,6 @@
 package kaptainwutax.seedcrackerX.finder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -16,21 +17,19 @@ public class FinderControl {
     }
 
     public List<Finder> getActiveFinders() {
-        this.activeFinders.values().forEach(finders -> {
-            finders.removeIf(Finder::isUseless);
-        });
+		// Snapshot per queue first: removeIf racing worker-thread adds can throw CME.
+		List<Finder> out = new ArrayList<>();
+		for (Queue<Finder> finders : this.activeFinders.values()) {
+			List<Finder> snapshot = new ArrayList<>(finders);
+			snapshot.removeIf(Finder::isUseless);
+			out.addAll(snapshot);
+		}
+		return out;
+	}
 
-        return this.activeFinders.values().stream()
-                .flatMap(Queue::stream).collect(Collectors.toList());
-    }
+	public void addFinder(Finder.Type type, Finder finder) {
+		if (finder.isUseless()) return;
 
-    public void addFinder(Finder.Type type, Finder finder) {
-        if (finder.isUseless()) return;
-
-        if (!this.activeFinders.containsKey(type)) {
-            this.activeFinders.put(type, new ConcurrentLinkedQueue<>());
-        }
-
-        this.activeFinders.get(type).add(finder);
-    }
+		this.activeFinders.computeIfAbsent(type, t -> new ConcurrentLinkedQueue<>()).add(finder);
+	}
 }
