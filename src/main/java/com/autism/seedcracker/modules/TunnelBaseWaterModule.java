@@ -130,6 +130,9 @@ public final class TunnelBaseWaterModule extends Module {
     private final LegitMovement look = new LegitMovement();
     private boolean isRotating = false;
     private Runnable rotCallback = null;
+    /** Manual-steer state: yaw last tick (to detect ACTIVE turning) + sustained-turn counter. */
+    private float lastSteerYaw = 0f;
+    private int steerHoldTicks = 0;
 
     private MendStage mendStage = MendStage.ENSURE;
     private Phase phase = Phase.DIG;
@@ -194,6 +197,8 @@ public final class TunnelBaseWaterModule extends Module {
             else AutismClientMessaging.sendPrefixed("§e[TunnelBase-Water] §fNo totem - continuing anyway (kick-on-no-totem is off).");
         }
         currentDirection = horizontalDir(mc);
+        if (mc.player != null) lastSteerYaw = mc.player.getYRot();
+        steerHoldTicks = 0;
         float[] v = dirValues(currentDirection);
         rotateTo(v[0], v[1], () -> state = State.MINING);
         AutismClientMessaging.sendPrefixed("§c[TunnelBase-Water] §fStarting (Water logic). Fully automated - watch for flags.");
@@ -440,19 +445,28 @@ public final class TunnelBaseWaterModule extends Module {
         // Turn while walking: don't freeze movement just because a rotation is in flight (that
         // stop-turn-go pattern is a bot tell). Only skip if turnWhileWalking is off.
         if (isRotating && !turnWhileWalking.get()) { stopMovement(mc); return; }
-        // Manual steering: the player turned the camera well off the tunnel heading (and the module
-        // isn't mid-rotation, so it wasn't us) - adopt where they look as the new heading instead of
-        // dragging the view back. Detours are cancelled; hazard logic re-runs on the new lane below.
+        // Manual steering: a DELIBERATE sustained mouse turn off the tunnel heading adopts that
+        // direction. Two fixes vs the old instant check: (1) the player must be ACTIVELY turning
+        // (yaw changing) - a static glance never steers; (2) we DON'T rotateTo() onto the new
+        // cardinal afterwards, which was snapping the player's view back and fighting their turn.
+        // A quick glance away and back is ignored; only a turn HELD for a few ticks commits.
         if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
             Direction lookDir = mc.player.getDirection();
             float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(
                 mc.player.getYRot() - dirValues(currentDirection)[0]));
-            if (lookDir != currentDirection && dev > 35f) {
-                currentDirection = lookDir;
-                isBackup = false; backupDirection = null; detourStartPos = null;
-                preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0;
-                float[] v = dirValues(lookDir);
-                rotateTo(v[0], v[1], null); // settle onto the cardinal grid
+            float yawDelta = Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - lastSteerYaw));
+            lastSteerYaw = mc.player.getYRot();
+            boolean deliberate = lookDir != currentDirection && dev > 35f;
+            boolean activelyTurning = yawDelta > 0.4f;
+            if (deliberate && activelyTurning) {
+                if (++steerHoldTicks >= 5) {
+                    currentDirection = lookDir;
+                    isBackup = false; backupDirection = null; detourStartPos = null;
+                    preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0; steerHoldTicks = 0;
+                    // No rotateTo() - leave the player's camera exactly where they put it.
+                }
+            } else {
+                steerHoldTicks = 0;
             }
         }
         if (mc.player.blockPosition().getY() < MIN_Y_LEVEL) {
