@@ -118,8 +118,9 @@ public final class ChunkFlagRenderer {
             // every 400ms (or when the flag set changes) - never per frame.
             java.util.Set<ChunkPos> hotspots = java.util.Set.of();
             java.util.Set<ChunkPos> suppressed = java.util.Set.of();
+            OverlapResult analysis = null;
             if (smartOverlap) {
-                OverlapResult analysis = cachedAnalysis;
+                analysis = cachedAnalysis;
                 if (analysis == null || now - lastAnalysisMs > 400 || ENTRIES.size() != lastAnalysisEntryCount) {
                     analysis = analyzeOverlap();
                     cachedAnalysis = analysis;
@@ -148,9 +149,11 @@ public final class ChunkFlagRenderer {
                 double hMinZ = hpos.getMinBlockZ() - origin.z;
                 double hMinY = displayY - origin.y;
                 double hcx = hMinX + 8, hcz = hMinZ + 8;
-                // Distinct look: hot orange, double-height box, pyramid spire + white-hot core.
-                int hot = 0xFFFFA020;
-                int hotFill = 0x30FFA020;
+                // Inherit the dominant colour of the flooded chunks (e.g. a sus-chunk clump draws
+                // in the sus colour, not generic orange), brightened for the hotspot spire.
+                int base = analysis != null ? analysis.dominantColor(hpos, 0xFFFFA020) : 0xFFFFA020;
+                int hot = brighten(base);
+                int hotFill = (base & 0x00FFFFFF) | 0x30000000;
                 AABB hbox = new AABB(hMinX, hMinY, hMinZ, hMinX + 16, hMinY + BOX_HEIGHT * 2, hMinZ + 16).inflate(INFLATE);
                 fillOps.add((pose, buffer) -> fillBox(pose, buffer, hbox, hotFill));
                 lineOps.add((pose, buffer) -> {
@@ -236,7 +239,33 @@ public final class ChunkFlagRenderer {
 
     // ---- smart overlap analysis ----
 
-    private record OverlapResult(java.util.Set<ChunkPos> hotspots, java.util.Set<ChunkPos> suppressed) {}
+    private record OverlapResult(java.util.Set<ChunkPos> hotspots, java.util.Set<ChunkPos> suppressed,
+                                 java.util.Map<ChunkPos, Integer> entryColors) {
+        /** Dominant colour among entries within the cluster radius of a chunk. */
+        int dominantColor(ChunkPos center, int fallback) {
+            java.util.Map<Integer, int[]> tally = new java.util.HashMap<>();
+            for (Map.Entry<ChunkPos, Integer> e : entryColors.entrySet()) {
+                ChunkPos p = e.getKey();
+                if (Math.abs(p.x() - center.x()) > CLUSTER_RADIUS || Math.abs(p.z() - center.z()) > CLUSTER_RADIUS) continue;
+                tally.computeIfAbsent(e.getValue(), k -> new int[1])[0]++;
+            }
+            int best = fallback, bestN = -1;
+            for (Map.Entry<Integer, int[]> e : tally.entrySet()) {
+                if (e.getValue()[0] > bestN) { bestN = e.getValue()[0]; best = e.getKey(); }
+            }
+            return best;
+        }
+    }
+
+    /** Brighten a colour toward white for the hotspot spire (keeps the module hue). */
+    private static int brighten(int argb) {
+        int a = argb & 0xFF000000;
+        int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+        r = Math.min(255, r + (255 - r) / 3);
+        g = Math.min(255, g + (255 - g) / 3);
+        b = Math.min(255, b + (255 - b) / 3);
+        return a | 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
 
     /**
      * Cluster flagged chunks and, in "flooded" areas, pick only the most-overlapped chunks as
@@ -254,7 +283,9 @@ public final class ChunkFlagRenderer {
         for (Key k : ENTRIES.keySet()) {
             byChunk.computeIfAbsent(k.pos(), p -> new java.util.HashSet<>()).add(k.moduleId());
         }
-        if (byChunk.size() < floodMinChunks) return new OverlapResult(java.util.Set.of(), java.util.Set.of());
+        if (byChunk.size() < floodMinChunks) {
+            return new OverlapResult(java.util.Set.of(), java.util.Set.of(), java.util.Map.of());
+        }
 
         // Precompute per-chunk flag density (flags within CLUSTER_RADIUS) for peak picking.
         Map<ChunkPos, Integer> density = new java.util.HashMap<>();
@@ -268,6 +299,11 @@ public final class ChunkFlagRenderer {
 
         java.util.Set<ChunkPos> hotspots = new java.util.HashSet<>();
         java.util.Set<ChunkPos> suppressed = new java.util.HashSet<>();
+        // Colour of each chunk = the colour of its (first) entry, for hotspot colour inheritance.
+        java.util.Map<ChunkPos, Integer> entryColors = new java.util.HashMap<>();
+        for (Map.Entry<Key, Entry> en : ENTRIES.entrySet()) {
+            entryColors.putIfAbsent(en.getKey().pos(), en.getValue().argb);
+        }
 
         for (Map.Entry<ChunkPos, java.util.Set<String>> e : byChunk.entrySet()) {
             ChunkPos pos = e.getKey();
@@ -303,7 +339,7 @@ public final class ChunkFlagRenderer {
                 else suppressed.add(pos);
             }
         }
-        return new OverlapResult(hotspots, suppressed);
+        return new OverlapResult(hotspots, suppressed, entryColors);
     }
 
 

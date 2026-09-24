@@ -201,6 +201,10 @@ public final class SusChunkFinderModule extends Module {
     private final Set<ChunkPos> flagged = ConcurrentHashMap.newKeySet();
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private final Map<ChunkPos, Long> lastScan = new ConcurrentHashMap<>();
+    /** Round-robin scan offset: the fixed-corner loops started at -radius every tick, so with a
+     * small chunks-per-tick budget the near-corner chunks hogged every scan and far chunks never
+     * got one (looked like the module "stopped registering" until toggled). Advances each call. */
+    private int scanOffset = 0;
 
     public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
@@ -439,13 +443,16 @@ public final class SusChunkFinderModule extends Module {
         ChunkPos center = mc.player.chunkPosition();
         int minY = mc.level.getMinY();
 
-        // Budgeted: only chunksPerTick chunks per tick (a full 16x16x79-block scan per chunk is
-        // ~20k block reads; the old loop did the whole radius in one tick whenever the rescan
-        // timers expired together = FPS hitch).
+        // Budgeted + round-robin: only chunksPerTick chunks per tick, and the start offset
+        // advances each tick so every chunk in the bubble gets a turn (see scanOffset above).
         int budget = chunksPerTick.get();
-        outer:
-        for (int dx = -radius; dx <= radius && budget > 0; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
+        int side = radius * 2 + 1;
+        int total = side * side;
+        for (int i = 0; i < total && budget > 0; i++) {
+            int idx = (scanOffset + i) % total;
+            int dx = idx % side - radius;
+            int dz = idx / side - radius;
+            {
                 int cx = center.x() + dx;
                 int cz = center.z() + dz;
                 if (!mc.level.hasChunk(cx, cz)) continue;
@@ -466,9 +473,10 @@ public final class SusChunkFinderModule extends Module {
                 } else {
                     flagged.remove(pos);
                 }
-                if (--budget <= 0) break outer;
+                if (--budget <= 0) break;
             }
         }
+        scanOffset = (scanOffset + chunksPerTick.get()) % total;
 
         // Prune out-of-range.
         int pr = radius + 1;
@@ -485,9 +493,13 @@ public final class SusChunkFinderModule extends Module {
         ChunkPos center = mc.player.chunkPosition();
 
         int budget = chunksPerTick.get();
-        outer:
-        for (int dx = -radius; dx <= radius && budget > 0; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
+        int side = radius * 2 + 1;
+        int total = side * side;
+        for (int i = 0; i < total && budget > 0; i++) {
+            int idx = (scanOffset + i) % total;
+            int dx = idx % side - radius;
+            int dz = idx / side - radius;
+            {
                 int cx = center.x() + dx;
                 int cz = center.z() + dz;
                 if (!mc.level.hasChunk(cx, cz)) continue;
@@ -503,9 +515,10 @@ public final class SusChunkFinderModule extends Module {
                 } else {
                     flagged.remove(pos);
                 }
-                if (--budget <= 0) break outer;
+                if (--budget <= 0) break;
             }
         }
+        scanOffset = (scanOffset + chunksPerTick.get()) % total;
 
         int pr = radius + 1;
         flagged.removeIf(p -> tooFar(p, center, pr));
@@ -598,9 +611,13 @@ public final class SusChunkFinderModule extends Module {
         ChunkPos center = mc.player.chunkPosition();
 
         int budget = chunksPerTick.get();
-        outer:
-        for (int dx = -radius; dx <= radius && budget > 0; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
+        int side = radius * 2 + 1;
+        int total = side * side;
+        for (int i = 0; i < total && budget > 0; i++) {
+            int idx = (scanOffset + i) % total;
+            int dx = idx % side - radius;
+            int dz = idx / side - radius;
+            {
                 int cx = center.x() + dx;
                 int cz = center.z() + dz;
                 if (!mc.level.hasChunk(cx, cz)) continue;
@@ -616,9 +633,10 @@ public final class SusChunkFinderModule extends Module {
                 } else {
                     flagged.remove(pos);
                 }
-                if (--budget <= 0) break outer;
+                if (--budget <= 0) break;
             }
         }
+        scanOffset = (scanOffset + chunksPerTick.get()) % total;
 
         int pr = radius + 1;
         flagged.removeIf(p -> tooFar(p, center, pr));
