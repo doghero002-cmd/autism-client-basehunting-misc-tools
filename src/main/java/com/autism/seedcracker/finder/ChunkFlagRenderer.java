@@ -219,6 +219,8 @@ public final class ChunkFlagRenderer {
         long now = System.currentTimeMillis();
         for (ChunkPos pos : flagged) {
             if (pos == null) continue;
+            // computeIfAbsent returns the EXISTING entry on a hit, so the Entry object is reused
+            // across ticks (the Key record is the only small allocation, on the first feed only).
             Entry entry = ENTRIES.computeIfAbsent(new Key(moduleId, pos), k -> new Entry());
             entry.argb = argb;
             entry.tracer = tracer;

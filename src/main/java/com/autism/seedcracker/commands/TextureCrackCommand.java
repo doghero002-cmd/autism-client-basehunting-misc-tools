@@ -50,6 +50,8 @@ public final class TextureCrackCommand extends Command {
     public static boolean allOffsets = false;
     /** Matches from the most recent completed solve (x,z pairs) - read by .crosscheck. */
     public static volatile java.util.List<long[]> lastMatches = java.util.List.of();
+    /** Per-match mismatch cost, parallel to lastMatches (0 = exact) - read by .crosscheck. */
+    public static volatile java.util.List<Double> lastCosts = java.util.List.of();
 
     public TextureCrackCommand() {
         super("texcrack", "Crack coordinates from block texture rotations.", "tc", "texturecrack");
@@ -336,10 +338,12 @@ public final class TextureCrackCommand extends Command {
             msg("§e" + blockName + ": " + t.getMessage() + " - assuming plain 4-rotation.");
         }
         java.util.List<long[]> collected = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        java.util.List<Double> costs = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
         TextureCrackEngine.solve(grid, weights, vs, obsY, yRange, centerX, centerZ, radius,
             formulaMode, facingLock, allOffsets, tolerance, 20,
             m -> {
                 collected.add(new long[]{m.x(), m.z()});
+                costs.add(m.cost());
                 mc.execute(() -> msg("§aMATCH §f" + m.x() + " " + m.y() + " " + m.z()
                     + " §7(" + (m.cost() <= 0 ? "exact" : String.format("cost %.2f", m.cost()))
                     + ", grid facing " + switch (m.orientation()) {
@@ -348,6 +352,7 @@ public final class TextureCrackCommand extends Command {
             },
             () -> {
                 lastMatches = java.util.List.copyOf(collected);
+                lastCosts = java.util.List.copyOf(costs);
                 mc.execute(() -> msg(TextureCrackEngine.status));
             });
     }
