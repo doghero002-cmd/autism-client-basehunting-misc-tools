@@ -71,7 +71,7 @@ public final class BedrockGpuEngine {
         return probeReason;
     }
 
-    private static synchronized Device bestDevice() {
+    public static synchronized Device bestDevice() {
         if (probed) return cachedDevice;
         probed = true;
         try {

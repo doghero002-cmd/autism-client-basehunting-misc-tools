@@ -94,9 +94,11 @@ public final class TextureCrackImageScreen extends Screen {
             .bounds(panelX, 126, 140, 20).build());
         this.addRenderableWidget(Button.builder(Component.literal("Export GPU"), b -> exportForGpu())
             .bounds(panelX, 150, 140, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("GPU search"), b -> gpuSearch())
+            .bounds(panelX, 174, 140, 20).build());
         // CPU load cap for the solver (duty-cycles its scan threads like the bedrock finder).
         this.addRenderableWidget(new net.minecraft.client.gui.components.AbstractSliderButton(
-                panelX, 174, 140, 20, Component.empty(),
+                panelX, 198, 140, 20, Component.empty(),
                 (Math.max(10, Math.min(100, TextureCrackEngine.cpuLoadPercent)) - 10) / 90.0) {
             {
                 updateMessage();
@@ -110,8 +112,52 @@ public final class TextureCrackImageScreen extends Screen {
             }
         });
         this.addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose())
-            .bounds(panelX, 198, 140, 20).build());
+            .bounds(panelX, 222, 140, 20).build());
     }
+
+    /** In-game GPU crack: searches the read grid around the player (no separate jar needed). */
+    private void gpuSearch() {
+        int[][] grid = TextureCrackCommand.grid;
+        if (grid == null) { status = "Read the grid first"; return; }
+        if (!RotationGpuEngine.available()) {
+            status = "No OpenCL GPU: " + com.autism.seedcracker.bedrock.BedrockGpuEngine.probeFailureReason();
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) { status = "Must be in a world"; return; }
+        if (gpuSearching) { status = "GPU search already running"; return; }
+        int cx = (int) Math.floor(mc.player.getX());
+        int cz = (int) Math.floor(mc.player.getZ());
+        int y = TextureCrackCommand.obsY;
+        boolean legacy = TextureCrackCommand.formulaMode == TextureCrackEngine.FORMULA_LEGACY;
+        int radius = TextureCrackCommand.radius;
+        onClose();
+        sendMessage("§a[TexCrack] GPU search r=" + String.format("%,d", radius) + " around " + cx + "," + cz + " Y=" + y + "...");
+        gpuSearching = true;
+        new Thread(() -> {
+            try {
+                List<long[]> hits = new ArrayList<>();
+                RotationGpuEngine.solve(grid, y, cx, cz, radius, legacy,
+                    m -> {
+                        hits.add(new long[]{m.x(), m.z()});
+                        Minecraft.getInstance().execute(() ->
+                            sendMessage("  §e-> Match X: " + m.x() + " Z: " + m.z() + " (rot " + m.orientation() * 90 + "°)"));
+                    });
+                TextureCrackCommand.lastMatches = List.copyOf(hits);
+                Minecraft.getInstance().execute(() ->
+                    sendMessage(hits.isEmpty()
+                        ? "§c[TexCrack] GPU: no matches."
+                        : "§a[TexCrack] GPU done: " + hits.size() + " match(es)."));
+            } catch (Throwable t) {
+                Minecraft.getInstance().execute(() ->
+                    sendMessage("§c[TexCrack] GPU failed: " + t.getMessage() + " - use Solve (CPU)."));
+            } finally {
+                gpuSearching = false;
+            }
+        }, "TexCrack-GPU").start();
+    }
+
+    private static volatile boolean gpuSearching = false;
 
     /** Writes the read grid as a rotation-pattern file + prints the full-world GPU command. */
     private void exportForGpu() {
