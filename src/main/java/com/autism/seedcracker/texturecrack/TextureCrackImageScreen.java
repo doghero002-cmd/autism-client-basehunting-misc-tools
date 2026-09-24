@@ -2,6 +2,8 @@ package com.autism.seedcracker.texturecrack;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.imageio.ImageIO;
 
@@ -90,9 +92,11 @@ public final class TextureCrackImageScreen extends Screen {
         }).bounds(panelX, 102, 140, 20).build());
         this.addRenderableWidget(Button.builder(Component.literal("Reset view"), b -> fitView())
             .bounds(panelX, 126, 140, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("Export GPU"), b -> exportForGpu())
+            .bounds(panelX, 150, 140, 20).build());
         // CPU load cap for the solver (duty-cycles its scan threads like the bedrock finder).
         this.addRenderableWidget(new net.minecraft.client.gui.components.AbstractSliderButton(
-                panelX, 150, 140, 20, Component.empty(),
+                panelX, 174, 140, 20, Component.empty(),
                 (Math.max(10, Math.min(100, TextureCrackEngine.cpuLoadPercent)) - 10) / 90.0) {
             {
                 updateMessage();
@@ -106,7 +110,47 @@ public final class TextureCrackImageScreen extends Screen {
             }
         });
         this.addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose())
-            .bounds(panelX, 174, 140, 20).build());
+            .bounds(panelX, 198, 140, 20).build());
+    }
+
+    /** Writes the read grid as a rotation-pattern file + prints the full-world GPU command. */
+    private void exportForGpu() {
+        int[][] grid = TextureCrackCommand.grid;
+        if (grid == null) { status = "Read the grid first (or set one manually)"; return; }
+        int rows = grid.length;
+        int cols = 0;
+        for (int[] r : grid) cols = Math.max(cols, r.length);
+        int known = 0;
+        List<String> lines = new ArrayList<>();
+        for (int r = 0; r < rows; r++) {
+            StringBuilder sb = new StringBuilder();
+            for (int c = 0; c < cols; c++) {
+                int v = c < grid[r].length ? grid[r][c] : -1;
+                if (v < 0) sb.append('.');
+                else { sb.append((char) ('0' + (v & 3))); known++; }
+            }
+            lines.add(sb.toString());
+        }
+        if (known == 0) { status = "Grid has no known cells"; return; }
+        try {
+            java.nio.file.Path f = autismclient.AutismClientAddon.FOLDER.toPath().resolve("rotation-pattern.txt");
+            java.nio.file.Files.createDirectories(f.getParent());
+            java.nio.file.Files.write(f, lines);
+            sendMessage("§a[TexCrack] Grid exported (" + known + " cells) to §f" + f.getFileName());
+            sendMessage("§7Run: §fjava -jar bedrock-gpu-cracker-1.1.0.jar --mode rotation --pattern \""
+                + f + "\" --y " + TextureCrackCommand.obsY + " --full-world --yes");
+            sendMessage("§7(or double-click the jar, pick Rotation mode, and paint/import it)");
+            status = "Exported " + known + " cells";
+        } catch (Exception e) {
+            status = "Export failed: " + e.getMessage();
+        }
+    }
+
+    private static void sendMessage(String msg) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.player != null) {
+            mc.player.sendSystemMessage(Component.literal(msg));
+        }
     }
 
     private void loadImage() {
