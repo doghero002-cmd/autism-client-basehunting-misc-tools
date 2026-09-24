@@ -129,19 +129,23 @@ public final class TextureCrackImageScreen extends Screen {
         int cx = (int) Math.floor(mc.player.getX());
         int cz = (int) Math.floor(mc.player.getZ());
         int y = TextureCrackCommand.obsY;
+        // Scan the configured +- yRange (matches the CPU solver) so unknown-height shots crack.
+        int ySpan = 2 * TextureCrackCommand.yRange + 1;
+        int yStart = y - TextureCrackCommand.yRange;
         boolean legacy = TextureCrackCommand.formulaMode == TextureCrackEngine.FORMULA_LEGACY;
         int radius = TextureCrackCommand.radius;
         onClose();
-        sendMessage("§a[TexCrack] GPU search r=" + String.format("%,d", radius) + " around " + cx + "," + cz + " Y=" + y + "...");
+        sendMessage("§a[TexCrack] GPU search r=" + String.format("%,d", radius) + " around " + cx + "," + cz
+            + " Y=" + yStart + (ySpan > 1 ? ".." + (yStart + ySpan - 1) : "") + "...");
         gpuSearching = true;
         new Thread(() -> {
             try {
                 List<long[]> hits = new ArrayList<>();
-                RotationGpuEngine.solve(grid, y, cx, cz, radius, legacy,
+                RotationGpuEngine.solve(grid, yStart, ySpan, cx, cz, radius, legacy,
                     m -> {
                         hits.add(new long[]{m.x(), m.z()});
                         Minecraft.getInstance().execute(() ->
-                            sendMessage("  §e-> Match X: " + m.x() + " Z: " + m.z() + " (rot " + m.orientation() * 90 + "°)"));
+                            sendMessage("  §e-> Match X: " + m.x() + " Y: " + m.y() + " Z: " + m.z() + " (rot " + m.orientation() * 90 + "°)"));
                     });
                 TextureCrackCommand.lastMatches = List.copyOf(hits);
                 Minecraft.getInstance().execute(() ->

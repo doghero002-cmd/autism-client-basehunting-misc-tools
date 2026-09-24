@@ -47,7 +47,7 @@ public final class RotationGpuEngine {
         return BedrockGpuEngine.availability() != null;
     }
 
-    public record Match(int x, int z, int orientation) {}
+    public record Match(int x, int z, int orientation, int y) {}
 
     /**
      * GPU-backed texture-rotation search. Finds anchors (x,z) whose texture-rotation pattern
@@ -61,7 +61,17 @@ public final class RotationGpuEngine {
      * @param legacy   true = legacy variant formula (old clients), false = nextInt
      * @param onMatch  optional callback fired for each verified match
      */
+    /** Single-Y entry (back-compat): scans just the one block level. */
     public static List<Match> solve(int[][] grid, int y, int centerX, int centerZ, int radius,
+                                    boolean legacy, Consumer<Match> onMatch) {
+        return solve(grid, y, 1, centerX, centerZ, radius, legacy, onMatch);
+    }
+
+    /**
+     * Y-range search: scans every block level in [yStart, yStart+ySpan-1] at each anchor
+     * (matches the .texcrack y-range setting, so an unknown-height screenshot still cracks).
+     */
+    public static List<Match> solve(int[][] grid, int yStart, int ySpan, int centerX, int centerZ, int radius,
                                     boolean legacy, Consumer<Match> onMatch) {
         if (!available()) {
             throw new IllegalStateException("No OpenCL GPU available - install your GPU vendor's driver, or use CPU mode.");
@@ -110,7 +120,7 @@ public final class RotationGpuEngine {
             kernel = CL.clCreateKernel(program, "search_rotation", null);
 
             // Self-test: kernel vs the CPU reference on a 64x64 tile.
-            String err = selfTest(context, queue, kernel, cellData, cellCount, cols, rows, y, legacy);
+            String err = selfTest(context, queue, kernel, cellData, cellCount, cols, rows, yStart, ySpan, legacy);
             if (err != null) throw new IllegalStateException("GPU self-test failed: " + err);
 
             int minX = centerX - radius, maxX = centerX + radius;
@@ -130,11 +140,11 @@ public final class RotationGpuEngine {
                 if (TextureCrackEngine.cancelRequested || results.size() >= MAX_MATCHES) break;
                 int spanX = Math.min(TILE, maxX - tile.x0() + 1);
                 int spanZ = Math.min(TILE, maxZ - tile.z0() + 1);
-                int[] raw = runTile(context, queue, kernel, cellData, cellCount, cols, rows, y, legacy,
+                int[] raw = runTile(context, queue, kernel, cellData, cellCount, cols, rows, yStart, ySpan, legacy,
                     tile.x0(), tile.z0(), spanX, spanZ);
-                for (int i = 0; i < raw.length; i += 3) {
-                    if (!cpuVerify(raw[i], raw[i + 1], raw[i + 2], cellList, cols, rows, y, legacy)) continue;
-                    Match m = new Match(raw[i], raw[i + 1], raw[i + 2]);
+                for (int i = 0; i < raw.length; i += 4) {
+                    if (!cpuVerify(raw[i], raw[i + 1], raw[i + 2], cellList, cols, rows, raw[i + 3], legacy)) continue;
+                    Match m = new Match(raw[i], raw[i + 1], raw[i + 2], raw[i + 3]);
                     results.add(m);
                     if (onMatch != null) onMatch.accept(m);
                     if (results.size() >= MAX_MATCHES) break;
@@ -173,25 +183,29 @@ public final class RotationGpuEngine {
     }
 
     private static String selfTest(cl_context context, cl_command_queue queue, cl_kernel kernel,
-                                   int[] cellData, int cellCount, int cols, int rows, int y, boolean legacy) {
+                                   int[] cellData, int cellCount, int cols, int rows, int yStart, int ySpan, boolean legacy) {
         final int span = 64, origin = -32;
-        int[] raw = runTile(context, queue, kernel, cellData, cellCount, cols, rows, y, legacy,
+        int[] raw = runTile(context, queue, kernel, cellData, cellCount, cols, rows, yStart, ySpan, legacy,
             origin, origin, span, span);
         java.util.Set<Long> gpuSet = new java.util.HashSet<>();
-        for (int i = 0; i < raw.length; i += 3) {
-            gpuSet.add(((long) raw[i] & 0xFFFFFFL) << 26 | ((long) raw[i + 1] & 0xFFFFFFL) << 2 | raw[i + 2]);
+        for (int i = 0; i < raw.length; i += 4) {
+            gpuSet.add(((long) raw[i] & 0xFFFFFFL) << 26 | ((long) raw[i + 1] & 0xFFFFFFL) << 2 | raw[i + 2]
+                | ((long) (raw[i + 3] & 0x3FF) << 50));
         }
         List<int[]> cells = new ArrayList<>();
         for (int i = 0; i < cellCount; i++) cells.add(new int[]{cellData[i * 4], cellData[i * 4 + 1], cellData[i * 4 + 2]});
-        for (int z = 0; z < span; z++) {
-            for (int x = 0; x < span; x++) {
-                for (int rot = 0; rot < 4; rot++) {
-                    boolean want = cpuVerify(origin + x, origin + z, rot, cells, cols, rows, y, legacy);
-                    boolean got = gpuSet.contains(((long) (origin + x) & 0xFFFFFFL) << 26
-                        | ((long) (origin + z) & 0xFFFFFFL) << 2 | rot);
-                    if (want != got) {
-                        return String.format("mismatch at x=%d z=%d rot=%d (cpu=%b gpu=%b)",
-                            origin + x, origin + z, rot, want, got);
+        for (int yy = 0; yy < ySpan; yy++) {
+            int y = yStart + yy;
+            for (int z = 0; z < span; z++) {
+                for (int x = 0; x < span; x++) {
+                    for (int rot = 0; rot < 4; rot++) {
+                        boolean want = cpuVerify(origin + x, origin + z, rot, cells, cols, rows, y, legacy);
+                        boolean got = gpuSet.contains(((long) (origin + x) & 0xFFFFFFL) << 26
+                            | ((long) (origin + z) & 0xFFFFFFL) << 2 | rot | ((long) (y & 0x3FF) << 50));
+                        if (want != got) {
+                            return String.format("mismatch at x=%d z=%d rot=%d y=%d (cpu=%b gpu=%b)",
+                                origin + x, origin + z, rot, y, want, got);
+                        }
                     }
                 }
             }
@@ -199,9 +213,9 @@ public final class RotationGpuEngine {
         return null;
     }
 
-    /** Executes the kernel on one tile; returns raw (x, z, rot) triplets. */
+    /** Executes the kernel on one tile; returns raw (x, z, rot, y) quads. */
     private static int[] runTile(cl_context context, cl_command_queue queue, cl_kernel kernel,
-                                 int[] cellData, int cellCount, int cols, int rows, int y, boolean legacy,
+                                 int[] cellData, int cellCount, int cols, int rows, int yStart, int ySpan, boolean legacy,
                                  int originX, int originZ, int spanX, int spanZ) {
         cl_mem cellsBuf = null, countBuf = null, matchBuf = null;
         int adaptiveSliceRows = 256;
@@ -212,10 +226,11 @@ public final class RotationGpuEngine {
             countBuf = CL.clCreateBuffer(context, CL.CL_MEM_READ_WRITE | CL.CL_MEM_COPY_HOST_PTR,
                 Sizeof.cl_int, Pointer.to(zero), null);
             matchBuf = CL.clCreateBuffer(context, CL.CL_MEM_WRITE_ONLY,
-                (long) Sizeof.cl_int * 3 * MATCH_CAP_PER_TILE, null, null);
+                (long) Sizeof.cl_int * 4 * MATCH_CAP_PER_TILE, null, null);
 
             int a = 0;
-            CL.clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[]{y}));
+            CL.clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[]{yStart}));
+            CL.clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[]{ySpan}));
             CL.clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[]{originX}));
             CL.clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[]{originZ}));
             CL.clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[]{spanX}));
@@ -230,12 +245,13 @@ public final class RotationGpuEngine {
             CL.clSetKernelArg(kernel, a, Sizeof.cl_int, Pointer.to(new int[]{MATCH_CAP_PER_TILE}));
 
             // Adaptive z-slice dispatches (watchdog-safe) + duty-cycle for load < 100%.
+            // (originZ/spanZ are args 3 and 5 now that yStart/ySpan lead.)
             int zOff = 0;
             while (zOff < spanZ) {
                 if (TextureCrackEngine.cancelRequested) break;
                 int slice = Math.min(Math.max(SLICE_MIN_ROWS, adaptiveSliceRows), spanZ - zOff);
-                CL.clSetKernelArg(kernel, 2, Sizeof.cl_int, Pointer.to(new int[]{originZ + zOff}));
-                CL.clSetKernelArg(kernel, 4, Sizeof.cl_int, Pointer.to(new int[]{slice}));
+                CL.clSetKernelArg(kernel, 3, Sizeof.cl_int, Pointer.to(new int[]{originZ + zOff}));
+                CL.clSetKernelArg(kernel, 5, Sizeof.cl_int, Pointer.to(new int[]{slice}));
                 long t0 = System.nanoTime();
                 long[] global = {roundUp(spanX, 16), roundUp(slice, 16)};
                 CL.clEnqueueNDRangeKernel(queue, kernel, 2, null, global, null, 0, null, null);
@@ -259,7 +275,7 @@ public final class RotationGpuEngine {
             int[] count = new int[1];
             CL.clEnqueueReadBuffer(queue, countBuf, CL.CL_TRUE, 0, Sizeof.cl_int, Pointer.to(count), 0, null, null);
             int n = Math.min(count[0], MATCH_CAP_PER_TILE);
-            int[] data = new int[n * 3];
+            int[] data = new int[n * 4];
             if (n > 0) {
                 CL.clEnqueueReadBuffer(queue, matchBuf, CL.CL_TRUE, 0,
                     (long) Sizeof.cl_int * data.length, Pointer.to(data), 0, null, null);

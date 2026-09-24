@@ -49,15 +49,16 @@ static inline int variant_at(int x, int y, int z, int legacy) {
 
 // cells: one int4 per known cell = (dx, dz, rotation 0..3, unused). Grid orientation rot maps
 // grid offsets to world offsets and advances the expected texture rotation by the same turn.
+// Y-range: scans yStart..yStart+ySpan-1 at each anchor (matches .texcrack y-range).
 __kernel void search_rotation(
-    const int posY,
+    const int yStart, const int ySpan,
     const int originX, const int originZ,
     const int spanX, const int spanZ,
     __constant int4* cells, const int cellCount,
     const int cols, const int rows,
     const int legacy,
     __global int* matchCount,
-    __global int* matches,                          // (x, z, rot) triplets
+    __global int* matches,                          // (x, z, rot, y) quads
     const int matchCap
 ) {
     int gx = get_global_id(0);
@@ -66,27 +67,31 @@ __kernel void search_rotation(
     int ax = originX + gx;
     int az = originZ + gz;
 
-    for (int rot = 0; rot < 4; rot++) {
-        bool ok = true;
-        for (int i = 0; i < cellCount && ok; i++) {
-            int4 cell = cells[i];
-            int dx, dz;
-            switch (rot) {
-                case 1:  dx = rows - 1 - cell.y; dz = cell.x; break;
-                case 2:  dx = cols - 1 - cell.x; dz = rows - 1 - cell.y; break;
-                case 3:  dx = cell.y; dz = cols - 1 - cell.x; break;
-                default: dx = cell.x; dz = cell.y; break;
+    for (int yy = 0; yy < ySpan; yy++) {
+        int posY = yStart + yy;
+        for (int rot = 0; rot < 4; rot++) {
+            bool ok = true;
+            for (int i = 0; i < cellCount && ok; i++) {
+                int4 cell = cells[i];
+                int dx, dz;
+                switch (rot) {
+                    case 1:  dx = rows - 1 - cell.y; dz = cell.x; break;
+                    case 2:  dx = cols - 1 - cell.x; dz = rows - 1 - cell.y; break;
+                    case 3:  dx = cell.y; dz = cols - 1 - cell.x; break;
+                    default: dx = cell.x; dz = cell.y; break;
+                }
+                int observed = variant_at(ax + dx, posY, az + dz, legacy);
+                int want = (cell.z + rot) & 3;
+                if (observed != want) ok = false;
             }
-            int observed = variant_at(ax + dx, posY, az + dz, legacy);
-            int want = (cell.z + rot) & 3;
-            if (observed != want) ok = false;
-        }
-        if (ok) {
-            int slot = atomic_inc(matchCount);
-            if (slot < matchCap) {
-                matches[slot * 3] = ax;
-                matches[slot * 3 + 1] = az;
-                matches[slot * 3 + 2] = rot;
+            if (ok) {
+                int slot = atomic_inc(matchCount);
+                if (slot < matchCap) {
+                    matches[slot * 4] = ax;
+                    matches[slot * 4 + 1] = az;
+                    matches[slot * 4 + 2] = rot;
+                    matches[slot * 4 + 3] = posY;
+                }
             }
         }
     }
