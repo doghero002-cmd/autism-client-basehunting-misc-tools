@@ -57,11 +57,18 @@ public final class BedrockGpuEngine {
 
     private static volatile Device cachedDevice;
     private static volatile boolean probed;
+    private static volatile String probeReason = "not probed yet";
 
     /** Best available device name, or null when no OpenCL runtime/device exists. Never throws. */
     public static String availability() {
         Device d = bestDevice();
         return d == null ? null : d.name() + " (" + d.computeUnits() + " CU)";
+    }
+
+    /** Why the GPU probe found no usable device (for the screen tooltip). */
+    public static String probeFailureReason() {
+        bestDevice();
+        return probeReason;
     }
 
     private static synchronized Device bestDevice() {
@@ -71,14 +78,19 @@ public final class BedrockGpuEngine {
             CL.setExceptionsEnabled(false);
             List<Device> found = new ArrayList<>();
             int[] numPlatforms = new int[1];
-            CL.clGetPlatformIDs(0, null, numPlatforms);
-            if (numPlatforms[0] == 0) return null;
+            int platErr = CL.clGetPlatformIDs(0, null, numPlatforms);
+            if (numPlatforms[0] == 0) {
+                probeReason = "no OpenCL platform (install your GPU vendor's driver)";
+                return null;
+            }
             cl_platform_id[] platforms = new cl_platform_id[numPlatforms[0]];
             CL.clGetPlatformIDs(platforms.length, platforms, null);
+            int gpuPlatforms = 0;
             for (cl_platform_id platform : platforms) {
                 int[] numDevices = new int[1];
                 if (CL.clGetDeviceIDs(platform, CL.CL_DEVICE_TYPE_GPU, 0, null, numDevices) != CL.CL_SUCCESS
                     || numDevices[0] == 0) continue;
+                gpuPlatforms++;
                 cl_device_id[] devices = new cl_device_id[numDevices[0]];
                 CL.clGetDeviceIDs(platform, CL.CL_DEVICE_TYPE_GPU, devices.length, devices, null);
                 for (cl_device_id dev : devices) {
@@ -96,8 +108,16 @@ public final class BedrockGpuEngine {
             found.sort(Comparator.comparing((Device d) -> isIntegrated(d) ? 1 : 0)
                 .thenComparing(d -> -d.computeUnits()));
             cachedDevice = found.isEmpty() ? null : found.get(0);
+            probeReason = cachedDevice != null ? "ok"
+                : (gpuPlatforms == 0
+                    ? "OpenCL runtime present but no GPU device (CPU-only driver?)"
+                    : "no usable OpenCL GPU device");
+        } catch (UnsatisfiedLinkError | NoClassDefFoundError t) {
+            cachedDevice = null;
+            probeReason = "OpenCL runtime not installed (install your GPU vendor's driver)";
         } catch (Throwable t) {
-            cachedDevice = null; // no runtime / natives failed to load
+            cachedDevice = null;
+            probeReason = "probe failed: " + t.getClass().getSimpleName();
         } finally {
             try { CL.setExceptionsEnabled(true); } catch (Throwable ignored) {}
         }

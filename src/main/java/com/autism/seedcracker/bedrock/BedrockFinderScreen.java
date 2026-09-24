@@ -111,7 +111,7 @@ public final class BedrockFinderScreen extends Screen {
             b.setMessage(engineLabel());
         }).bounds(panelX, this.gridY + 116, 160, 20)
             .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(
-                gpuName != null ? gpuName : "No OpenCL GPU found - install your GPU vendor's driver.")))
+                gpuName != null ? gpuName : "No GPU: " + BedrockGpuEngine.probeFailureReason())))
             .build();
         this.addRenderableWidget(engineButton);
 
