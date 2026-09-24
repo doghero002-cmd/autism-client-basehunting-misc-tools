@@ -115,6 +115,9 @@ public final class ChunkFinderModule extends Module {
     private ExecutorService pool;
     private volatile boolean scanning = false;
     private int tickCounter = 0;
+    /** Round-robin dispatch offset: iterating from -radius every dispatch starved far chunks
+     * (same class of bug as the SusChunk fixed-corner scan). Advances each dispatch. */
+    private int scanOffset = 0;
 
     public ChunkFinderModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":z-chunk-finder", "Chunk Finder", category,
@@ -181,29 +184,33 @@ public final class ChunkFinderModule extends Module {
         ChunkPos center = mc.player.chunkPosition();
         long now = System.currentTimeMillis();
 
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                int cx = center.x() + dx;
-                int cz = center.z() + dz;
-                if (!mc.level.hasChunk(cx, cz)) continue;
-                ChunkPos pos = new ChunkPos(cx, cz);
-                Long last = scannedAt.get(pos);
-                if (last != null && now - last < RESCAN_MS) continue;
-                if (activeScans.get() >= MAX_CONCURRENT) return;
+        int side = radius * 2 + 1;
+        int total = side * side;
+        for (int i = 0; i < total; i++) {
+            int idx = (scanOffset + i) % total;
+            int dx = idx % side - radius;
+            int dz = idx / side - radius;
+            int cx = center.x() + dx;
+            int cz = center.z() + dz;
+            if (!mc.level.hasChunk(cx, cz)) continue;
+            ChunkPos pos = new ChunkPos(cx, cz);
+            Long last = scannedAt.get(pos);
+            if (last != null && now - last < RESCAN_MS) continue;
+            if (activeScans.get() >= MAX_CONCURRENT) break;
 
-                scannedAt.put(pos, now);
-                LevelChunk chunk = mc.level.getChunk(cx, cz);
-                activeScans.incrementAndGet();
-                pool.submit(() -> {
-                    try {
-                        analyzeChunk(mc, chunk, pos, center);
-                    } catch (Throwable ignored) {
-                    } finally {
-                        activeScans.decrementAndGet();
-                    }
-                });
-            }
+            scannedAt.put(pos, now);
+            LevelChunk chunk = mc.level.getChunk(cx, cz);
+            activeScans.incrementAndGet();
+            pool.submit(() -> {
+                try {
+                    analyzeChunk(mc, chunk, pos, center);
+                } catch (Throwable ignored) {
+                } finally {
+                    activeScans.decrementAndGet();
+                }
+            });
         }
+        scanOffset = (scanOffset + 1) % total;
     }
 
     private static final class Analysis {
