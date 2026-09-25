@@ -76,34 +76,40 @@ public class DataStorage {
         throw new UnsupportedOperationException("go do implement bits count for " + feature.getName() + " you fool");
     }
 
-    public void tick() {
+    /** Cheap per-tick work that must run even when the cracker is inactive (the GUI-open flag). */
+    public void tickGuiOnly() {
         if (openGui) {
             ConfigScreen configscreen = new ConfigScreen();
             Screen screen = configscreen.getConfigScreenByCloth(Minecraft.getInstance().gui.screen());
             Minecraft.getInstance().gui.setScreen(screen);
             openGui = false;
         }
-        if (!this.timeMachine.isRunning) {
-            this.baseSeedData.dump();
-            this.biomeSeedData.dump();
-            // blockUpdateQueue.tick() removed: nothing enqueues (dead feature), and tick()
-            // sends ABORT_DESTROY packets + starts a Thread if a queue ever appeared.
+    }
 
-            this.timeMachine.isRunning = true;
+    public void tick() {
+        tickGuiOnly();
+        if (this.timeMachine.isRunning) return;
+        // Only submit a worker when there's actually data waiting to process: the old code
+        // submitted a TimeMachine task every tick while idle, a steady CPU churn with no upside.
+        this.baseSeedData.dump();
+        this.biomeSeedData.dump();
+        if (this.scheduledData.isEmpty()) return;
+        // blockUpdateQueue.tick() removed: nothing enqueues (dead feature), and tick()
+        // sends ABORT_DESTROY packets + starts a Thread if a queue ever appeared.
+        this.timeMachine.isRunning = true;
 
-            TimeMachine.SERVICE.submit(() -> {
-                try {
-                    this.scheduledData.removeIf(c -> {
-                        c.accept(this);
-                        return true;
-                    });
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+        TimeMachine.SERVICE.submit(() -> {
+            try {
+                this.scheduledData.removeIf(c -> {
+                    c.accept(this);
+                    return true;
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
-                this.timeMachine.isRunning = false;
-            });
-        }
+            this.timeMachine.isRunning = false;
+        });
     }
 
     public synchronized boolean addPillarData(PillarData data, DataAddedEvent event) {
