@@ -103,8 +103,8 @@ This addon combines a handful of different modules into one package so you can u
 - Minecraft `26.2`
 - Java `25+`
 - [Fabric Loader](https://fabricmc.net/) `0.19.3+` and Fabric API
-- [AUTISM Client](https://github.com/AutismClient/AutismClient) (any compatible version)
-- [Baritone](https://github.com/doghero002-cmd/baritone) (`baritone-meteor`) — required for the RTP / Relog / search movement
+- [AUTISM Client](https://github.com/AutismDevelopment/Autism-Client) (any compatible version)
+- [Baritone](https://github.com/cabaletta/baritone) (`baritone-meteor`) — required for the RTP / Relog / search movement
 - DonutSMP API key — only needed for the AH Flipper’s live mode
 
 ## Install
