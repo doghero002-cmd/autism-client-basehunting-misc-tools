@@ -95,6 +95,12 @@ public final class TunnelBaseWaterModule extends Module {
     private final BoolSetting manualSteer = add(new BoolSetting("manual-steer", "Steer with mouse", true)
         .description("Turn the tunnel by looking: turn your camera past ~35 degrees and the tunnel adopts that direction instead of forcing itself back straight.")
         .group("Movement"));
+    private final BoolSetting followCamera = add(new BoolSetting("follow-camera", "Follow camera", true)
+        .description("DEFAULT: the tunnel continuously follows where you look. The heading tracks the nearest cardinal to your camera and the movement rotation matches your exact view, so the tunnel bends as you turn. Off = only manual-steer on deliberate turns.")
+        .group("Movement"));
+    private final IntSetting followDeadband = add(new IntSetting("follow-deadband", "Follow deadband", 6, 0, 30, 1)
+        .description("Degrees your camera must drift from the current heading before the tunnel re-centres on it (stops jitter; 0 = track every tiny movement).")
+        .group("Movement").visibleWhen(() -> followCamera.get()));
     private final BoolSetting backgroundRun = add(new BoolSetting("background-run", "Run while tabbed out", true)
         .description("Keep tunneling while the window is unfocused: blocks the pause menu on alt-tab and auto-closes it if it slipped in.")
         .group("General"));
@@ -445,12 +451,31 @@ public final class TunnelBaseWaterModule extends Module {
         // Turn while walking: don't freeze movement just because a rotation is in flight (that
         // stop-turn-go pattern is a bot tell). Only skip if turnWhileWalking is off.
         if (isRotating && !turnWhileWalking.get()) { stopMovement(mc); return; }
-        // Manual steering: a DELIBERATE sustained mouse turn off the tunnel heading adopts that
-        // direction. Two fixes vs the old instant check: (1) the player must be ACTIVELY turning
-        // (yaw changing) - a static glance never steers; (2) we DON'T rotateTo() onto the new
-        // cardinal afterwards, which was snapping the player's view back and fighting their turn.
-        // A quick glance away and back is ignored; only a turn HELD for a few ticks commits.
-        if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
+        // Follow camera: the heading continuously tracks where you look (the tunnel bends with
+        // your camera in real time), with a small deadband so it doesn't jitter. The Water hazard
+        // and stuck logic still runs on the tracked heading. When follow is OFF, the old manual
+        // steering applies (deliberate sustained turn past 35 degrees adopts that direction).
+        if (followCamera.get() && !diagonalDetour && currentDirection != null) {
+            Direction lookDir = mc.player.getDirection();
+            float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(
+                mc.player.getYRot() - dirValues(currentDirection)[0]));
+            // Only re-centre when you've clearly moved off the current lane; the deadband keeps a
+            // straight walk from wobbling. Heading follows the camera's nearest cardinal.
+            if (lookDir != currentDirection && dev > followDeadband.get()) {
+                currentDirection = lookDir;
+                isBackup = false; backupDirection = null; detourStartPos = null;
+                preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0;
+            }
+            // Drive the actual movement rotation to your exact camera yaw (not the quantized
+            // cardinal) so the tunnel curves smoothly with your view. Only nudge while not mid-
+            // scripted-rotation (hazard turns, mend, etc. own the camera then).
+            if (!isRotating) {
+                float camYaw = mc.player.getYRot();
+                if (Math.abs(net.minecraft.util.Mth.wrapDegrees(camYaw - dirValues(currentDirection)[0])) > 2f) {
+                    rotateTo(camYaw, dirValues(currentDirection)[1], null);
+                }
+            }
+        } else if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
             Direction lookDir = mc.player.getDirection();
             float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(
                 mc.player.getYRot() - dirValues(currentDirection)[0]));
@@ -463,7 +488,6 @@ public final class TunnelBaseWaterModule extends Module {
                     currentDirection = lookDir;
                     isBackup = false; backupDirection = null; detourStartPos = null;
                     preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0; steerHoldTicks = 0;
-                    // No rotateTo() - leave the player's camera exactly where they put it.
                 }
             } else {
                 steerHoldTicks = 0;

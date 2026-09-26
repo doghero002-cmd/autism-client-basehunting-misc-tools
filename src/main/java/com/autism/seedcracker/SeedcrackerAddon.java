@@ -208,6 +208,9 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.modules().register(new QuickMacroModule(catDogsMisc));
         AutismAddons.modules().register(new NameProtectModule(catDogsMisc));
 
+        // Combat suite (subtle mace PVP).
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.MacePvpModule(catDogsMisc));
+
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());
         AutismAddons.commands().register(new com.autism.seedcracker.commands.TextureCrackCommand());
