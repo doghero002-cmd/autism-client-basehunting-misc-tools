@@ -109,6 +109,7 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         AutismAddons.modules().register(new SeedcrackerModule());
         AutismAddons.modules().register(new BedrockFinderModule());
+        AutismAddons.modules().register(new com.autism.seedcracker.modules.TextureCrackerModule(catDogsMisc));
         AutismAddons.modules().register(new DonutRTPStashFinderModule());
         AutismAddons.modules().register(new RelogLoaderModule());
 
