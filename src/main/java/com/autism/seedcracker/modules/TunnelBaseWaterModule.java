@@ -161,6 +161,8 @@ public final class TunnelBaseWaterModule extends Module {
     private boolean jumped = false;
     private boolean pearlReset = true;
     private boolean shouldCloseInventory = false;
+    /** Follow-mode camera rotations use their own marker so they don't deadlock the next nudge. */
+    private boolean followRotating = false;
     private int resetMiningTick = 0, resetUseTick = 0;
     private boolean wasScreenOpen = false;
     private final com.autism.seedcracker.util.StuckDetector stuck = new com.autism.seedcracker.util.StuckDetector("TunnelBaseWaterModule",
@@ -448,6 +450,14 @@ public final class TunnelBaseWaterModule extends Module {
 
     // ---- MINING ----
     private void handleMining(Minecraft mc) {
+        // Master mining guard: never swing while these hold, or the bot fights itself.
+        //  - AIRBORNE: mining while falling/in a 1-block gap lags back and jams the bot.
+        //  - USING ITEM (eating): an attack latch would cancel the eat, so it never finishes.
+        //  - LAVA AHEAD: don't chew into a lava pocket (the reflex below handles being IN it).
+        if (!mc.player.onGround() || mc.player.isUsingItem() || lavaAhead(mc)) {
+            updateMining(mc, false);
+            return;
+        }
         // Turn while walking: don't freeze movement just because a rotation is in flight (that
         // stop-turn-go pattern is a bot tell). Only skip if turnWhileWalking is off.
         if (isRotating && !turnWhileWalking.get()) { stopMovement(mc); return; }
@@ -459,21 +469,23 @@ public final class TunnelBaseWaterModule extends Module {
             Direction lookDir = mc.player.getDirection();
             float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(
                 mc.player.getYRot() - dirValues(currentDirection)[0]));
-            // Only re-centre when you've clearly moved off the current lane; the deadband keeps a
-            // straight walk from wobbling. Heading follows the camera's nearest cardinal.
+            // Re-centre the heading when you've moved off the current lane. The deadband only
+            // stops wobble; it does NOT delay following (a clear turn re-centres immediately).
             if (lookDir != currentDirection && dev > followDeadband.get()) {
                 currentDirection = lookDir;
                 isBackup = false; backupDirection = null; detourStartPos = null;
                 preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0;
             }
-            // Drive the actual movement rotation to your exact camera yaw (not the quantized
-            // cardinal) so the tunnel curves smoothly with your view. Only nudge while not mid-
-            // scripted-rotation (hazard turns, mend, etc. own the camera then).
-            if (!isRotating) {
-                float camYaw = mc.player.getYRot();
-                if (Math.abs(net.minecraft.util.Mth.wrapDegrees(camYaw - dirValues(currentDirection)[0])) > 2f) {
-                    rotateTo(camYaw, dirValues(currentDirection)[1], null);
-                }
+            // Drive the movement rotation to your exact camera yaw every tick so the tunnel bends
+            // with your view in real time. Follow ROTATIONS use their own marker (followRotating)
+            // so they don't block the next tick's update (the old !isRotating gate deadlocked:
+            // rotateTo set isRotating, which then suppressed every subsequent nudge).
+            float camYaw = mc.player.getYRot();
+            boolean scripted = isRotating && !followRotating; // hazard/mend turns own the camera
+            if (!scripted
+                && Math.abs(net.minecraft.util.Mth.wrapDegrees(camYaw - dirValues(currentDirection)[0])) > 1.5f) {
+                followRotating = true;
+                rotateTo(camYaw, dirValues(currentDirection)[1], () -> followRotating = false);
             }
         } else if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
             Direction lookDir = mc.player.getDirection();
@@ -584,6 +596,18 @@ public final class TunnelBaseWaterModule extends Module {
             ? checkHazardDiagonal(mc, currentDirection, diagSide, 0)
             : checkHazardDirection(mc, currentDirection, 0);
         if (laneHot) avoidHazard(mc, true);
+    }
+
+    /** True when lava is in the 2-block column directly ahead (feet or head level): stop mining
+     * before we open a lava pocket. Complements the in-lava reflex, which only fires once we're
+     * already standing in it. */
+    private boolean lavaAhead(Minecraft mc) {
+        if (mc.level == null || mc.player == null || currentDirection == null) return false;
+        BlockPos feet = mc.player.blockPosition().relative(currentDirection);
+        BlockPos head = feet.above();
+        return mc.level.getBlockState(feet).getFluidState().is(net.minecraft.world.level.material.Fluids.LAVA)
+            || mc.level.getBlockState(head).getFluidState().is(net.minecraft.world.level.material.Fluids.LAVA)
+            || mc.level.getBlockState(feet.below()).getFluidState().is(net.minecraft.world.level.material.Fluids.LAVA);
     }
 
     /** Re-aim precisely at the centre of the head-level block in front (stuck-recovery step). */
@@ -834,7 +858,9 @@ public final class TunnelBaseWaterModule extends Module {
             updateMining(mc, false); mc.options.keyJump.setDown(false); mc.options.keyUse.setDown(false);
             return;
         }
-        if (isRotating) { updateMining(mc, false); return; }
+        // Only scripted NON-tower rotations (hazard/mend) should stall the tower; the tower's own
+        // phase transitions set isRotating too and must not deadlock it.
+        if (isRotating && phase != Phase.TOWER) { updateMining(mc, false); return; }
         towerPhase(mc);
     }
 
@@ -896,7 +922,8 @@ public final class TunnelBaseWaterModule extends Module {
             updateMining(mc, false); mc.options.keyJump.setDown(false); mc.options.keyUse.setDown(false);
             return;
         }
-        if (isRotating) { updateMining(mc, false); return; }
+        // Only scripted NON-tower rotations should stall the tower (same fix as handleGoAbove).
+        if (isRotating && phase != Phase.TOWER) { updateMining(mc, false); return; }
         towerPhase(mc);
     }
 
@@ -918,15 +945,17 @@ public final class TunnelBaseWaterModule extends Module {
             }
             case TOWER -> {
                 updateMining(mc, false);
-                if (!towerRotationDone && !isRotating) {
-                    towerRotationDone = true;
-                    rotateTo(mc.player.getYRot(), 90f, () -> com.autism.seedcracker.util.InvSync.select(mc, obiSlot.get() - 1));
-                }
+                // Keep the view pitched DOWN the whole tower phase, not just on entry: the old
+                // one-shot rotateTo left isRotating true across the jump, so handleGoAbove's
+                // isRotating early-return suppressed every subsequent towerPhase tick = the
+                // "only places 1 block" stall. Re-assert the aim each tick (cheap, no rotateTo).
+                mc.player.setXRot(90f);
+                towerRotationDone = true;
+                com.autism.seedcracker.util.InvSync.select(mc, obiSlot.get() - 1);
                 // Legit towering: only place when on the ground (never use-spam while airborne, the
                 // classic scaffold flag), with a jittered per-place cooldown. Jump between places.
                 if (placeCooldown > 0) { placeCooldown--; mc.options.keyUse.setDown(false); }
                 else if (mc.player.onGround()) {
-                    com.autism.seedcracker.util.InvSync.select(mc, obiSlot.get() - 1);
                     mc.options.keyJump.setDown(true);
                     updateUsage(mc, true);
                     placeCooldown = 2 + (int) (Math.random() * 2); // 2-3 ticks between places
@@ -1021,6 +1050,7 @@ public final class TunnelBaseWaterModule extends Module {
         if (mc.player.getInventory().getSelectedSlot() != slot) {
             com.autism.seedcracker.util.InvSync.select(mc, slot);
         } else if (mc.player.getFoodData().getFoodLevel() < 18) {
+            updateMining(mc, false); // release any latched attack or it cancels the eat
             updateUsage(mc, true); // keep eating until well fed, not just past the trigger point
         } else {
             updateUsage(mc, false);
