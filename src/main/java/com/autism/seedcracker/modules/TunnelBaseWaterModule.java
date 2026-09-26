@@ -189,6 +189,7 @@ public final class TunnelBaseWaterModule extends Module {
         preferredSide = 0; detourStartPos = null; hazardCommitTicks = 0; noFoodCooldown = 0;
         diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0; scanTicks = 0;
         resetMiningTick = 0; resetUseTick = 0; wasScreenOpen = false; jumped = false;
+        followRotating = false; // clear any stale follow rotation from a previous run
         look.reset();
         stuck.reset();
 
@@ -396,18 +397,19 @@ public final class TunnelBaseWaterModule extends Module {
     private void scanForBase(Minecraft mc) {
         int chests = 0, shulkers = 0, movingPiston = 0;
         boolean foundSpawner = false;
-        // Water scans every loaded chunk's block entities within the client's view distance.
-        int vd = mc.options.getEffectiveRenderDistance();
+        // Cap the scan radius: a full (2*vd+1)^2 chunk x all-block-entities sweep every 10 ticks
+        // was a real frame hit at high render distance (625+ chunks, thousands of map reads).
+        int vd = Math.min(mc.options.getEffectiveRenderDistance(), 8);
         net.minecraft.world.level.ChunkPos center = mc.player.chunkPosition();
         for (int dx = -vd; dx <= vd; dx++) {
             for (int dz = -vd; dz <= vd; dz++) {
                 int cx = center.x() + dx, cz = center.z() + dz;
                 if (!mc.level.hasChunk(cx, cz)) continue;
                 net.minecraft.world.level.chunk.LevelChunk chunk = mc.level.getChunk(cx, cz);
-                for (BlockPos pos : chunk.getBlockEntities().keySet()) {
-                    BlockEntity be = chunk.getBlockEntities().get(pos);
+                for (BlockEntity be : chunk.getBlockEntities().values()) {
                     if (be == null) continue;
                     if (be instanceof SpawnerBlockEntity) foundSpawner = true;
+                    BlockPos pos = be.getBlockPos();
                     if (pos.getY() > 0) continue;
                     Block b = be.getBlockState().getBlock();
                     if (b == Blocks.CHEST || b == Blocks.TRAPPED_CHEST || b == Blocks.BARREL) chests++;
@@ -485,7 +487,9 @@ public final class TunnelBaseWaterModule extends Module {
             if (!scripted
                 && Math.abs(net.minecraft.util.Mth.wrapDegrees(camYaw - dirValues(currentDirection)[0])) > 1.5f) {
                 followRotating = true;
-                rotateTo(camYaw, dirValues(currentDirection)[1], () -> followRotating = false);
+                // Follow drives YAW only - it must NOT touch your pitch (dirValues returns pitch
+                // 45 in STANDING mode, which was overriding your camera pitch every tick).
+                rotateTo(camYaw, mc.player.getXRot(), () -> followRotating = false);
             }
         } else if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
             Direction lookDir = mc.player.getDirection();
@@ -580,7 +584,9 @@ public final class TunnelBaseWaterModule extends Module {
             || mc.level.getBlockState(headFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock;
 
         mc.options.keyUp.setDown(!fallingAhead);
-        if (diagonalDetour) { mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false); }
+        // Lane-centering assumes a cardinal lane; follow mode walks your exact camera (possibly
+        // diagonal), so strafing to a cardinal lane fights the follow. Disable it while following.
+        if (diagonalDetour || followCamera.get()) { mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false); }
         else laneCenterCorrection(mc);
 
         if (mode.get() == MiningMode.STANDING) {
