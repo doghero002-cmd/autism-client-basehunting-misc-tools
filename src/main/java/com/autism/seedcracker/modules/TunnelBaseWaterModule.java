@@ -239,6 +239,16 @@ public final class TunnelBaseWaterModule extends Module {
     }
     private float pendingYaw, pendingPitch;
 
+    /** Steering rotation for hazard/stuck recovery. While FOLLOWING, your camera is authoritative
+     * (you're looking where you want to go), so this NEVER drives the view - it only updates the
+     * movement direction that was already changed by the caller. In manual mode it behaves like
+     * rotateTo. This is the fix for "it keeps aiming back at the block / I can't move my camera":
+     * the hazard router was rotating to the cardinal lane every time you steered off it. */
+    private void steerTo(float yaw, float pitch, Runnable cb) {
+        if (followCamera.get()) { if (cb != null) cb.run(); return; }
+        rotateTo(yaw, pitch, cb);
+    }
+
     private void tickRotation(Minecraft mc) {
         if (!isRotating) return;
         // Ease-out profile: step proportional to remaining angle (35%), clamped to [1.5, turnSpeed].
@@ -515,20 +525,25 @@ public final class TunnelBaseWaterModule extends Module {
             if (stuckTicks == 20) {
                 mc.options.keyJump.setDown(true); jumped = true; // hop a lip / unstick feet
             } else if (stuckTicks == 40) {
-                reAimAtFrontBlock(mc);
+                // While following, YOUR camera is authoritative: never re-aim it. Just drop the
+                // attack latch so mining re-triggers toward wherever you're actually looking.
+                if (!followCamera.get()) reAimAtFrontBlock(mc);
                 updateMining(mc, false); // drop the attack latch so it re-triggers next tick
             } else if (stuckTicks == 60) {
                 avoidHazard(mc, false);
             } else if (stuckTicks >= 90) {
                 stuckTicks = 0;
-                state = State.GOABOVEHAZARD; // climb out of the pocket
-                return;
+                // While following, don't tower out (that state drives the camera); just keep
+                // steering movement. Manual mode still climbs out of the pocket.
+                if (!followCamera.get()) { state = State.GOABOVEHAZARD; return; }
             }
         } else { stuckTicks = 0; lastCoords = cur; }
 
-        if (!diagonalDetour) tryJumpStep(mc);
+        if (!diagonalDetour && !followCamera.get()) tryJumpStep(mc);
 
-        if (diagonalDetour) {
+        // Diagonal-detour holds the camera at 45° and rotates back - it fights a live camera, so
+        // it only runs in manual mode. Follow steers off your view and needs no scripted detour.
+        if (diagonalDetour && !followCamera.get()) {
             // Hold the 45° camera (mend/eat interludes rotate it back to cardinal).
             if (!isRotating && Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - diagYaw)) > 10f) {
                 rotateTo(diagYaw, dirValues(currentDirection)[1], null);
@@ -560,7 +575,7 @@ public final class TunnelBaseWaterModule extends Module {
                 detourStartPos = null;
                 hazardCommitTicks = 10; // commit to the resumed heading too
                 float[] v = dirValues(currentDirection);
-                rotateTo(v[0], v[1], null);
+                steerTo(v[0], v[1], null);
             }
         }
 
@@ -687,27 +702,31 @@ public final class TunnelBaseWaterModule extends Module {
             currentDirection = heading;
             hazardCommitTicks = 10;
             float[] rv = dirValues(heading);
-            rotateTo(rv[0], rv[1], null);
+            steerTo(rv[0], rv[1], null);
             return;
         }
 
         // Prefer a single 45° diagonal past the hazard over the 90° sidestep staircase: one turn
-        // out, one turn back, instead of a camera turn at every lake edge.
-        Direction[] diagSides = preferredSide > 0 ? new Direction[]{ right, left } : new Direction[]{ left, right };
-        for (Direction d : diagSides) {
-            if (checkHazardDiagonal(mc, heading, d, 2)) continue;
-            if (detourStartPos == null) detourStartPos = mc.player.blockPosition();
-            isBackup = false;
-            backupDirection = null;
-            currentDirection = heading;
-            diagonalDetour = true;
-            diagSide = d;
-            preferredSide = (d == right) ? 1 : -1;
-            hazardCommitTicks = 10;
-            float[] dv = dirValues(heading);
-            diagYaw = net.minecraft.util.Mth.wrapDegrees(dv[0] + (d == right ? 45f : -45f));
-            rotateTo(diagYaw, dv[1], null);
-            return;
+        // out, one turn back, instead of a camera turn at every lake edge. Follow mode skips this:
+        // it sets diagonalDetour, which would freeze follow heading updates while its camera-hold
+        // is disabled - the cardinal-sidestep loop below works without driving the camera.
+        if (!followCamera.get()) {
+            Direction[] diagSides = preferredSide > 0 ? new Direction[]{ right, left } : new Direction[]{ left, right };
+            for (Direction d : diagSides) {
+                if (checkHazardDiagonal(mc, heading, d, 2)) continue;
+                if (detourStartPos == null) detourStartPos = mc.player.blockPosition();
+                isBackup = false;
+                backupDirection = null;
+                currentDirection = heading;
+                diagonalDetour = true;
+                diagSide = d;
+                preferredSide = (d == right) ? 1 : -1;
+                hazardCommitTicks = 10;
+                float[] dv = dirValues(heading);
+                diagYaw = net.minecraft.util.Mth.wrapDegrees(dv[0] + (d == right ? 45f : -45f));
+                rotateTo(diagYaw, dv[1], null);
+                return;
+            }
         }
 
         // Strict scans FIRST (deep-clear lanes preferred), short scans as the fallback. A longer
@@ -735,14 +754,16 @@ public final class TunnelBaseWaterModule extends Module {
                 currentDirection = d;
                 hazardCommitTicks = 10;
                 float[] v = dirValues(currentDirection);
-                rotateTo(v[0], v[1], null);
+                steerTo(v[0], v[1], null);
                 return;
             }
         }
         // Both sides blocked: tower OVER the hazard (keeps forward progress into fresh chunks).
         // Only the ceiling matters for climbing UP - lava below the floor must NOT veto the climb
         // (at bedrock there is nearly always lava within a few blocks down, which used to box us in).
-        if (!checkHazardAbove(mc)) {
+        // Follow mode skips the tower: GOABOVEHAZARD pitches the camera down the whole climb,
+        // which seizes your view. Fall through to the back-out branch instead.
+        if (!checkHazardAbove(mc) && !followCamera.get()) {
             state = State.GOABOVEHAZARD;
             return;
         }
@@ -753,7 +774,7 @@ public final class TunnelBaseWaterModule extends Module {
             currentDirection = back;
             hazardCommitTicks = 10;
             float[] v = dirValues(currentDirection);
-            rotateTo(v[0], v[1], null);
+            steerTo(v[0], v[1], null);
             return;
         }
         com.autism.seedcracker.modules.FlagDetectorModule.report("HAZARD_BOXED", "TunnelBaseWater",
