@@ -163,6 +163,7 @@ public final class TunnelBaseWaterModule extends Module {
     private boolean shouldCloseInventory = false;
     private int resetMiningTick = 0, resetUseTick = 0;
     private boolean wasScreenOpen = false;
+    private int gravelRetreatTicks = 0; // back away from a falling gravel/sand column before mining it
     private final com.autism.seedcracker.util.StuckDetector stuck = new com.autism.seedcracker.util.StuckDetector("TunnelBaseWaterModule",
         com.autism.seedcracker.util.Tuning.STUCK_TICKS_TUNNEL, com.autism.seedcracker.util.Tuning.STUCK_EPSILON);
 
@@ -328,18 +329,27 @@ public final class TunnelBaseWaterModule extends Module {
         }
 
         // Survival reflex: actually IN lava (commit gap, hidden source, flow front). Overrides the
-        // whole state machine - float up + back out, then flip detour side and re-route.
-        if (mc.player.isInLava()) lavaEscapeTicks = 10;
+        // whole state machine - swim up + back AWAY horizontally, then flip detour side and re-route.
+        // The old version pressed sneak(keyDown)+jump together, which cancelled out and left you
+        // hanging in the lava, and never moved you OUT of the block.
+        if (mc.player.isInLava()) lavaEscapeTicks = 14;
         if (lavaEscapeTicks > 0) {
             lavaEscapeTicks--;
             updateMining(mc, false);
             updateUsage(mc, false);
-            mc.options.keyUp.setDown(false);
-            mc.options.keyDown.setDown(true);
-            mc.options.keyJump.setDown(true);
+            mc.options.keyDown.setDown(false);   // never sneak in lava - sneaking sinks you
+            mc.options.keyJump.setDown(true);    // swim up out of the flow
+            // Back AWAY from the lava along the tunnel (reverse of the heading), not forward into it.
+            // In follow mode movement goes where the camera points, so briefly steer the view back.
+            Direction away = currentDirection == null ? null : currentDirection.getOpposite();
+            if (followCamera.get() && away != null) {
+                float[] back = dirValues(away);
+                mc.player.setYRot(back[0]); // direct set, not a slow rotateTo - this is a reflex
+            }
+            mc.options.keyUp.setDown(true);      // hold forward (which now points away from the lava)
             if (lavaEscapeTicks == 0 && !mc.player.isInLava()) {
-                mc.options.keyDown.setDown(false);
                 mc.options.keyJump.setDown(false);
+                mc.options.keyUp.setDown(false);
                 hazardCommitTicks = 0;
                 preferredSide = -preferredSide;
                 if (state == State.MINING || state == State.GOABOVEHAZARD) avoidHazard(mc, true);
@@ -460,10 +470,12 @@ public final class TunnelBaseWaterModule extends Module {
     // ---- MINING ----
     private void handleMining(Minecraft mc) {
         // Master mining guard: never swing while these hold, or the bot fights itself.
-        //  - AIRBORNE: mining while falling/in a 1-block gap lags back and jams the bot.
+        //  - FALLING: mining on the way DOWN (off a ledge / into a gap) lags back and jams the bot.
+        //    A step-hop's UPWARD arc is fine and must keep mining, or every hop stalls the tunnel.
         //  - USING ITEM (eating): an attack latch would cancel the eat, so it never finishes.
         //  - LAVA AHEAD: don't chew into a lava pocket (the reflex below handles being IN it).
-        if (!mc.player.onGround() || mc.player.isUsingItem() || lavaAhead(mc)) {
+        boolean falling = !mc.player.onGround() && mc.player.getDeltaMovement().y < -0.08;
+        if (falling || mc.player.isUsingItem() || lavaAhead(mc)) {
             updateMining(mc, false);
             return;
         }
@@ -539,7 +551,10 @@ public final class TunnelBaseWaterModule extends Module {
             }
         } else { stuckTicks = 0; lastCoords = cur; }
 
-        if (!diagonalDetour && !followCamera.get()) tryJumpStep(mc);
+        // Jump-step restores the quick hop over 1-block lips. Safe in follow mode now: it only
+        // fires when grounded (the airborne mining guard keeps it from fighting the mine latch),
+        // and tryJumpStep's own persist-check avoids hopping onto a block mid-break.
+        if (!diagonalDetour) tryJumpStep(mc);
 
         // Diagonal-detour holds the camera at 45° and rotates back - it fights a live camera, so
         // it only runs in manual mode. Follow steers off your view and needs no scripted detour.
@@ -579,13 +594,28 @@ public final class TunnelBaseWaterModule extends Module {
             }
         }
 
-        // Gravel/sand column in the lane: stand still and chew through it - walking into a
-        // falling column is the classic suffocation-jitter loop.
+        // Gravel/sand column in the lane: BACK OUT of its fall path first, then mine it from a
+        // safe distance. The old logic just stopped the forward key but kept mining while standing
+        // under the column, so the gravel collapsed onto your head (suffocation-jitter loop).
         BlockPos feetFront = cur.relative(currentDirection);
         BlockPos headFront = feetFront.above();
         boolean fallingAhead =
             mc.level.getBlockState(feetFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
             || mc.level.getBlockState(headFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock;
+
+        if (fallingAhead && gravelRetreatTicks == 0) gravelRetreatTicks = 6; // start backing out
+        if (gravelRetreatTicks > 0) {
+            gravelRetreatTicks--;
+            updateMining(mc, false);
+            mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false);
+            // Back AWAY from the column (reverse of the heading). In follow mode steer the view back
+            // so forward-key actually retreats; manual mode walks backward via the reverse heading.
+            Direction away = currentDirection == null ? null : currentDirection.getOpposite();
+            if (followCamera.get() && away != null) mc.player.setYRot(dirValues(away)[0]);
+            mc.options.keyUp.setDown(true);
+            if (gravelRetreatTicks == 0) mc.options.keyUp.setDown(false);
+            return;
+        }
 
         mc.options.keyUp.setDown(!fallingAhead);
         // Lane-centering assumes a cardinal lane; follow mode walks your exact camera (possibly
