@@ -1,6 +1,7 @@
 package com.autism.seedcracker.modules;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import com.autism.seedcracker.SeedcrackerAddon;
@@ -49,6 +50,8 @@ public final class HoleTunnelStairsEspModule extends Module {
         .description("Minimum staircase run length.").group("Staircases"));
     private final IntSetting maxTunnelHeight = add(new IntSetting("max-tunnel-height", "Max tunnel height", 3, 2, 10, 1)
         .description("Max interior height of a tunnel/staircase section.").group("Tunnels"));
+    private final IntSetting searchDepth = add(new IntSetting("search-depth", "Search depth below you", 24, 4, 96, 4)
+        .description("How far below your Y to scan. Holes/tunnels near the surface matter for base-hunting; scanning bedrock level was wasted work.").group("Performance"));
     private final BoolSetting airOnly = add(new BoolSetting("air-only", "Only air blocks", false)
         .description("Only count fully-air blocks as passable (stricter).").group("General"));
     private final ColorSetting holeColor = add(new ColorSetting("hole-color", "Hole colour", 0xFFFF4040).group("Render"));
@@ -64,6 +67,18 @@ public final class HoleTunnelStairsEspModule extends Module {
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private boolean passStarted = false;
     private int tickCounter = 0;
+
+    // Per-chunk passability cache. The detection checks re-query the same neighbours many times
+    // per column; caching the block-state+collision-shape result cuts world lookups dramatically.
+    // Open-addressing over local (x,z,yRel): 16*16 columns x the bounded Y band, ~2x load factor.
+    // Values: 0=empty, 1=passable, 2=solid.
+    private byte[] passableCache = new byte[0];
+    private int cacheYMin = 0, cacheYSpan = 0, cacheBaseX = 0, cacheBaseZ = 0;
+    // Column-key dedup sets (packed x,z -> seen) replace the old O(n) noneIntersects() scans.
+    private final HashSet<Long> holeCols = new HashSet<>();
+    private final HashSet<Long> hole3x1Cols = new HashSet<>();
+
+    private static long packCol(int x, int z) { return ((long) x & 0xFFFFFFFFL) << 32 | ((long) z & 0xFFFFFFFFL); }
 
     public HoleTunnelStairsEspModule(autismclient.modules.ModuleCategory category) {
         super(SeedcrackerAddon.ID + ":hole-tunnel-stairs-esp", "Hole/Tunnel/Stairs ESP", category,
@@ -92,6 +107,8 @@ public final class HoleTunnelStairsEspModule extends Module {
         holes3x1.clear();
         tunnels.clear();
         staircases.clear();
+        holeCols.clear();
+        hole3x1Cols.clear();
     }
 
     private void clearRender() {
@@ -127,12 +144,19 @@ public final class HoleTunnelStairsEspModule extends Module {
         // fills in progressively instead of spiking one frame with a full-volume scan.
         if (!passStarted) { clearAll(); passStarted = true; }
         var batch = scanCursor.nextBatch(mc, scanRadius.get(), 600, chunksPerTick.get());
+        // Clamp Y to a band around the player: base-hunting holes/tunnels are near the surface,
+        // so scanning from bedrock level to above the player was dominated by useless deep work.
+        int playerY = mc.player.getBlockY();
+        int yMin = Math.max(mc.level.getMinY(), playerY - searchDepth.get());
+        int yMax = playerY + 16;
         for (LevelChunk chunk : batch) {
             int baseX = chunk.getPos().getMinBlockX();
             int baseZ = chunk.getPos().getMinBlockZ();
+            // Reset the cache per chunk: same Y band every chunk, so size/offsets only change with settings.
+            setupCache(baseX, baseZ, yMin - 4, yMax + 4);
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    for (int y = mc.level.getMinY(); y < mc.player.getBlockY() + 16; y++) {
+                    for (int y = yMin; y < yMax; y++) {
                         BlockPos pos = new BlockPos(baseX + x, y, baseZ + z);
                         if (mode.get() == Mode.ALL || mode.get() == Mode.HOLES) {
                             checkHole(mc, pos);
@@ -154,8 +178,10 @@ public final class HoleTunnelStairsEspModule extends Module {
         BlockPos.MutableBlockPos cur = pos.mutable();
         while (isValidHoleSection(mc, cur) && depth < 60) { depth++; cur.move(Direction.DOWN); }
         if (depth >= minHoleDepth.get()) {
-            AABB box = new AABB(cur.getX(), cur.getY(), cur.getZ(), cur.getX() + 1, pos.getY() + 1, cur.getZ() + 1);
-            if (noneIntersects(holes, box)) holes.add(box);
+            // O(1) column dedup: one hole box per (x,z) column.
+            if (holeCols.add(packCol(pos.getX(), pos.getZ()))) {
+                holes.add(new AABB(cur.getX(), cur.getY(), cur.getZ(), cur.getX() + 1, pos.getY() + 1, cur.getZ() + 1));
+            }
         }
     }
 
@@ -173,8 +199,9 @@ public final class HoleTunnelStairsEspModule extends Module {
             BlockPos.MutableBlockPos cur = pos.mutable();
             while (isValid3x1X(mc, cur) && depth < 60) { depth++; cur.move(Direction.DOWN); }
             if (depth >= minHoleDepth.get()) {
-                AABB box = new AABB(cur.getX(), cur.getY(), cur.getZ(), cur.getX() + 3, pos.getY() + 1, cur.getZ() + 1);
-                if (noneIntersects(holes3x1, box)) holes3x1.add(box);
+                if (hole3x1Cols.add(packCol(pos.getX(), pos.getZ()))) {
+                    holes3x1.add(new AABB(cur.getX(), cur.getY(), cur.getZ(), cur.getX() + 3, pos.getY() + 1, cur.getZ() + 1));
+                }
             }
             return;
         }
@@ -184,8 +211,9 @@ public final class HoleTunnelStairsEspModule extends Module {
             BlockPos.MutableBlockPos cur = pos.mutable();
             while (isValid3x1Z(mc, cur) && depth < 60) { depth++; cur.move(Direction.DOWN); }
             if (depth >= minHoleDepth.get()) {
-                AABB box = new AABB(cur.getX(), cur.getY(), cur.getZ(), cur.getX() + 1, pos.getY() + 1, cur.getZ() + 3);
-                if (noneIntersects(holes3x1, box)) holes3x1.add(box);
+                if (hole3x1Cols.add(packCol(pos.getX(), pos.getZ()))) {
+                    holes3x1.add(new AABB(cur.getX(), cur.getY(), cur.getZ(), cur.getX() + 1, pos.getY() + 1, cur.getZ() + 3));
+                }
             }
         }
     }
@@ -280,13 +308,35 @@ public final class HoleTunnelStairsEspModule extends Module {
         return height;
     }
 
-    private boolean isPassable(Minecraft mc, BlockPos pos) {
-        BlockState state = mc.level.getBlockState(pos);
-        if (airOnly.get()) return state.isAir();
-        VoxelShape shape = state.getCollisionShape(mc.level, pos, CollisionContext.empty());
-        return shape.isEmpty() || !net.minecraft.world.phys.shapes.Shapes.block().equals(shape);
+    private void setupCache(int baseX, int baseZ, int yMin, int yMax) {
+        cacheBaseX = baseX; cacheBaseZ = baseZ; cacheYMin = yMin; cacheYSpan = Math.max(1, yMax - yMin + 1);
+        int need = 16 * 16 * cacheYSpan;
+        if (passableCache.length != need) passableCache = new byte[need];
+        else java.util.Arrays.fill(passableCache, (byte) 0);
     }
 
+    private boolean isPassable(Minecraft mc, BlockPos pos) {
+        int lx = pos.getX() - cacheBaseX, lz = pos.getZ() - cacheBaseZ, ly = pos.getY() - cacheYMin;
+        boolean inBounds = lx >= 0 && lx < 16 && lz >= 0 && lz < 16 && ly >= 0 && ly < cacheYSpan;
+        int idx = inBounds ? (ly * 256 + lz * 16 + lx) : -1;
+        if (inBounds) {
+            byte v = passableCache[idx];
+            if (v != 0) return v == 1;
+        }
+        BlockState state = mc.level.getBlockState(pos);
+        boolean result;
+        if (airOnly.get()) {
+            result = state.isAir();
+        } else {
+            VoxelShape shape = state.getCollisionShape(mc.level, pos, CollisionContext.empty());
+            result = shape.isEmpty() || !net.minecraft.world.phys.shapes.Shapes.block().equals(shape);
+        }
+        if (inBounds) passableCache[idx] = (byte) (result ? 1 : 2);
+        return result;
+    }
+
+    // Used only by tunnels/staircases, which legitimately overlap columns (they extend horizontally
+    // and rise), so they can't use the O(1) column dedup that the vertical holes use.
     private static boolean noneIntersects(List<AABB> list, AABB box) {
         for (AABB b : list) if (b.intersects(box) || b.equals(box)) return false;
         return true;
