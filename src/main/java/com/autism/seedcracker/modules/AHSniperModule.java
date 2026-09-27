@@ -169,8 +169,11 @@ public final class AHSniperModule extends Module {
             }
             apiQueryInProgress = true;
             queryApi(key).thenAccept(list -> {
+                // Hop back to the client thread before touching snipe state: processApiResponse
+                // mutates isAuctionSniping/currentSeller/auctionPageCounter, which tick() reads on
+                // the main thread. Running it on the async thread was a data race.
                 apiQueryInProgress = false;
-                processApiResponse(mc, list);
+                mc.execute(() -> processApiResponse(mc, list));
             });
         } else {
             // We found a seller via the API: open their page and buy.
