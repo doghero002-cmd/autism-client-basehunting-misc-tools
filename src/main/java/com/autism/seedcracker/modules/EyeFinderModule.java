@@ -62,8 +62,10 @@ public final class EyeFinderModule extends Module {
         if (mc.player == null || mc.level == null) return;
 
         Set<BlockPos> targets = new HashSet<>();
+        Set<String> seen = new HashSet<>();
         for (Player p : mc.level.players()) {
             if (p == mc.player || p.isSpectator()) continue;
+            seen.add(p.getPlainTextName());
 
             Vec3 eye = p.getEyePosition();
             Vec3 look = p.getViewVector(1.0f);
@@ -93,6 +95,11 @@ public final class EyeFinderModule extends Module {
                 }
             }
         }
+
+        // Evict state for players who left render range / disconnected, so the maps don't grow
+        // stale entries over a long session on a busy server.
+        lastTarget.keySet().retainAll(seen);
+        stareTicks.keySet().retainAll(seen);
 
         BlockEspRenderer.feed(id(), targets, color.get(), tracers.get(), true);
     }

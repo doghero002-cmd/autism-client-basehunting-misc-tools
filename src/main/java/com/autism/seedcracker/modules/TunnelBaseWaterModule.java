@@ -161,8 +161,6 @@ public final class TunnelBaseWaterModule extends Module {
     private boolean jumped = false;
     private boolean pearlReset = true;
     private boolean shouldCloseInventory = false;
-    /** Follow-mode camera rotations use their own marker so they don't deadlock the next nudge. */
-    private boolean followRotating = false;
     private int resetMiningTick = 0, resetUseTick = 0;
     private boolean wasScreenOpen = false;
     private final com.autism.seedcracker.util.StuckDetector stuck = new com.autism.seedcracker.util.StuckDetector("TunnelBaseWaterModule",
@@ -189,7 +187,6 @@ public final class TunnelBaseWaterModule extends Module {
         preferredSide = 0; detourStartPos = null; hazardCommitTicks = 0; noFoodCooldown = 0;
         diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0; scanTicks = 0;
         resetMiningTick = 0; resetUseTick = 0; wasScreenOpen = false; jumped = false;
-        followRotating = false; // clear any stale follow rotation from a previous run
         look.reset();
         stuck.reset();
 
@@ -478,19 +475,11 @@ public final class TunnelBaseWaterModule extends Module {
                 isBackup = false; backupDirection = null; detourStartPos = null;
                 preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0;
             }
-            // Drive the movement rotation to your exact camera yaw every tick so the tunnel bends
-            // with your view in real time. Follow ROTATIONS use their own marker (followRotating)
-            // so they don't block the next tick's update (the old !isRotating gate deadlocked:
-            // rotateTo set isRotating, which then suppressed every subsequent nudge).
-            float camYaw = mc.player.getYRot();
-            boolean scripted = isRotating && !followRotating; // hazard/mend turns own the camera
-            if (!scripted
-                && Math.abs(net.minecraft.util.Mth.wrapDegrees(camYaw - dirValues(currentDirection)[0])) > 1.5f) {
-                followRotating = true;
-                // Follow drives YAW only - it must NOT touch your pitch (dirValues returns pitch
-                // 45 in STANDING mode, which was overriding your camera pitch every tick).
-                rotateTo(camYaw, mc.player.getXRot(), () -> followRotating = false);
-            }
+            // Follow reads your camera yaw directly - it does NOT run a rotateTo. Routing your
+            // view through the slow ease-out rotation was the reluctance: the rotation lagged a
+            // fast mouse and latched isRotating, stalling movement. Your camera is already aimed
+            // where you want to go, so follow just uses it. Scripted hazard/mend turns still use
+            // rotateTo (those genuinely need to move the camera).
         } else if (manualSteer.get() && !isRotating && !diagonalDetour && currentDirection != null) {
             Direction lookDir = mc.player.getDirection();
             float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(

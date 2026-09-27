@@ -70,6 +70,7 @@ public final class PaperRigModule extends Module {
     private int lastCount2;
     private Item predictedWinner;
     private int predictedRoll;
+    private int dispenserScanTicks = 0;
     private String statusMessage = "Searching for dispensers...";
 
     public PaperRigModule(autismclient.modules.ModuleCategory category) {
@@ -113,12 +114,17 @@ public final class PaperRigModule extends Module {
         Item item2 = resolveItem(dispenser2Item.get());
 
         if (dispenser1 == null || dispenser2 == null) {
-            findDispensers(mc);
-            if (dispenser1 != null && dispenser2 != null) {
-                lastCount1 = countItem(mc, item1);
-                lastCount2 = countItem(mc, item2);
-                phase = 0;
-                statusMessage = "Ready - pull the lever!";
+            // Throttle the 31x31x31 dispenser scan: it ran every tick while searching (a steady
+            // FPS sink), but dispensers don't move - twice a second is plenty.
+            if (++dispenserScanTicks >= 10) {
+                dispenserScanTicks = 0;
+                findDispensers(mc);
+                if (dispenser1 != null && dispenser2 != null) {
+                    lastCount1 = countItem(mc, item1);
+                    lastCount2 = countItem(mc, item2);
+                    phase = 0;
+                    statusMessage = "Ready - pull the lever!";
+                }
             }
             return;
         }

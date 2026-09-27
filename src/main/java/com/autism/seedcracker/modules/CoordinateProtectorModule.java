@@ -78,8 +78,19 @@ public final class CoordinateProtectorModule extends Module {
     }
 
     private static boolean containsNumber(String text, int n) {
-        // Word-boundary match so "100" doesn't match in "1000".
-        return java.util.regex.Pattern.compile("(?<!\\d)" + java.util.regex.Pattern.quote(String.valueOf(n)) + "(?!\\d)")
-            .matcher(text).find();
+        // Digit-scan equivalent of "(?<!\d)n(?!\d)" — avoids compiling a regex per chat send.
+        String needle = String.valueOf(n);
+        int from = 0;
+        int len = text.length();
+        int nlen = needle.length();
+        while (from + nlen <= len) {
+            int idx = text.indexOf(needle, from);
+            if (idx < 0) return false;
+            boolean beforeOk = idx == 0 || !Character.isDigit(text.charAt(idx - 1));
+            boolean afterOk = idx + nlen >= len || !Character.isDigit(text.charAt(idx + nlen));
+            if (beforeOk && afterOk) return true;
+            from = idx + 1;
+        }
+        return false;
     }
 }
