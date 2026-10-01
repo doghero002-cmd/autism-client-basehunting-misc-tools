@@ -39,8 +39,8 @@ public final class ShopBuyerModule extends Module {
     private static final int DELAY = 1;
     private static final int SHOP_RESEND_TICKS = 40; // only re-send /shop after 2s of no open
 
-    public ShopBuyerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":shop-buyer", "Shop Buyer", category,
+    public ShopBuyerModule() {
+        super(SeedcrackerAddon.ID + ":shop-buyer", "Shop Buyer",
             "Automatically buys a chosen item from the /shop PvP category.");
     }
 

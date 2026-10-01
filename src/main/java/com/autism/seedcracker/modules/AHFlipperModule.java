@@ -36,8 +36,8 @@ public final class AHFlipperModule extends Module {
     private ClientProductionRuntime runtime;
     private CompletableFuture<Optional<ClientProductionRuntime>> starting;
 
-    public AHFlipperModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":ah-flipper", "AH Flipper", category,
+    public AHFlipperModule() {
+        super(SeedcrackerAddon.ID + ":ah-flipper", "AH Flipper",
             "Scans the DonutSMP auction house for underpriced flips (packet mode, or live API with a key).");
     }
 

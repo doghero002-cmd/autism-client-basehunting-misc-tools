@@ -1,5 +1,7 @@
 package com.autism.seedcracker.render;
 
+import com.autism.seedcracker.compat.EspRenderTypes;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -7,10 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-import autismclient.util.AutismWorldGeometry;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.rendertype.AutismRenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
@@ -46,6 +46,7 @@ public final class BlockEspRenderer {
     private static final class BoxFeed {
         java.util.List<AABB> boxes;
         int argb;
+        int fillAlpha = 0x2E; // 0-255, derived from the module's opacity setting
         long lastFeedMs;
     }
 
@@ -81,14 +82,14 @@ public final class BlockEspRenderer {
                 // ONE geometry submit per feed (a lambda per box at 1000s of boxes was the
                 // per-box overhead that made massive storage fields drop frames / stop rendering).
                 context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
+                    EspRenderTypes.LINES_SEE_THROUGH, (pose, buffer) -> {
                         for (BlockPos pos : blocks) {
                             outlineBox(pose, buffer, boxAt(pos, origin), lineArgb);
                         }
                     });
                 if (fill) {
                     context.submitNodeCollector().submitCustomGeometry(poseStack,
-                        AutismRenderTypes.storageEspFillSeeThrough(), (pose, buffer) -> {
+                        EspRenderTypes.FILL_SEE_THROUGH, (pose, buffer) -> {
                             for (BlockPos pos : blocks) {
                                 fillBox(pose, buffer, boxAt(pos, origin), fillArgb);
                             }
@@ -109,8 +110,8 @@ public final class BlockEspRenderer {
                             nearest.getY() + 0.5 - origin.y,
                             nearest.getZ() + 0.5 - origin.z);
                         context.submitNodeCollector().submitCustomGeometry(poseStack,
-                            AutismRenderTypes.storageEspLinesSeeThrough(),
-                            (pose, buffer) -> AutismWorldGeometry.line(pose, buffer, 0, 0, 0,
+                            EspRenderTypes.LINES_SEE_THROUGH,
+                            (pose, buffer) -> EspRenderTypes.line(pose, buffer, 0, 0, 0,
                                 centre.x, centre.y, centre.z, lineArgb, LINE_WIDTH));
                     }
                 }
@@ -122,8 +123,20 @@ public final class BlockEspRenderer {
                 if (bf.boxes == null || bf.boxes.isEmpty()) continue;
                 java.util.List<AABB> boxes = bf.boxes;
                 int argb = bf.argb;
+                // Wireframe outline (always) + translucent shell fill (module-configurable opacity;
+                // shows the box clearly through walls and lava - the Anubis look). Both through-wall.
+                int fillArgb = (argb & 0x00FFFFFF) | (bf.fillAlpha << 24);
                 context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
+                    EspRenderTypes.FILL_SEE_THROUGH, (pose, buffer) -> {
+                        for (AABB b : boxes) {
+                            AABB rel = new AABB(
+                                b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,
+                                b.maxX - origin.x, b.maxY - origin.y, b.maxZ - origin.z).inflate(INFLATE);
+                            fillBox(pose, buffer, rel, fillArgb);
+                        }
+                    });
+                context.submitNodeCollector().submitCustomGeometry(poseStack,
+                    EspRenderTypes.LINES_SEE_THROUGH, (pose, buffer) -> {
                         for (AABB b : boxes) {
                             AABB rel = new AABB(
                                 b.minX - origin.x, b.minY - origin.y, b.minZ - origin.z,
@@ -156,10 +169,16 @@ public final class BlockEspRenderer {
 
     /** Feed a list of bounding boxes for a module (e.g. per-geode outlines). Call every tick while enabled. */
     public static void feedBoxes(String moduleId, java.util.List<AABB> boxes, int argb) {
+        feedBoxes(moduleId, boxes, argb, 0x2E);
+    }
+
+    /** Feed boxes with a custom fill opacity (0-255). Call every tick while enabled. */
+    public static void feedBoxes(String moduleId, java.util.List<AABB> boxes, int argb, int fillAlpha) {
         if (moduleId == null || boxes == null) return;
         BoxFeed f = BOX_FEEDS.computeIfAbsent(moduleId, k -> new BoxFeed());
         f.boxes = boxes;
         f.argb = argb;
+        f.fillAlpha = Math.max(0, Math.min(255, fillAlpha));
         f.lastFeedMs = System.currentTimeMillis();
     }
 
@@ -209,7 +228,7 @@ public final class BlockEspRenderer {
 
     private static void line(PoseStack.Pose pose, VertexConsumer buffer, double x1, double y1, double z1,
                              double x2, double y2, double z2, int color) {
-        AutismWorldGeometry.line(pose, buffer, x1, y1, z1, x2, y2, z2, color, LINE_WIDTH);
+        EspRenderTypes.line(pose, buffer, x1, y1, z1, x2, y2, z2, color, LINE_WIDTH);
     }
 
     private static void quad(PoseStack.Pose pose, VertexConsumer buffer, double x1, double y1, double z1,

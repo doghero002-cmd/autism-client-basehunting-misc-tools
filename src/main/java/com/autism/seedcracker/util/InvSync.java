@@ -1,5 +1,6 @@
 package com.autism.seedcracker.util;
 
+import com.autism.seedcracker.compat.ClientInventory;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -32,7 +33,7 @@ public final class InvSync {
             return;
         }
         try {
-            autismclient.util.AutismInventoryHelper.selectHotbarSlot(mc, slot);
+            ClientInventory.selectHotbarSlot(mc, slot);
         } catch (Throwable t) {
             // Client-only fallback DESYNCS the held item server-side (flag risk) - log once.
             if (!fallbackLogged) {

@@ -32,8 +32,8 @@ public final class FakePayModule extends Module {
         .description("Deduct the faked amount from the Fake Scoreboard balance (you paid it out).")
         .group("General"));
 
-    public FakePayModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-fake-pay", "Fake Pay", category,
+    public FakePayModule() {
+        super(SeedcrackerAddon.ID + ":z-fake-pay", "Fake Pay",
             "Fakes /pay commands locally so it looks like you paid without paying.");
     }
 

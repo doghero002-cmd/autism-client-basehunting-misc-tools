@@ -39,11 +39,24 @@ public final class MacePvpModule extends Module {
 
     public enum AimStyle { LEGIT, INSTANT, NONE }
     public enum SlamMode { HOLD, PULSE }
+    public enum EnchantPrefer { DENSITY, BREACH, WIND_BURST, ANY }
 
     // ---- auto mace ----
     private final BoolSetting autoMace = add(new BoolSetting("auto-mace", "Auto mace", true)
         .description("Hit-select the mace and swing when you have the fall distance for a smash crit on a target below you.")
         .group("Mace"));
+    private final EnumSetting<EnchantPrefer> prefer = add(new EnumSetting<>("prefer", "Prefer enchant", EnchantPrefer.DENSITY, EnchantPrefer.values())
+        .description("Anubis: auto-swap to the mace carrying the preferred smash enchant. DENSITY = raw smash damage, BREACH = armour pierce, WIND_BURST = re-launch on hit, ANY = first mace found.")
+        .group("Mace"));
+    private final BoolSetting weaponsOnly = add(new BoolSetting("weapons-only", "Only mace in hotbar", false)
+        .description("Anubis: only auto-swap if the preferred mace is already in your hotbar (never pull it from the inventory grid). Off = also search the inventory.")
+        .group("Mace"));
+    private final BoolSetting swapBack = add(new BoolSetting("swap-back", "Swap back after swing", true)
+        .description("Anubis: return to your previous held slot a few ticks after the swing so you're not left holding the mace.")
+        .group("Mace"));
+    private final IntSetting backDelay = add(new IntSetting("back-delay", "Swap-back delay (ticks)", 4, 1, 20, 1)
+        .description("Ticks to hold the mace before swapping back.")
+        .group("Mace").visibleWhen(() -> swapBack.get()));
     private final IntSetting targetRange = add(new IntSetting("target-range", "Target range", 5, 2, 8, 1)
         .description("Reach (blocks) to consider a player a valid crit target.")
         .group("Mace"));
@@ -79,9 +92,12 @@ public final class MacePvpModule extends Module {
     private final LegitMovement look = new LegitMovement();
     private int launchTicks = -1;   // ticks since the wind-charge launch (-1 = not slamming)
     private int cooldownWait = 0;
+    // Anubis swap-back state.
+    private int returnSlot = -1;    // slot we were holding before the auto-swap (-1 = none)
+    private int backTick = -1;      // tick to swap back on (-1 = none)
 
-    public MacePvpModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":mace-pvp", "Mace PVP", category,
+    public MacePvpModule() {
+        super(SeedcrackerAddon.ID + ":mace-pvp", "Mace PVP",
             "Subtle mace-burst assistant: auto mace crits, wind-charge stunt slam, elytra re-deploy. Human aim, cooldown-aware.");
     }
 
@@ -102,6 +118,7 @@ public final class MacePvpModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
         if (cooldownWait > 0) cooldownWait--;
+        tickSwapBack(mc); // Anubis: return to the pre-swap held slot after the swing delay
 
         LivingEntity target = nearestTarget(mc);
         boolean slamming = launchTicks >= 0;
@@ -138,8 +155,9 @@ public final class MacePvpModule extends Module {
         if (respectCooldown.get() && mc.player.getAttackStrengthScale(0.5f) < 1.0f) return;
         if (cooldownWait > 0) return;
 
-        int mace = findItem(mc, "minecraft:mace");
-        if (mace < 0) return; // no mace in hotbar
+        // Anubis: pick the best mace (enchant-preference) instead of the first one found.
+        int mace = bestMace(mc);
+        if (mace < 0) return; // no mace available
 
         // Aim before swinging (subtle): LEGIT eases over a few ticks via the human engine,
         // INSTANT snaps. LEGIT swings only once we're close enough to the target angle.
@@ -158,7 +176,7 @@ public final class MacePvpModule extends Module {
             }
         }
 
-        com.autism.seedcracker.util.InvSync.select(mc, mace);
+        selectMaceWithReturn(mc, mace); // remember return slot, then select the mace
         mc.gameMode.attack(mc.player, target);
         mc.player.swing(InteractionHand.MAIN_HAND);
         cooldownWait = respectCooldown.get() ? 2 : 1;
@@ -224,6 +242,92 @@ public final class MacePvpModule extends Module {
             if (!s.isEmpty() && BuiltInRegistries.ITEM.getKey(s.getItem()).toString().equals(id)) return i;
         }
         return -1;
+    }
+
+    // ---- Anubis enchant-preference mace selection ----
+
+    /** The registry id of the enchant we prefer on the mace, per the prefer setting. */
+    private String preferredEnchantId() {
+        return switch (prefer.get()) {
+            case DENSITY -> "minecraft:density";
+            case BREACH -> "minecraft:breach";
+            case WIND_BURST -> "minecraft:wind_burst";
+            case ANY -> null;
+        };
+    }
+
+    /** Level of `enchantId` on the stack (0 = not present). Reads the item's stored enchantments. */
+    private static int enchantLevel(ItemStack stack, String enchantId) {
+        if (stack.isEmpty() || enchantId == null) return 0;
+        try {
+            var ench = stack.getEnchantments();
+            for (var e : ench.entrySet()) {
+                var keyOpt = e.getKey().unwrapKey();
+                if (keyOpt.isPresent() && keyOpt.get().toString().equals(enchantId)) return e.getIntValue();
+            }
+        } catch (Throwable ignored) {}
+        return 0;
+    }
+
+    /**
+     * Anubis: pick the BEST mace slot - prefer one carrying the chosen smash enchant (highest level
+     * wins). Searches the hotbar first; if weapons-only is off, also searches the inventory grid
+     * (returning a hotbar slot it can be swapped into). Returns a hotbar slot, or -1 if none.
+     */
+    private int bestMace(Minecraft mc) {
+        String want = preferredEnchantId();
+        int anyHotbar = -1, bestHotbar = -1, bestHotbarLvl = -1;
+        int anyInv = -1, bestInv = -1, bestInvLvl = -1;
+        for (int i = 0; i < 36; i++) {
+            ItemStack s = mc.player.getInventory().getItem(i);
+            if (s.isEmpty() || !BuiltInRegistries.ITEM.getKey(s.getItem()).toString().equals("minecraft:mace")) continue;
+            boolean hotbar = i < 9;
+            int lvl = want == null ? 1 : enchantLevel(s, want);
+            if (hotbar) {
+                if (anyHotbar < 0) anyHotbar = i;
+                if (lvl > bestHotbarLvl) { bestHotbarLvl = lvl; bestHotbar = i; }
+            } else {
+                if (anyInv < 0) anyInv = i;
+                if (lvl > bestInvLvl) { bestInvLvl = lvl; bestInv = i; }
+            }
+        }
+        // Prefer a hotbar mace with the wanted enchant; else any hotbar mace; else inventory (if allowed).
+        if (want != null && bestHotbarLvl > 0) return bestHotbar;
+        if (anyHotbar >= 0) return anyHotbar;
+        if (!weaponsOnly.get() && want != null && bestInvLvl > 0) return swapIntoHotbar(mc, bestInv);
+        if (!weaponsOnly.get() && anyInv >= 0) return swapIntoHotbar(mc, anyInv);
+        return -1;
+    }
+
+    /** Swap an inventory-grid stack into the selected hotbar slot (returns that hotbar slot). */
+    private int swapIntoHotbar(Minecraft mc, int invSlot) {
+        int selected = mc.player.getInventory().getSelectedSlot();
+        com.autism.seedcracker.compat.ClientInventory.swapInventorySlots(mc, invSlot, selected);
+        return selected;
+    }
+
+    /** Remember the slot to return to, then select the mace slot (Anubis swap pattern). Only records
+     * a return slot when we're actually CHANGING slots - if you're already holding the mace there's
+     * nothing to swap back to. */
+    private void selectMaceWithReturn(Minecraft mc, int maceSlot) {
+        int current = mc.player.getInventory().getSelectedSlot();
+        if (swapBack.get() && returnSlot < 0 && current != maceSlot) {
+            returnSlot = current;
+            backTick = backDelay.get();
+        }
+        com.autism.seedcracker.util.InvSync.select(mc, maceSlot);
+    }
+
+    /** Swap back to the held slot after the swing delay (called from tick). Only acts if we recorded
+     * a genuine slot change; if the player manually swapped away from the mace, respect that and
+     * don't yank them back. */
+    private void tickSwapBack(Minecraft mc) {
+        if (returnSlot < 0) return;
+        if (backTick > 0) { backTick--; return; }
+        int current = mc.player.getInventory().getSelectedSlot();
+        if (current != returnSlot) com.autism.seedcracker.util.InvSync.select(mc, returnSlot);
+        returnSlot = -1;
+        backTick = -1;
     }
 
     private float[] yawPitchTo(Minecraft mc, LivingEntity target) {

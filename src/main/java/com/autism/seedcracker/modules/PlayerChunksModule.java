@@ -50,8 +50,8 @@ public final class PlayerChunksModule extends Module {
     private final java.util.Set<String> seenPlayers = ConcurrentHashMap.newKeySet();
     private int sampleTicks = 0;
 
-    public PlayerChunksModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":player-chunks", "Player Chunks", category,
+    public PlayerChunksModule() {
+        super(SeedcrackerAddon.ID + ":player-chunks", "Player Chunks",
             "Caches every other player's chunk positions - loiter clusters reveal their base.");
     }
 

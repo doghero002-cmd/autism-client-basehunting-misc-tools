@@ -39,8 +39,8 @@ public final class HomeSetterModule extends Module {
 
     private volatile boolean running = false;
 
-    public HomeSetterModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-home-setter", "Home Setter", category,
+    public HomeSetterModule() {
+        super(SeedcrackerAddon.ID + ":z-home-setter", "Home Setter",
             "One-shot: sets a home at your current position by running the server home commands.");
     }
 

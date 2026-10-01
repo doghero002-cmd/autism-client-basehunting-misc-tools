@@ -58,8 +58,8 @@ public final class TranslateModule extends Module {
         .description("Translate the item's display name line as well as the lore lines.")
         .group("Scope").visibleWhen(() -> items.get()));
 
-    public TranslateModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":translate", "Translate", category,
+    public TranslateModule() {
+        super(SeedcrackerAddon.ID + ":translate", "Translate",
             "Auto-translates chat and item tooltip text into your language (async + cached).");
         instance = this;
     }

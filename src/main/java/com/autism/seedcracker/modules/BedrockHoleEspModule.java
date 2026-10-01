@@ -51,8 +51,8 @@ public final class BedrockHoleEspModule extends Module {
     private int rangeX, rangeY, totalVolume;
     private BlockPos origin;
 
-    public BedrockHoleEspModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":bedrock-hole-esp", "Bedrock Hole ESP", category,
+    public BedrockHoleEspModule() {
+        super(SeedcrackerAddon.ID + ":bedrock-hole-esp", "Bedrock Hole ESP",
             "Highlights holes in the bedrock floor (gaps bounded by bedrock).");
     }
 

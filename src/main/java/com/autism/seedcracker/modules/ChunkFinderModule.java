@@ -18,7 +18,7 @@ import autismclient.api.module.ColorSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -119,8 +119,8 @@ public final class ChunkFinderModule extends Module {
      * (same class of bug as the SusChunk fixed-corner scan). Advances each dispatch. */
     private int scanOffset = 0;
 
-    public ChunkFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-chunk-finder", "Chunk Finder", category,
+    public ChunkFinderModule() {
+        super(SeedcrackerAddon.ID + ":z-chunk-finder", "Chunk Finder",
             "Flags chunks with base signs (rotated deepslate, long dripstone/vines, grown kelp, veins).");
     }
 
@@ -428,7 +428,7 @@ public final class ChunkFinderModule extends Module {
     private void onNewFlag(ChunkPos pos, String reasons, int x, int z) {
         if (!notify.get()) return;
         String msg = reasons + " (X:" + x + " Z:" + z + ")";
-        AutismNotifications.warning("Chunk: " + msg);
+        ClientNotify.warning("Chunk: " + msg);
         AutismClientMessaging.sendPrefixed("§6[ChunkFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.9f);

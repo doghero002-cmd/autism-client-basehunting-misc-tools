@@ -36,8 +36,8 @@ public final class AutoEatModule extends Module {
     private int foodSlot = -1;
     private int prevSlot = -1;
 
-    public AutoEatModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-auto-eat", "Auto Eat", category,
+    public AutoEatModule() {
+        super(SeedcrackerAddon.ID + ":z-auto-eat", "Auto Eat",
             "Automatically eats hotbar food when your hunger is low.");
     }
 

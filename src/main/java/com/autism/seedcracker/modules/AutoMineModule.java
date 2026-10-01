@@ -43,8 +43,8 @@ public final class AutoMineModule extends Module {
         .description("Stop when the tool's remaining durability falls below this % of max.")
         .group("General").visibleWhen(() -> antiBreak.get()));
 
-    public AutoMineModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":auto-mine", "Auto Mine", category,
+    public AutoMineModule() {
+        super(SeedcrackerAddon.ID + ":auto-mine", "Auto Mine",
             "Automatically mines whatever block your crosshair is on.");
     }
 

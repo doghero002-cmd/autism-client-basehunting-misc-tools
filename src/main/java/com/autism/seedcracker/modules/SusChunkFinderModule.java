@@ -13,7 +13,7 @@ import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
@@ -44,11 +44,11 @@ import net.minecraft.world.level.chunk.LevelChunk;
  */
 public final class SusChunkFinderModule extends Module {
 
-    public enum Mode { DOGS, WATER, XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL, ACTIVITY, SIGNAL }
+    public enum Mode { DOGS, WATER, XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL, ACTIVITY, SIGNAL, GEODE }
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>(
-            "mode", "Mode", Mode.DOGS, Mode.values())
-        .description("DOGS (default) = our score-based detector: independent underground signals (deep kelp, underground vines, rotated deepslate, flat mined rooms, storage) must corroborate before flagging. WATER = raw Water-client detector (noisier: worldgen kelp ages + natural caves false-flag). XENON = below-Y15 placement. TYPES = block types. NEW_CHUNKS = freshly generated (packet fluid-tick). OLD_CHUNKS = visited before. TUNNEL = 2x1 corridors. ACTIVITY = load/unload cycling (another player's render bubble). SIGNAL = loaded chunks beyond the server's render radius (someone else streams them).")
+            "mode", "Mode", Mode.GEODE, Mode.values())
+        .description("GEODE (default) = Anubis sus-chunk logic: underground light pockets + amethyst (geodes = caves = player traffic). DOGS = our score-based detector: independent underground signals (deep kelp, underground vines, rotated deepslate, flat mined rooms, storage) must corroborate before flagging. WATER = raw Water-client detector (noisier: worldgen kelp ages + natural caves false-flag). XENON = below-Y15 placement. TYPES = block types. NEW_CHUNKS = freshly generated (packet fluid-tick). OLD_CHUNKS = visited before. TUNNEL = 2x1 corridors. ACTIVITY = load/unload cycling (another player's render bubble). SIGNAL = loaded chunks beyond the server's render radius (someone else streams them).")
         .group("General"));
     private final EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new EnumSetting<>("sensitivity", "Sensitivity",
@@ -198,6 +198,23 @@ public final class SusChunkFinderModule extends Module {
         .description("Save flagged chunks to disk keyed by dimension and reload them on join (survives relog, nyx behaviour).")
         .group("General"));
 
+    // GEODE-mode settings (Anubis sus-chunk port).
+    private final BoolSetting glow = add(new BoolSetting("geode-glow", "Glow detection", true)
+        .description("Also flag underground light pockets (amethyst glow through a cave), not just direct amethyst. Finds geodes even when the amethyst is out of detail range.")
+        .group("Geode").visibleWhen(() -> mode.get() == Mode.GEODE));
+    private final IntSetting geodeMinY = add(new IntSetting("geode-min-y", "Min Y", -58, -64, 64, 2)
+        .description("Lowest Y scanned for the glow pocket.").group("Geode").visibleWhen(() -> mode.get() == Mode.GEODE));
+    private final IntSetting geodeMaxY = add(new IntSetting("geode-max-y", "Max Y", 30, -64, 64, 2)
+        .description("Highest Y scanned for the glow pocket (geodes form in the deepslate band).").group("Geode").visibleWhen(() -> mode.get() == Mode.GEODE));
+    private final IntSetting geodeGlowLight = add(new IntSetting("geode-glow-light", "Glow light level", 5, 1, 15, 1)
+        .description("Block-light level a cell must reach to count as a glow pocket (amethyst cluster emits 5).").group("Geode").visibleWhen(() -> mode.get() == Mode.GEODE));
+    private final IntSetting geodeSpread = add(new IntSetting("geode-spread", "Spread radius", 1, 0, 3, 1)
+        .description("Anubis spreadRadius: how many chunks away a hot chunk's heat corroborates its neighbours. Nearby geode chunks reinforce each other into one confirmed find.")
+        .group("Geode").visibleWhen(() -> mode.get() == Mode.GEODE));
+    private final IntSetting geodeHeatNeed = add(new IntSetting("geode-heat", "Heat to flag", 4, 1, 30, 1)
+        .description("Anubis sensitivity: accumulated heat a chunk needs (after neighbour spread) before it flags. Higher = fewer, more-confirmed finds.")
+        .group("Geode").visibleWhen(() -> mode.get() == Mode.GEODE));
+
     private final Set<ChunkPos> flagged = ConcurrentHashMap.newKeySet();
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private final Map<ChunkPos, Long> lastScan = new ConcurrentHashMap<>();
@@ -206,8 +223,8 @@ public final class SusChunkFinderModule extends Module {
      * got one (looked like the module "stopped registering" until toggled). Advances each call. */
     private int scanOffset = 0;
 
-    public SusChunkFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder", category,
+    public SusChunkFinderModule() {
+        super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder",
             "Flags suspicious chunks (XENON below-Y15 base detection, or per-block-type).");
     }
 
@@ -218,6 +235,10 @@ public final class SusChunkFinderModule extends Module {
         lastScan.clear();
         newChunks.clear();
         oldChunks.clear();
+        geodeHeat.clear();
+        geodeSelf.clear();
+        geodeVeto.clear();
+        geodeScanned.clear();
         scanCursorAge.reset();
         scanCursorTunnel.reset();
         if (persistFlags.get()) loadFlags();
@@ -232,6 +253,10 @@ public final class SusChunkFinderModule extends Module {
             notified.clear();
             lastScan.clear();
             activityFlaggedAt.clear();
+            geodeHeat.clear();
+            geodeSelf.clear();
+            geodeVeto.clear();
+            geodeScanned.clear();
             scanCursorAge.reset();
             scanCursorTunnel.reset();
         }
@@ -245,6 +270,10 @@ public final class SusChunkFinderModule extends Module {
         lastScan.clear();
         activity.clear();
         activityFlaggedAt.clear();
+        geodeHeat.clear();
+        geodeSelf.clear();
+        geodeVeto.clear();
+        geodeScanned.clear();
         ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
     }
 
@@ -296,6 +325,7 @@ public final class SusChunkFinderModule extends Module {
             case TUNNEL -> tickTunnelScan(mc);
             case ACTIVITY -> tickActivity(mc);
             case SIGNAL -> tickSignal(mc);
+            case GEODE -> tickGeode(mc);
         }
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-sus-chunk-finder", flagged, color.get(), tracer.get());
     }
@@ -1050,6 +1080,197 @@ public final class SusChunkFinderModule extends Module {
         notified.removeIf(p -> tooFar(p, center, pr));
     }
 
+    // ---- GEODE mode (Anubis sus-chunk port) ----
+    // Two detectors combined:
+    //   CLASSIC  - scan sections for amethyst clusters + buds (a geode = a cave = player traffic).
+    //   GLOW     - scan for underground light pockets: amethyst clusters EMIT light, so a lit
+    //              pocket deep underground with open air around it is almost always a geode, which
+    //              means a cave system - exactly where players tunnel and base.
+    // Both flag the chunk; the glow test is what makes this different from TYPES'amethyst check
+    // (it finds geodes even when the amethyst itself is out of render/simulation detail range).
+
+    // Anubis SusChunkFinderModule heat-map state. Chunks accumulate a heat score; a hot chunk
+    // spreads heat to its neighbours (corroboration); natural/unfinished chunks veto; only chunks
+    // with enough scanned neighbours + accumulated heat flag; hottestPerPatch dedupes the render.
+    private java.util.List<LevelChunk> geodeQueue = java.util.Collections.emptyList();
+    private int geodeIndex = 0;
+    private long lastGeodeRefreshMs = 0;
+
+    /** chunkKey -> accumulated heat (after spread). */
+    private final Map<Long, Integer> geodeHeat = new ConcurrentHashMap<>();
+    /** chunkKey -> this chunk's own (pre-spread) heat, so re-scans replace rather than stack. */
+    private final Map<Long, Integer> geodeSelf = new ConcurrentHashMap<>();
+    /** chunkKey -> vetoed (natural/unfinished area - Anubis hasUngrown suppresses it). */
+    private final Set<Long> geodeVeto = ConcurrentHashMap.newKeySet();
+    /** chunkKey -> already scanned (for the scanned-neighbours edge-artifact gate). */
+    private final Set<Long> geodeScanned = ConcurrentHashMap.newKeySet();
+
+    private static long ckey(int x, int z) { return (((long) x) << 32) | (z & 0xffffffffL); }
+    private static int ckx(long k) { return (int) (k >> 32); }
+    private static int ckz(long k) { return (int) k; }
+
+    private void tickGeode(Minecraft mc) {
+        long now = System.currentTimeMillis();
+        if (geodeIndex >= geodeQueue.size() && now - lastGeodeRefreshMs >= rescanMs.get()) {
+            geodeQueue = com.autism.seedcracker.finder.ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
+            geodeIndex = 0;
+            lastGeodeRefreshMs = now;
+        }
+
+        int budget = chunksPerTick.get();
+        while (budget-- > 0 && geodeIndex < geodeQueue.size()) {
+            LevelChunk chunk = geodeQueue.get(geodeIndex++);
+            scanChunkGeode(mc, chunk);
+        }
+
+        // Prune heat/scanned state well beyond range so it doesn't grow unbounded.
+        ChunkPos center = mc.player.chunkPosition();
+        int pr = scanRadius.get() + 4;
+        geodeHeat.keySet().removeIf(k -> Math.max(Math.abs(ckx(k) - center.x()), Math.abs(ckz(k) - center.z())) > pr);
+        geodeSelf.keySet().removeIf(k -> Math.max(Math.abs(ckx(k) - center.x()), Math.abs(ckz(k) - center.z())) > pr);
+        geodeVeto.removeIf(k -> Math.max(Math.abs(ckx(k) - center.x()), Math.abs(ckz(k) - center.z())) > pr);
+        geodeScanned.removeIf(k -> Math.max(Math.abs(ckx(k) - center.x()), Math.abs(ckz(k) - center.z())) > pr);
+
+        // Anubis computeVisible: a chunk flags if it has enough accumulated heat AND isn't vetoed
+        // AND enough of its neighbours were actually scanned (avoids map-edge false positives).
+        // hottestPerPatch then keeps only the single hottest chunk per connected cluster, so a big
+        // geode field renders ONE clean box instead of a wall of red.
+        flagged.clear();
+        Map<Long, Integer> visible = hottestPerPatch(geodeHeat);
+        int needHeat = geodeHeatNeed.get();
+        for (Map.Entry<Long, Integer> e : visible.entrySet()) {
+            long k = e.getKey();
+            if (e.getValue() < needHeat) continue;
+            if (geodeVeto.contains(k)) continue;
+            if (scannedNeighbours(ckx(k), ckz(k)) < 3) continue; // Anubis MIN_SCANNED_NEIGHBOURS
+            ChunkPos pos = new ChunkPos(ckx(k), ckz(k));
+            if (flagged.add(pos) && notified.add(pos)) onNewFlag(pos);
+        }
+        int pr2 = scanRadius.get() + 2;
+        notified.removeIf(p -> tooFar(p, center, pr2));
+    }
+
+    /** Score one chunk into the heat-map (Anubis updateChunk): compute self-heat, replace the old
+     * self contribution, spread the delta to neighbours, and record natural vetoes. */
+    private void scanChunkGeode(Minecraft mc, LevelChunk chunk) {
+        ChunkPos pos = chunk.getPos();
+        long key = ckey(pos.x(), pos.z());
+
+        // Self-heat: amethyst growth (classic) = a strong base heat, plus glow-cell count / 12
+        // (Anubis GeodeGlowScan returns the glow-edge cell count and divides by 12 for the score).
+        int self = 0;
+        int amethyst = com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(
+            chunk, SusChunkFinderModule::isAmethystGrowth, 64);
+        if (amethyst > 0) self += 6 + amethyst; // a confirmed geode in this chunk
+        if (glow.get()) self += countGlowCells(mc, chunk) / 12;
+
+        boolean hasUngrown = amethyst == 0 && self == 0; // nothing here -> natural, veto it
+        geodeScanned.add(key);
+
+        int spread = geodeSpread.get();
+        int prev = geodeSelf.getOrDefault(key, 0);
+        int delta = self - prev;
+        geodeSelf.put(key, self);
+
+        // Replace the heat contribution across the spread area (Anubis forArea + heat.addTo).
+        for (int dx = -spread; dx <= spread; dx++) {
+            for (int dz = -spread; dz <= spread; dz++) {
+                long nk = ckey(pos.x() + dx, pos.z() + dz);
+                if (delta != 0) {
+                    int nv = geodeHeat.getOrDefault(nk, 0) + delta;
+                    if (nv <= 0) geodeHeat.remove(nk); else geodeHeat.put(nk, nv);
+                }
+            }
+        }
+
+        // Anubis hasUngrown veto: a fully-natural chunk (no amethyst, no glow) vetoes itself and its
+        // spread area so surrounding natural caves don't accumulate phantom heat.
+        if (hasUngrown) {
+            for (int dx = -spread; dx <= spread; dx++) {
+                for (int dz = -spread; dz <= spread; dz++) {
+                    geodeVeto.add(ckey(pos.x() + dx, pos.z() + dz));
+                }
+            }
+        } else {
+            geodeVeto.remove(key); // a real signal clears this chunk's veto
+        }
+    }
+
+    /** Count 8-neighbours that have been scanned (Anubis scannedNeighbours). */
+    private int scannedNeighbours(int x, int z) {
+        int n = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+                if ((dx != 0 || dz != 0) && geodeScanned.contains(ckey(x + dx, z + dz))) n++;
+        return n;
+    }
+
+    /** Keep only the single hottest chunk per connected cluster (Anubis hottestPerPatch): flood-fill
+     * clusters of hot chunks and emit each cluster's max, so one geode = one rendered box. */
+    private static Map<Long, Integer> hottestPerPatch(Map<Long, Integer> heat) {
+        Map<Long, Integer> out = new ConcurrentHashMap<>();
+        Set<Long> done = ConcurrentHashMap.newKeySet();
+        for (Long seed : heat.keySet()) {
+            if (!done.add(seed)) continue;
+            // Flood-fill this cluster.
+            long best = seed;
+            int bestVal = heat.getOrDefault(seed, 0);
+            java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>();
+            queue.add(seed);
+            while (!queue.isEmpty()) {
+                long cur = queue.poll();
+                int v = heat.getOrDefault(cur, 0);
+                if (v > bestVal) { bestVal = v; best = cur; }
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        long nk = ckey(ckx(cur) + dx, ckz(cur) + dz);
+                        if (heat.containsKey(nk) && done.add(nk)) queue.add(nk);
+                    }
+                }
+            }
+            out.put(best, bestVal);
+        }
+        return out;
+    }
+
+    /** Amethyst cluster or any bud stage (matches Anubis isAmethystGrowth). */
+    private static boolean isAmethystGrowth(net.minecraft.world.level.block.state.BlockState s) {
+        return s.is(Blocks.AMETHYST_CLUSTER) || s.is(Blocks.LARGE_AMETHYST_BUD)
+            || s.is(Blocks.MEDIUM_AMETHYST_BUD) || s.is(Blocks.SMALL_AMETHYST_BUD);
+    }
+
+    /** Open air or an amethyst cluster (matches Anubis open(): a cave cell a glow can reach). */
+    private static boolean isOpenForGlow(net.minecraft.world.level.block.state.BlockState s) {
+        return s.isAir() || s.is(Blocks.AMETHYST_CLUSTER);
+    }
+
+    /**
+     * Count underground glow-edge cells in the chunk (Anubis GeodeGlowScan.scan returns this count;
+     * SusChunkFinder divides it by 12 for the heat). A glow-edge cell is an open-air cell whose own
+     * block-light is dark but sits next to a lit cell at the amethyst-glow level - the rim of an
+     * amethyst pocket. Reads block light from the lighting engine (no world mutation, no fragile
+     * internal DataLayer access).
+     */
+    private int countGlowCells(Minecraft mc, LevelChunk chunk) {
+        int baseX = chunk.getPos().getMinBlockX();
+        int baseZ = chunk.getPos().getMinBlockZ();
+        int minY = Math.max(mc.level.getMinY() + 4, geodeMinY.get());
+        int maxY = Math.min(geodeMaxY.get(), mc.player.getBlockY());
+        int count = 0;
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    BlockPos p = new BlockPos(baseX + x, y, baseZ + z);
+                    if (!isOpenForGlow(mc.level.getBlockState(p))) continue;
+                    if (mc.level.getMaxLocalRawBrightness(p) < geodeGlowLight.get()) continue;
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     /** Count-vs-threshold with the sensitivity scale applied (TYPES mode). */
     private boolean typeHit(LevelChunk chunk, java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> pred, int baseCount) {
         int need = sensitivity.get().scale(baseCount);
@@ -1127,7 +1348,7 @@ public final class SusChunkFinderModule extends Module {
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
         String msg = "Sus chunk at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§d[SusChunkFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);

@@ -58,6 +58,9 @@ public final class AmethystEspModule extends Module {
         .description("Translucent fill on the amethyst blocks.").group("Render"));
     private final BoolSetting chatAlert = add(new BoolSetting("chat-alert", "Chat alert", true)
         .description("Chat message when a new geode is found.").group("General"));
+    private final BoolSetting bypass = add(new BoolSetting("bypass", "Amethyst bypass (anti-xray)", true)
+        .description("DEFAULT: Anubis AmethystBypass - reveal geodes the server HIDES by scanning chunk-section palettes for amethyst the server declared but stripped (palette leak). Works even when no amethyst is visible in your block view.")
+        .group("Bypass"));
     private final ColorSetting color = add(new ColorSetting("color", "ESP colour", 0xFFB464FF)
         .description("Colour of the amethyst markers.").group("Render"));
 
@@ -70,8 +73,8 @@ public final class AmethystEspModule extends Module {
     private java.util.List<net.minecraft.world.phys.AABB> cachedBoxes = java.util.List.of();
     private int boxRebuildTicks = 0;
 
-    public AmethystEspModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":amethyst-esp", "Amethyst ESP", category,
+    public AmethystEspModule() {
+        super(SeedcrackerAddon.ID + ":amethyst-esp", "Amethyst ESP",
             "Highlights amethyst geodes (cluster blocks) around you.");
     }
 
@@ -198,6 +201,30 @@ public final class AmethystEspModule extends Module {
             boxes.add(new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX, maxY, maxZ).inflate(1.0));
         }
         return boxes;
+    }
+
+    /** Amethyst bypass (Anubis palette leak): called by the chunk-packet hook with the raw buffer.
+     * Flags sections whose palette declares amethyst the server stripped from the block data. */
+    public void onChunkData(net.minecraft.network.FriendlyByteBuf buffer, int chunkX, int chunkZ,
+                            int sectionCount, int minSectionY) {
+        if (!bypass.get()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null) return;
+        java.util.List<Integer> hidden = com.autism.seedcracker.netherite.HiddenAmethystScanner
+            .findHiddenSections(buffer, sectionCount, minSectionY);
+        if (hidden.isEmpty()) return;
+        // The blocks are hidden, so we don't know exact positions - flag the section's chunk with a
+        // marker block at the section centre so the geode box/ESP still shows where to dig.
+        ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+        long key = ((long) pos.x() << 32) | (pos.z() & 0xffffffffL);
+        Set<BlockPos> found = flagged.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
+        for (int secY : hidden) {
+            found.add(new BlockPos((chunkX << 4) + 8, (secY << 4) + 8, (chunkZ << 4) + 8));
+        }
+        if (chatAlert.get() && notified.add(key)) {
+            AutismClientMessaging.sendPrefixed("§d[AmethystESP] §fHidden geode at X:" + pos.getMinBlockX()
+                + " Z:" + pos.getMinBlockZ() + " §7(" + hidden.size() + " sections)");
+        }
     }
 
     private void scanChunk(LevelChunk chunk) {

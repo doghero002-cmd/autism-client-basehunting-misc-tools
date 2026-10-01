@@ -35,8 +35,8 @@ public final class AhSellModule extends Module {
 
     private enum State { IDLE, SELECTING, WAITING_FOR_GUI, CLICKING_CONFIRM }
 
-    public AhSellModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":ah-sell", "AH Sell", category,
+    public AhSellModule() {
+        super(SeedcrackerAddon.ID + ":ah-sell", "AH Sell",
             "Automatically /ah sell's items from your hotbar at a set price.");
     }
 

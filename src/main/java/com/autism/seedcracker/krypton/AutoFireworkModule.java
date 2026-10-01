@@ -36,8 +36,8 @@ public final class AutoFireworkModule extends Module {
     private int counter = 0;
     private int cooldownCounter = 0;
 
-    public AutoFireworkModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":auto-firework", "Auto Firework", category,
+    public AutoFireworkModule() {
+        super(SeedcrackerAddon.ID + ":auto-firework", "Auto Firework",
             "Enable to use a firework boost (while gliding) and swap back. Bind the toggle to a key.");
     }
 

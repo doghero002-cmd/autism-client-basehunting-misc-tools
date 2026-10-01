@@ -35,8 +35,8 @@ public final class AutoRenderModule extends Module {
     private int hold = 0;
     private int savedSimDistance = -1;
 
-    public AutoRenderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-auto-render", "Auto Render", category,
+    public AutoRenderModule() {
+        super(SeedcrackerAddon.ID + ":z-auto-render", "Auto Render",
             "Briefly boosts render distance when you drop below Y=-2.");
     }
 

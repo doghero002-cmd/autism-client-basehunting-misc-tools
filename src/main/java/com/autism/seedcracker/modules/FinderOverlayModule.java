@@ -27,8 +27,8 @@ public final class FinderOverlayModule extends Module {
         .description("Flags within a 5x5-chunk area before it counts as flooded (single noisy module, e.g. a kelp forest).")
         .group("General"));
 
-    public FinderOverlayModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":finder-overlay", "Finder Overlay", category,
+    public FinderOverlayModule() {
+        super(SeedcrackerAddon.ID + ":finder-overlay", "Finder Overlay",
             "Condenses flooded finder-flag areas to the most-overlapped hotspot chunks.");
     }
 

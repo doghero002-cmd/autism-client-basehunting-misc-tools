@@ -57,8 +57,8 @@ public final class RaidPlannerModule extends Module {
     private int pollTicks = 0;
     private long lastReportMs = 0;
 
-    public RaidPlannerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":raid-planner", "Raid Planner", category,
+    public RaidPlannerModule() {
+        super(SeedcrackerAddon.ID + ":raid-planner", "Raid Planner",
             "Ranks every base find GOLD/SILVER/BRONZE so you raid the richest target first.");
     }
 

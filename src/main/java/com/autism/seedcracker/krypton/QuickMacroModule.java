@@ -32,8 +32,8 @@ public final class QuickMacroModule extends Module {
         .description("Chat notification when commands run.")
         .group("General"));
 
-    public QuickMacroModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":quick-macro", "Quick Macro", category,
+    public QuickMacroModule() {
+        super(SeedcrackerAddon.ID + ":quick-macro", "Quick Macro",
             "Run command(s) on enable, then disable. Bind the toggle to a key.");
     }
 

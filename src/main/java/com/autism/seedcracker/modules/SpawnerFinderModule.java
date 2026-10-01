@@ -13,7 +13,7 @@ import autismclient.api.module.ColorSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.ChunkPos;
@@ -64,8 +64,8 @@ public final class SpawnerFinderModule extends Module {
     private final Set<net.minecraft.core.BlockPos> activatedNotified = new HashSet<>();
     private int tickCounter = 0;
 
-    public SpawnerFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-spawner-finder", "Spawner Finder", category,
+    public SpawnerFinderModule() {
+        super(SeedcrackerAddon.ID + ":z-spawner-finder", "Spawner Finder",
             "Flags chunks containing a monster spawner block entity (dungeons / spawner farms).");
     }
 
@@ -144,7 +144,7 @@ public final class SpawnerFinderModule extends Module {
         if (notify.get()) {
             String msg = "ACTIVATED spawner at " + pos.getX() + " " + pos.getY() + " " + pos.getZ()
                 + " (delay=" + delay + ") - player was nearby!";
-            AutismNotifications.warning(msg);
+            ClientNotify.warning(msg);
             AutismClientMessaging.sendPrefixed("§d[SpawnerFinder] §f" + msg);
             if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.6f);
         }
@@ -157,7 +157,7 @@ public final class SpawnerFinderModule extends Module {
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
         String msg = "Spawner found at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§c[SpawnerFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {

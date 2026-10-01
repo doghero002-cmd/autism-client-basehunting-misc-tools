@@ -39,8 +39,8 @@ public final class FastPlaceModule extends Module {
         .description("Right-click cooldown in ticks (lower = faster).")
         .group("General"));
 
-    public FastPlaceModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-fast-place", "Fast Place", category,
+    public FastPlaceModule() {
+        super(SeedcrackerAddon.ID + ":z-fast-place", "Fast Place",
             "Reduces the block-place / item-use delay so you place faster.");
     }
 

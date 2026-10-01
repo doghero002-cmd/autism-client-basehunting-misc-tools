@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ModuleLookup;
+
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.util.FlagLog;
 
@@ -85,8 +87,8 @@ public final class FlagDetectorModule extends Module {
         return System.currentTimeMillis() < graceUntilMs;
     }
 
-    public FlagDetectorModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":flag-detector", "Flag Detector", category,
+    public FlagDetectorModule() {
+        super(SeedcrackerAddon.ID + ":flag-detector", "Flag Detector",
             "Logs anti-cheat flags / setbacks / desyncs to flag-log.txt so the client can be improved.");
     }
 
@@ -495,31 +497,31 @@ public final class FlagDetectorModule extends Module {
     public static void renderHud(net.minecraft.client.gui.GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.font == null) return;
-        var mod = autismclient.modules.ModuleRegistry.get(SeedcrackerAddon.ID + ":flag-detector");
+        var mod = ModuleLookup.get(SeedcrackerAddon.ID + ":flag-detector");
         if (!(mod instanceof FlagDetectorModule fd) || !fd.isEnabled() || !fd.hud.get()) return;
         if (fd.hudOnlyInGame.get() && (mc.player == null || mc.getConnection() == null)) return;
         if (mc.gui != null && mc.gui.hud.isHidden()) return;
-        if (autismclient.modules.PackHideState.isActive()) return;
+        if (com.autism.seedcracker.compat.ClientCompatUtil.isPackHideActive()) return;
 
         HudStats s = hudStats();
         int width = fd.hudWidth.get();
         int contentWidth = width - 12;
-        java.util.List<autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row> rows = new java.util.ArrayList<>();
+        java.util.List<com.autism.seedcracker.compat.HudPanel.Row> rows = new java.util.ArrayList<>();
 
-        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+        rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
             trimHud(mc.font, "last 60s: " + s.windowAll() + "  total: " + s.totalAll(), contentWidth), 0xFFE8E8E8));
-        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+        rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
             trimHud(mc.font, "setbacks: " + s.wSetbacks() + " (" + s.totalSetbacks() + ")", contentWidth), 0xFFFF8A80));
-        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+        rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
             trimHud(mc.font, "rot-corr: " + s.wRotations() + " (" + s.totalRotations() + ")", contentWidth), 0xFFFFCC80));
         if (s.totalKicks() > 0) {
-            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
                 trimHud(mc.font, "kicks: " + s.wKicks() + " (" + s.totalKicks() + ")", contentWidth), 0xFFEF9A9A));
         }
-        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+        rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
             trimHud(mc.font, "speed-pred: " + s.wPredicts() + " (" + s.totalPredicts() + ")", contentWidth), 0xFFFFFF8D));
         if (s.lastSetbackDist() >= 0.0D) {
-            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
                 trimHud(mc.font, "last setback: " + String.format(java.util.Locale.ROOT, "%.2f", s.lastSetbackDist()) + "b", contentWidth),
                 0xFFCE93D8));
         }
@@ -528,15 +530,15 @@ public final class FlagDetectorModule extends Module {
         for (int i = 0; i < 4; i++) bar.append(i < heat ? '#' : '-');
         bar.append(']');
         if (s.speedImminent()) bar.append(" !");
-        rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+        rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
             trimHud(mc.font, bar.toString(), contentWidth), heatColor(heat, s.speedImminent())));
         if (fd.hudSession.get()) {
-            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
                 trimHud(mc.font, "session: " + formatElapsed(s.sessionElapsedMs()), contentWidth), 0xFFB0BEC5));
         }
 
         String title = trimHud(mc.font, "BYPASS TELEMETRY", contentWidth);
-        autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.render(
+        com.autism.seedcracker.compat.HudPanel.render(
             context, mc.font, fd.hudX.get(), fd.hudY.get(), width, title, rows, fd.hudAccent.get());
     }
 

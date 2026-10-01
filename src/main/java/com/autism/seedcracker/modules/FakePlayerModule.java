@@ -29,8 +29,8 @@ public final class FakePlayerModule extends Module {
 
     private RemotePlayer fake;
 
-    public FakePlayerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-fake-player", "Fake Player", category,
+    public FakePlayerModule() {
+        super(SeedcrackerAddon.ID + ":z-fake-player", "Fake Player",
             "Spawns a client-side fake player decoy at your position.");
     }
 

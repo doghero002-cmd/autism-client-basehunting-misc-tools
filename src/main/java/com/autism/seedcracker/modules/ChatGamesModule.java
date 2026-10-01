@@ -79,8 +79,8 @@ public final class ChatGamesModule extends Module {
     private String lastDetectedCommand = "";
     private volatile boolean aiInFlight = false;
 
-    public ChatGamesModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":chat-games", "Auto Chat Games", category,
+    public ChatGamesModule() {
+        super(SeedcrackerAddon.ID + ":chat-games", "Auto Chat Games",
             "Answers chat-game math questions (local solver, or routed to an AI API).");
     }
 

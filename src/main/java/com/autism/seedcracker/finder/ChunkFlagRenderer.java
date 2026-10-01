@@ -1,5 +1,7 @@
 package com.autism.seedcracker.finder;
 
+import com.autism.seedcracker.compat.EspRenderTypes;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,13 +11,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.rendertype.AutismRenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-import autismclient.util.AutismWorldGeometry;
 
 /**
  * Shared world renderer for the chunk-scanner finder modules.
@@ -190,7 +190,7 @@ public final class ChunkFlagRenderer {
                     cornerBrackets(pose, buffer, box, argb);
                     line(pose, buffer, cx, beamMinY, cz, cx, beamMaxY, cz, beaconArgb);
                     if (tracer) {
-                        AutismWorldGeometry.line(pose, buffer, 0, 0, 0,
+                        EspRenderTypes.line(pose, buffer, 0, 0, 0,
                             cx, displayY + BOX_HEIGHT * 0.5 - origin.y, cz, argb, LINE_WIDTH);
                     }
                 });
@@ -198,12 +198,12 @@ public final class ChunkFlagRenderer {
 
             if (!fillOps.isEmpty()) {
                 context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspFillSeeThrough(),
+                    EspRenderTypes.FILL_SEE_THROUGH,
                     (pose, buffer) -> { for (var op : fillOps) op.accept(pose, buffer); });
             }
             if (!lineOps.isEmpty()) {
                 context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(),
+                    EspRenderTypes.LINES_SEE_THROUGH,
                     (pose, buffer) -> { for (var op : lineOps) op.accept(pose, buffer); });
             }
         });
@@ -365,7 +365,7 @@ public final class ChunkFlagRenderer {
 
     private static void line(PoseStack.Pose pose, VertexConsumer buffer, double x1, double y1, double z1,
                              double x2, double y2, double z2, int color) {
-        AutismWorldGeometry.line(pose, buffer, x1, y1, z1, x2, y2, z2, color, LINE_WIDTH);
+        EspRenderTypes.line(pose, buffer, x1, y1, z1, x2, y2, z2, color, LINE_WIDTH);
     }
 
     /**

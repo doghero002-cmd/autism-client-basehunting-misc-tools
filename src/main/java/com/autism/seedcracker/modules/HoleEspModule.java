@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.EspRenderTypes;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,7 +16,6 @@ import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.rendertype.AutismRenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
@@ -23,7 +24,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-import autismclient.util.AutismWorldGeometry;
 
 /**
  * Hole ESP.
@@ -60,8 +60,8 @@ public final class HoleEspModule extends Module {
 
     private record Hole(AABB box, int depth, boolean is1x1) {}
 
-    public HoleEspModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":hole-esp", "Hole ESP", category,
+    public HoleEspModule() {
+        super(SeedcrackerAddon.ID + ":hole-esp", "Hole ESP",
             "Highlights deep vertical holes (1x1 and 3x1) around you.");
     }
 
@@ -304,7 +304,7 @@ public final class HoleEspModule extends Module {
             }
             if (!boxes.isEmpty()) {
                 context.submitNodeCollector().submitCustomGeometry(poseStack,
-                    AutismRenderTypes.storageEspLinesSeeThrough(), (pose, buffer) -> {
+                    EspRenderTypes.LINES_SEE_THROUGH, (pose, buffer) -> {
                         for (int i = 0; i < boxes.size(); i++) {
                             outlineBox(pose, buffer, boxes.get(i), colors.get(i));
                         }
@@ -338,6 +338,6 @@ public final class HoleEspModule extends Module {
 
     private static void line(PoseStack.Pose pose, VertexConsumer buffer, double x1, double y1, double z1,
                              double x2, double y2, double z2, int color) {
-        AutismWorldGeometry.line(pose, buffer, x1, y1, z1, x2, y2, z2, color, 2.0f);
+        EspRenderTypes.line(pose, buffer, x1, y1, z1, x2, y2, z2, color, 2.0f);
     }
 }

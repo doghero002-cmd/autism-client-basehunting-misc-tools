@@ -11,7 +11,7 @@ import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.protocol.Packet;
@@ -52,8 +52,8 @@ public final class SpectatorDetectorModule extends Module {
     private final java.util.Map<String, Long> lastAlertMs = new java.util.concurrent.ConcurrentHashMap<>();
     private int scanTicks = 0;
 
-    public SpectatorDetectorModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":spectator-detector", "Spectator Detector", category,
+    public SpectatorDetectorModule() {
+        super(SeedcrackerAddon.ID + ":spectator-detector", "Spectator Detector",
             "Alerts when staff watch you: spectator gamemode, vanish latency-mismatch, staff tab prefixes.");
     }
 
@@ -131,6 +131,6 @@ public final class SpectatorDetectorModule extends Module {
 
         FlagLog.warn("STAFF", "SpectatorDetector", message);
         if (chat.get()) AutismClientMessaging.sendPrefixed("§c[Staff] §f" + message);
-        if (toast.get()) AutismNotifications.warning("Staff: " + message);
+        if (toast.get()) ClientNotify.warning("Staff: " + message);
     }
 }

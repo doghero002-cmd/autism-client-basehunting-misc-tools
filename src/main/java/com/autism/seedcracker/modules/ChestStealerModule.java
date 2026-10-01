@@ -49,8 +49,8 @@ public final class ChestStealerModule extends Module {
 
     private int cooldown = 0;
 
-    public ChestStealerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":chest-stealer", "Chest Stealer", category,
+    public ChestStealerModule() {
+        super(SeedcrackerAddon.ID + ":chest-stealer", "Chest Stealer",
             "Shift-loots items out of any open container (filtered, human-paced).");
     }
 
