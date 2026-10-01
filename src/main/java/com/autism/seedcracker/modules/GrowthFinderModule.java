@@ -13,7 +13,7 @@ import autismclient.api.module.ColorSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.ChunkPos;
@@ -84,8 +84,8 @@ public final class GrowthFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public GrowthFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-growth-finder", "Growth Finder", category,
+    public GrowthFinderModule() {
+        super(SeedcrackerAddon.ID + ":z-growth-finder", "Growth Finder",
             "Flags chunks dense with vegetation/growth (vines, berries, dripstone) - overgrown, long-loaded areas.");
     }
 
@@ -228,7 +228,7 @@ public final class GrowthFinderModule extends Module {
         if (!notify.get()) return;
         int sx = s.source.getX(), sz = s.source.getZ();
         String msg = "Growth (score " + s.score + (s.maxVine > 0 ? ", max vine " + s.maxVine : "") + ") near X:" + sx + " Z:" + sz;
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§2[GrowthFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {

@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ModuleLookup;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -60,8 +62,8 @@ public final class BalanceTagsModule extends Module {
     private final Set<String> alerted = ConcurrentHashMap.newKeySet();
     private long lastRequestMs = 0;
 
-    public BalanceTagsModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":balance-tags", "Balance Tags", category,
+    public BalanceTagsModule() {
+        super(SeedcrackerAddon.ID + ":balance-tags", "Balance Tags",
             "Lists nearby players' DonutSMP balances (API) with HP + distance on a HUD panel.");
     }
 
@@ -164,7 +166,7 @@ public final class BalanceTagsModule extends Module {
     public static void renderHud(GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.font == null || mc.player == null || mc.level == null) return;
-        var mod = autismclient.modules.ModuleRegistry.get(SeedcrackerAddon.ID + ":balance-tags");
+        var mod = ModuleLookup.get(SeedcrackerAddon.ID + ":balance-tags");
         if (!(mod instanceof BalanceTagsModule bt) || !bt.isEnabled()) return;
         if (mc.gui != null && mc.gui.hud.isHidden()) return;
 
@@ -177,7 +179,7 @@ public final class BalanceTagsModule extends Module {
         Font font = mc.font;
         int width = bt.hudWidth.get();
         int contentWidth = width - 12;
-        List<autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row> rows = new ArrayList<>();
+        List<com.autism.seedcracker.compat.HudPanel.Row> rows = new ArrayList<>();
         int max = Math.min(players.size(), bt.maxRows.get());
         for (int i = 0; i < max; i++) {
             Player p = players.get(i);
@@ -191,11 +193,11 @@ public final class BalanceTagsModule extends Module {
             }
             line.append("  ").append((int) p.distanceTo(mc.player)).append("m");
             int color = bal != null && bal >= 10_000_000L ? 0xFFFFD54F : 0xFFE8E8E8;
-            rows.add(autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.Row.body(
+            rows.add(com.autism.seedcracker.compat.HudPanel.Row.body(
                 trim(font, line.toString(), contentWidth), color));
         }
 
-        autismclient.gui.vanillaui.direct.DirectHudPanelRenderer.render(
+        com.autism.seedcracker.compat.HudPanel.render(
             context, font, bt.hudX.get(), bt.hudY.get(), width,
             trim(font, "BALANCES", contentWidth), rows, bt.accent.get());
     }

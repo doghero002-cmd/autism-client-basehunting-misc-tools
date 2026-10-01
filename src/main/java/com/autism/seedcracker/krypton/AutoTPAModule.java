@@ -58,8 +58,8 @@ public final class AutoTPAModule extends Module {
     private Stage stage = Stage.SEND;
     private long stageSince = 0L;
 
-    public AutoTPAModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":auto-tpa", "Auto TPA", category,
+    public AutoTPAModule() {
+        super(SeedcrackerAddon.ID + ":auto-tpa", "Auto TPA",
             "Spam /tpa or /tpahere and click the confirm screen, on configurable delays.");
     }
 
@@ -133,24 +133,11 @@ public final class AutoTPAModule extends Module {
         Screen screen = mc.gui.screen();
         if (screen == null) return false;
 
-        // Primary: the macro custom-menu path (snapshot -> accept button -> submit).
-        try {
-            autismclient.api.custommenu.CustomMenuSnapshot snapshot =
-                autismclient.util.custommenu.CustomMenuScreens.openScreenSnapshot(mc);
-            if (snapshot != null) {
-                autismclient.api.custommenu.CustomMenuButton accept =
-                    autismclient.util.macro.CustomMenuActionSupport.acceptButton(snapshot.buttons());
-                if (accept != null) {
-                    var result = autismclient.api.custommenu.CustomMenuAdapterRegistry.submit(
-                        snapshot, new autismclient.api.custommenu.CustomMenuSubmission(java.util.Map.of(), accept));
-                    if (result != null && result.success()) return true;
-                }
-            }
-        } catch (Throwable ignored) {
-            // Fall through to the direct-click fallback below.
-        }
+        // The macro custom-menu helpers (CustomMenuScreens / CustomMenuActionSupport) were renamed
+        // in later (obfuscated) client builds, so that path is gone. Go straight to the direct-click
+        // fallback, which was already the safety net and works on every client version.
 
-        // Fallback: invoke the best-matching / first clickable widget directly.
+        // Invoke the best-matching / first clickable widget directly.
         String needle = confirmText.get().trim().toLowerCase(java.util.Locale.ROOT);
         AbstractWidget match = null;
         AbstractWidget fallback = null;

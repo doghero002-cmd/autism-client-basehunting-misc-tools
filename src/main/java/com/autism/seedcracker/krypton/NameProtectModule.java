@@ -22,8 +22,8 @@ public final class NameProtectModule extends Module {
         .description("Name shown instead of your real username.")
         .group("General"));
 
-    public NameProtectModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":name-protect", "Name Protect", category,
+    public NameProtectModule() {
+        super(SeedcrackerAddon.ID + ":name-protect", "Name Protect",
             "Hide your real username (shows a fake name).");
         INSTANCE = this;
     }

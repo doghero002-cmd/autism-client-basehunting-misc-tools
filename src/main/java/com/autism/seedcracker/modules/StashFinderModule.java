@@ -13,7 +13,7 @@ import autismclient.api.module.ColorSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.ChunkPos;
@@ -114,8 +114,8 @@ public final class StashFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public StashFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-stash-finder", "Stash Finder", category,
+    public StashFinderModule() {
+        super(SeedcrackerAddon.ID + ":z-stash-finder", "Stash Finder",
             "Flags chunks dense with chests/hoppers/shulkers - likely hidden player stashes.");
     }
 
@@ -475,7 +475,7 @@ public final class StashFinderModule extends Module {
         if (!notify.get()) return;
         String band = isReal ? "REAL base" : "ambiguous";
         String msg = band + " (score " + score + ", " + size + " storage) at X:" + centre.getX() + " Y:" + centre.getY() + " Z:" + centre.getZ();
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§6[StashFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
@@ -495,7 +495,7 @@ public final class StashFinderModule extends Module {
         recordHeat(pos.getMinBlockX() + 8, pos.getMinBlockZ() + 8);
         if (!notify.get()) return;
         String msg = "Stash chunk (" + count + " storage) at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§6[StashFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {

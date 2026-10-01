@@ -34,8 +34,8 @@ public final class TPASpammerModule extends Module {
 
     private int tickCounter = 0;
 
-    public TPASpammerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-tpa-spammer", "TPA Spammer", category,
+    public TPASpammerModule() {
+        super(SeedcrackerAddon.ID + ":z-tpa-spammer", "TPA Spammer",
             "Repeatedly sends /tpa or /tpahere requests to a target player on a delay.");
     }
 

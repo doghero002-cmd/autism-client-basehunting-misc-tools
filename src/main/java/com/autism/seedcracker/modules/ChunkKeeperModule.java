@@ -69,8 +69,8 @@ public final class ChunkKeeperModule extends Module {
     private int feedTicks = 0;
     private long heldResends = 0, heldRehides = 0, heldUnloads = 0;
 
-    public ChunkKeeperModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":chunk-keeper", "Chunk Keeper", category,
+    public ChunkKeeperModule() {
+        super(SeedcrackerAddon.ID + ":chunk-keeper", "Chunk Keeper",
             "Holds revealed chunks: blocks anti-xray re-sends/re-hides so deepslate & ores stay rendered. Also flags strip attempts.");
     }
 

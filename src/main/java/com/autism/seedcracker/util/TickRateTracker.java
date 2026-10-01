@@ -15,7 +15,7 @@ public final class TickRateTracker {
     /** Server TPS from the base client's tracker (20 = healthy; 20 when unknown). */
     public static float averageTps() {
         try {
-            double tps = autismclient.util.macro.ServerTickTracker.getEstimatedTps();
+            double tps = com.autism.seedcracker.compat.ClientCompatUtil.getEstimatedTps();
             if (tps <= 0 || Double.isNaN(tps)) return 20.0f;
             return (float) Math.min(20.0, tps);
         } catch (Throwable t) {

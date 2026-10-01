@@ -7,6 +7,7 @@ import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
@@ -71,8 +72,8 @@ public final class AutoLogModule extends Module {
     private float lastRawHealth = -1.0f;
     private boolean loggedOut = false;
 
-    public AutoLogModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-auto-log", "Auto Log", category,
+    public AutoLogModule() {
+        super(SeedcrackerAddon.ID + ":z-auto-log", "Auto Log",
             "Automatically disconnects under configurable danger conditions (low health, damage, players).");
     }
 
@@ -154,7 +155,7 @@ public final class AutoLogModule extends Module {
             loggedOut = true;
             if (notify.get()) {
                 AutismClientMessaging.sendPrefixed("§c[Auto Log] Disconnecting: §f" + reason);
-                autismclient.util.AutismNotifications.warning("Auto Log: " + reason);
+                ClientNotify.warning("Auto Log: " + reason);
             }
             disconnect(mc, reason);
         }

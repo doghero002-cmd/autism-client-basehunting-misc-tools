@@ -20,8 +20,8 @@ public final class ScoreboardHiderModule extends Module {
         return hide;
     }
 
-    public ScoreboardHiderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":scoreboard-hider", "Scoreboard Hider", category,
+    public ScoreboardHiderModule() {
+        super(SeedcrackerAddon.ID + ":scoreboard-hider", "Scoreboard Hider",
             "Hides the server's scoreboard sidebar (render-only, undetectable).");
     }
 

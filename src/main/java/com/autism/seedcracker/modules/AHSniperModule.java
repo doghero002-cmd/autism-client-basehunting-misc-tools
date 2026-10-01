@@ -90,8 +90,8 @@ public final class AHSniperModule extends Module {
     private String currentSeller = "";
     private long lastApiCall;
 
-    public AHSniperModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper", category,
+    public AHSniperModule() {
+        super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper",
             "Buys a target item the instant it appears at/under your price (manual GUI or API mode).");
     }
 
@@ -169,8 +169,11 @@ public final class AHSniperModule extends Module {
             }
             apiQueryInProgress = true;
             queryApi(key).thenAccept(list -> {
+                // Hop back to the client thread before touching snipe state: processApiResponse
+                // mutates isAuctionSniping/currentSeller/auctionPageCounter, which tick() reads on
+                // the main thread. Running it on the async thread was a data race.
                 apiQueryInProgress = false;
-                processApiResponse(mc, list);
+                mc.execute(() -> processApiResponse(mc, list));
             });
         } else {
             // We found a seller via the API: open their page and buy.

@@ -75,8 +75,8 @@ public final class SeedRayModule extends Module {
     private int compareTicks = 0;
     private boolean haveComparedOnce = false;
 
-    public SeedRayModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":seed-ray", "Seed Ray", category,
+    public SeedRayModule() {
+        super(SeedcrackerAddon.ID + ":seed-ray", "Seed Ray",
             "Simulates ore veins from the cracked world seed; mined-out veins reveal player activity (Kiwi).");
     }
 

@@ -80,8 +80,8 @@ public final class HoleTunnelStairsEspModule extends Module {
 
     private static long packCol(int x, int z) { return ((long) x & 0xFFFFFFFFL) << 32 | ((long) z & 0xFFFFFFFFL); }
 
-    public HoleTunnelStairsEspModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":hole-tunnel-stairs-esp", "Hole/Tunnel/Stairs ESP", category,
+    public HoleTunnelStairsEspModule() {
+        super(SeedcrackerAddon.ID + ":hole-tunnel-stairs-esp", "Hole/Tunnel/Stairs ESP",
             "Highlights player-dug holes, tunnels, and staircases (base/dug-path signs).");
     }
 

@@ -40,7 +40,11 @@ public class Config {
     public FeatureToggle netherBiome = new FeatureToggle(false);
     public FeatureToggle biome = new FeatureToggle(false);
     public RenderType render = RenderType.XRAY;
-    public boolean active = true;
+    // Default OFF: the cracker is opt-in. When this was true, a stale/persisted config kept the
+    // cracker active across restarts even with every module off, and ~13 finder types default to
+    // enabled - so every chunk-load submitted finder scans to the thread pool (chunk-load lag).
+    // The SeedcrackerModule still flips this on/off as it's toggled; this only changes the default.
+    public boolean active = false;
     public boolean debug = false;
     public boolean antiXrayBypass = true;
     private MCVersion version = MCVersion.latest();

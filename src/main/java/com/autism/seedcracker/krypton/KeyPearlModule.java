@@ -33,8 +33,8 @@ public final class KeyPearlModule extends Module {
     private int stage = 0; // 0=swap+throw, 1=wait, 2=swapback
     private int counter = 0;
 
-    public KeyPearlModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":key-pearl", "Key Pearl", category,
+    public KeyPearlModule() {
+        super(SeedcrackerAddon.ID + ":key-pearl", "Key Pearl",
             "Enable to throw an ender pearl and swap back. Bind the toggle to a key.");
     }
 

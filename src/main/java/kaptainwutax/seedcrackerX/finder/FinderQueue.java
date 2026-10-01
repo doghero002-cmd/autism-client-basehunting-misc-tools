@@ -51,6 +51,13 @@ public class FinderQueue {
     public void onChunkData(Level world, ChunkPos chunkPos) {
         if (!Config.get().active) return;
 
+        // Resolve the enabled finder types ONCE up front. If none are on, there is nothing to scan,
+        // so skip entirely - this is the "chunks stutter even with modules off" fix: Config.active
+        // can be stuck true (it persists), and ~13 finder types default to enabled, so every chunk
+        // used to submit a task per type to the 5-thread pool regardless of what the user wanted.
+        List<Finder.Type> activeTypes = getActiveFinderTypes();
+        if (activeTypes.isEmpty()) return;
+
         // Throttle: skip chunks we already queued/scanned this session so a render-distance reload
         // or chunk re-send doesn't re-flood the finder pool. This is the main chunk-loading lag fix.
         long key = ((long) chunkPos.x() << 32) | (chunkPos.z() & 0xffffffffL);
@@ -60,7 +67,7 @@ public class FinderQueue {
         if (SERVICE instanceof java.util.concurrent.ThreadPoolExecutor tpe
             && tpe.getQueue().size() > 256) return;
 
-        getActiveFinderTypes().forEach(type -> {
+        activeTypes.forEach(type -> {
             SERVICE.submit(() -> {
                 try {
                     List<Finder> finders = type.finderBuilder.build(world, chunkPos);
