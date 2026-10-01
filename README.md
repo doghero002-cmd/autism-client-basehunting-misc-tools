@@ -42,55 +42,67 @@ This addon combines a handful of different modules into one package so you can u
 
 ## Features
 
+### What this pack is for
+
+This addon bundles base-finding, stash scouting, seed-cracking, and utility tooling into a single AUTISM Client jar. It is designed for DonutSMP-style hunting workflows and for players who want a compact, all-in-one toolset without juggling separate mods.
+
 ### Core modules
 
-- **Seedcracker** — SeedCrackerX integration for seed cracking and chunk/structure analysis.
-- **Bedrock Finder** — Finds valuable terrain features and coordinate-based points of interest.
-- **Donut RTP Stash Finder** — Uses RTP + automated digging to locate stash blocks around 0,0 and log results.
-- **Relog Loader** — Forces chunk reloads so ESP and region scanners can read newly generated terrain.
+- **Seedcracker** — SeedCrackerX-style seed cracking and structure analysis.
+- **Bedrock Finder** — Terrain and coordinate-based discovery tools.
+- **Texture Cracker** — Visual and texture-led crack/search helpers.
+- **Donut RTP Stash Finder** — RTP-based stash hunting around 0,0 and nearby structures.
+- **Relog Loader** — Forces chunk refreshes so discovery tools can read newly generated terrain.
 
 ### Module groups
 
 | Section | Included tools |
 | --- | --- |
-| **Core** | Seedcracker, Bedrock Finder, Donut RTP Stash Finder, Relog Loader |
-| **Finders** | Stash, Chunk, Spawner, SusChunk, SeedRay, Chunk Waypoints, Finder Overlay, Player Chunks, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Base Webhook, Chunk Keeper, Base Log Browser, Tunnel Base Finder, Tunnel Base Water, Nether Tunnel Finder, and Structure Detector |
-| **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, and Spawner Protect |
-| **Fake** | FakePay, FakePayments, and FakeRoles |
-| **Render** | AutoRender, PaperRig, and Scoreboard Hider |
-| **Trading** | AH Flipper, AH Sniper, Shop Buyer, and AH Sell |
-| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter, Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Hole ESP, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, and Name Protect |
+| **Core** | Seedcracker, Bedrock Finder, Texture Cracker, Donut RTP Stash Finder, Relog Loader |
+| **Finders** | Netherite Finder, Stash Finder, Chunk Finder, Spawner Finder, SusChunk Finder, SeedRay, Chunk Waypoints, Finder Overlay, Player Chunks, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Base Webhook, Chunk Keeper, Base Log Browser, Tunnel Base Finder, Tunnel Base Water, Nether Tunnel Finder, Structure Detector |
+| **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, Spawner Protect |
+| **Render** | AutoRender, PaperRig, Scoreboard Hider, Storage Recorder |
+| **Fake** | FakePay, FakePayments, FakeRoles |
+| **Trading** | AH Flipper, AH Sniper, Shop Buyer, AH Sell |
+| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Player Panic, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Balance Tags, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter, Home Meta, Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Translate, Hole ESP, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, Name Protect, Mace PVP |
 
 ### DonutSMP stash tools
 
-- **Donut RTP Stash Finder** — RTPs around the map, then digs near 0,0 and searches for stash blocks using a Baritone “legit / smooth movement” profile. Results are logged to `bases.txt`.
-- **Relog Loader** — Digs down, relogs to force the server to resend chunks, then flies so ESP can read the region more reliably.
+- **Donut RTP Stash Finder** — Uses RTP plus directed digging around key areas to locate stash blocks and log the results to `bases.txt`.
+- **Relog Loader** — Digs down, relogs, and re-pulls chunks so finder modules can read fresh terrain more reliably.
 
-> For tunnel base hunting specifically, the water tunnel base finder is often the safer and better option for avoiding flags.
+> For tunnel base hunting, the water variant of the tunnel finder is usually the safer and less disruptive option for avoiding flags.
 
-## Recommended modules by task
+## Recommended setup by task
 
-### Recommended modules for stash finding
+### Best stash-finding setup
 
 - **Stash Finder**
 - **Relog Loader**
-- **Prime Chunk Finder** (Medium)
-- **Auto Render**
+- **Prime Chunk Finder**
+- **AutoRender**
 - **Elytra Warner**
 - **Auto Firework**
-- **Spectator Protector**
+- **Spectator Detector**
 - **Amethyst ESP**
-- **Storage ESP**
-- **Spawner ESP**
+- **Storage Recorder**
 - **Chunk Keeper**
 
-### Recommended modules for tunnel base hunting
+### Best tunnel-base setup
 
 - **Tunnel Base Finder** (Water / Dogs mode)
-- **Storage ESP**
+- **Storage Recorder**
 - **Prime Chunk Finder**
 - **Finder Overlay**
 - **Amethyst ESP**
+
+### Useful utility modules
+
+- **Player Panic** — immediate defensive stop/disable state for risky automation.
+- **Chest Stealer** — fast container pickup and inventory management.
+- **Auto Replenish** — automatic item restock workflow.
+- **Balance Tags** — tags and tracking for balance-heavy inventory work.
+- **Translate** and **Home Meta** — helpful multitool utility modules for quick in-game workflows.
 
 ## Quick Start
 
@@ -115,8 +127,15 @@ This addon combines a handful of different modules into one package so you can u
 
 ## Build
 
+From the project root, build the addon with either of these commands:
+
+```bash
+# Linux / macOS
+./gradlew build --no-daemon
+```
+
 ```powershell
-# Build this addon from the project root.
+# Windows
 .\gradlew.bat build --no-daemon
 ```
 
