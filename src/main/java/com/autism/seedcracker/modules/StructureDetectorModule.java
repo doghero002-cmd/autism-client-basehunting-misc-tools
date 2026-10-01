@@ -70,8 +70,8 @@ public final class StructureDetectorModule extends Module {
     private static final Pattern COORDS = Pattern.compile("\\[?(-?\\d+)\\s*[,\\s]+~?\\s*[,\\s]+(-?\\d+)\\]?");
     private static final Pattern COORDS3 = Pattern.compile("\\[?(-?\\d+)\\s*[,\\s]+(-?\\d+)\\s*[,\\s]+(-?\\d+)\\]?");
 
-    public StructureDetectorModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":structure-detector", "Structure Detector", category,
+    public StructureDetectorModule() {
+        super(SeedcrackerAddon.ID + ":structure-detector", "Structure Detector",
             "Locates natural structures via /locate so they aren't mistaken for player bases.");
     }
 

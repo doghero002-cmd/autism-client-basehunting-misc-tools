@@ -28,8 +28,8 @@ public final class CoordSnapperModule extends Module {
         .description("Zero your velocity while snapping so you stay centered.")
         .group("General"));
 
-    public CoordSnapperModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-coord-snapper", "Coord Snapper", category,
+    public CoordSnapperModule() {
+        super(SeedcrackerAddon.ID + ":z-coord-snapper", "Coord Snapper",
             "Snaps your position to the center of the block you are standing in.");
     }
 

@@ -35,8 +35,8 @@ public final class AutoSmeltModule extends Module {
 
     private int cooldown = 0;
 
-    public AutoSmeltModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":auto-smelt", "Auto Smelt", category,
+    public AutoSmeltModule() {
+        super(SeedcrackerAddon.ID + ":auto-smelt", "Auto Smelt",
             "Runs open furnaces for you: pull output, refuel, feed input.");
     }
 

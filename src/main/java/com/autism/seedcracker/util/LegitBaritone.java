@@ -1,6 +1,7 @@
 package com.autism.seedcracker.util;
 
-import autismclient.util.AutismCompatManager;
+import com.autism.seedcracker.compat.BaritoneCompat;
+
 import net.minecraft.client.Minecraft;
 
 /**
@@ -25,7 +26,7 @@ public final class LegitBaritone {
 
     /** Apply the legit profile. Safe to call repeatedly. */
     public static void apply(Minecraft mc) {
-        if (!AutismCompatManager.isBaritoneAvailable()) return;
+        if (!BaritoneCompat.isBaritoneAvailable()) return;
 
         // Don't force client-side rotations for movement, and be anti-cheat friendly.
         set(mc, "freeLook", true);
@@ -66,14 +67,14 @@ public final class LegitBaritone {
     }
 
     private static void set(Minecraft mc, String name, boolean value) {
-        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+        BaritoneCompat.sendBaritoneCommand(mc, "#set " + name + " " + value);
     }
 
     private static void setF(Minecraft mc, String name, double value) {
-        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+        BaritoneCompat.sendBaritoneCommand(mc, "#set " + name + " " + value);
     }
 
     private static void setI(Minecraft mc, String name, int value) {
-        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+        BaritoneCompat.sendBaritoneCommand(mc, "#set " + name + " " + value);
     }
 }

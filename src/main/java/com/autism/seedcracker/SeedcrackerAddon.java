@@ -89,127 +89,138 @@ public final class SeedcrackerAddon extends AutismAddon {
         return ApiVersion.CURRENT;
     }
 
+    /** Track a module in our own obfuscation-proof registry, then register it with the client. */
+    private static void reg(autismclient.modules.Module module) {
+        com.autism.seedcracker.compat.ModuleLookup.track(module);
+        AutismAddons.modules().register(module);
+    }
+
+    /** Register + assign a named tab via the reflection-based CategoryAssigner (restores per-tab
+     * grouping across client versions without referencing the renamed category type). */
+    private static void regTab(autismclient.modules.Module module, String tab) {
+        com.autism.seedcracker.compat.CategoryAssigner.assign(module, tab);
+        reg(module);
+    }
+
     @Override
     public void onInitialize() {
         this.name = "Dogs BaseHunting/QQL Tools";
         this.authors = "KaptainWutax, 19MisterX98";
         this.color = 0xFF50C878;
 
-        // Category tabs for the Zelith modules (each type gets its own tab in the module menu).
-        // NOTE: AutismAddons.modules().registerCategory(label) collapses every call for the same
-        // addon into ONE shared addon category (the API keys addon categories by addon id only and
-        // ignores the label). To get genuinely separate tabs we register plain (non-addon) categories
-        // keyed by their label, the same way the client's builtin modules do.
-        autismclient.modules.ModuleCategory catFinders = autismclient.modules.ModuleCategory.register("Finders");
-        autismclient.modules.ModuleCategory catEntity = autismclient.modules.ModuleCategory.register("Entity");
-        autismclient.modules.ModuleCategory catFake = autismclient.modules.ModuleCategory.register("Fake");
-        autismclient.modules.ModuleCategory catRender = autismclient.modules.ModuleCategory.register("Render");
-        autismclient.modules.ModuleCategory catTrading = autismclient.modules.ModuleCategory.register("Trading");
-        autismclient.modules.ModuleCategory catDogsMisc = autismclient.modules.ModuleCategory.register("Dogs Misc Tools");
+        // Modules register with NO explicit category TYPE: reg(...) lands each under the addon's
+        // auto category, and regTab(...) assigns a named tab through CategoryAssigner's reflective
+        // lookup (the category type is ModuleCategory in v5, renamed in obfuscated clients, so it's
+        // resolved at runtime, never referenced at compile time). If the lookup fails on some future
+        // client it degrades to one tab instead of failing to load.
 
-        AutismAddons.modules().register(new SeedcrackerModule());
-        AutismAddons.modules().register(new BedrockFinderModule());
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.TextureCrackerModule(catDogsMisc));
-        AutismAddons.modules().register(new DonutRTPStashFinderModule());
-        AutismAddons.modules().register(new RelogLoaderModule());
+        reg(new SeedcrackerModule());
+        reg(new BedrockFinderModule());
+        reg(new com.autism.seedcracker.modules.TextureCrackerModule());
+        reg(new DonutRTPStashFinderModule());
+        reg(new RelogLoaderModule());
 
         // Zelith chunk-scanner finder modules (ported). The shared renderer self-registers a
         // LevelRenderEvents collector that all six feed their flagged chunks into.
         ChunkFlagRenderer.init();
-        AutismAddons.modules().register(new StashFinderModule(catFinders));
-        AutismAddons.modules().register(new ChunkFinderModule(catFinders));
-        AutismAddons.modules().register(new SpawnerFinderModule(catFinders));
-        AutismAddons.modules().register(new SusChunkFinderModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.SeedRayModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.ChunkWaypointsModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.FinderOverlayModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.PlayerChunksModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.LightSourceFinderModule(catFinders));
-        AutismAddons.modules().register(new PrimeChunkFinderModule(catFinders));
-        AutismAddons.modules().register(new ActivityFinderModule(catFinders));
-        AutismAddons.modules().register(new GrowthFinderModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.HeatMapRadarModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.RaidPlannerModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.BaseWebhookModule(catFinders));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.ChunkKeeperModule(catFinders));
-        AutismAddons.modules().register(new BaseLogBrowserModule(catFinders));
-        AutismAddons.modules().register(new TunnelBaseFinderModule(catFinders));
-        AutismAddons.modules().register(new TunnelBaseWaterModule(catFinders));
-        AutismAddons.modules().register(new NetherTunnelFinderModule(catFinders));
-        AutismAddons.modules().register(new StructureDetectorModule(catFinders));
+        regTab(new com.autism.seedcracker.modules.NetheriteFinderModule(), "Finders");
+        regTab(new StashFinderModule(), "Finders");
+        regTab(new ChunkFinderModule(), "Finders");
+        regTab(new SpawnerFinderModule(), "Finders");
+        regTab(new SusChunkFinderModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.SeedRayModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.ChunkWaypointsModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.FinderOverlayModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.PlayerChunksModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.LightSourceFinderModule(), "Finders");
+        regTab(new PrimeChunkFinderModule(), "Finders");
+        regTab(new ActivityFinderModule(), "Finders");
+        regTab(new GrowthFinderModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.HeatMapRadarModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.RaidPlannerModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.BaseWebhookModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.ChunkKeeperModule(), "Finders");
+        regTab(new BaseLogBrowserModule(), "Finders");
+        regTab(new TunnelBaseFinderModule(), "Finders");
+        regTab(new TunnelBaseWaterModule(), "Finders");
+        regTab(new NetherTunnelFinderModule(), "Finders");
+        regTab(new StructureDetectorModule(), "Finders");
 
         // Zelith entity / fake modules (ported), each under its own tab.
-        AutismAddons.modules().register(new EntityScannerModule(catEntity));
-        AutismAddons.modules().register(new AntiTrapModule(catEntity));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.EyeFinderModule(catEntity));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.ItemFrameEspModule(catEntity));
-        AutismAddons.modules().register(new BoneDropperModule(catEntity));
-        AutismAddons.modules().register(new SpawnerProtectModule(catEntity));
-        AutismAddons.modules().register(new AutoRenderModule(catRender));
-        AutismAddons.modules().register(new PaperRigModule(catRender));
-        AutismAddons.modules().register(new ScoreboardHiderModule(catRender));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.StorageRecorderModule(catRender));
-        AutismAddons.modules().register(new FakePayModule(catFake));
-        AutismAddons.modules().register(new FakePaymentsModule(catFake));
-        AutismAddons.modules().register(new FakeRolesModule(catFake));
+        regTab(new EntityScannerModule(), "Entity");
+        regTab(new AntiTrapModule(), "Entity");
+        regTab(new com.autism.seedcracker.modules.EyeFinderModule(), "Entity");
+        regTab(new com.autism.seedcracker.modules.ItemFrameEspModule(), "Entity");
+        regTab(new BoneDropperModule(), "Entity");
+        regTab(new SpawnerProtectModule(), "Entity");
+        regTab(new AutoRenderModule(), "Render");
+        regTab(new PaperRigModule(), "Render");
+        regTab(new ScoreboardHiderModule(), "Render");
+        regTab(new com.autism.seedcracker.modules.StorageRecorderModule(), "Render");
+        regTab(new FakePayModule(), "Fake");
+        regTab(new FakePaymentsModule(), "Fake");
+        regTab(new FakeRolesModule(), "Fake");
 
         // Trading.
-        AutismAddons.modules().register(new AHFlipperModule(catTrading));
-        AutismAddons.modules().register(new AHSniperModule(catTrading));
-        AutismAddons.modules().register(new ShopBuyerModule(catTrading));
-        AutismAddons.modules().register(new AhSellModule(catTrading));
+        regTab(new AHFlipperModule(), "Trading");
+        regTab(new AHSniperModule(), "Trading");
+        regTab(new ShopBuyerModule(), "Trading");
+        regTab(new AhSellModule(), "Trading");
 
         // Dogs Misc Tools (Zelith misc modules, ported).
-        AutismAddons.modules().register(new SprintModule(catDogsMisc));
-        AutismAddons.modules().register(new AntiAFKModule(catDogsMisc));
-        AutismAddons.modules().register(new FastPlaceModule(catDogsMisc));
-        AutismAddons.modules().register(new FreeLookModule(catDogsMisc));
-        AutismAddons.modules().register(new AutoEatModule(catDogsMisc));
-        AutismAddons.modules().register(new AutoMineModule(catDogsMisc));
-        AutismAddons.modules().register(new SwingSpeedModule(catDogsMisc));
-        AutismAddons.modules().register(new CoordSnapperModule(catDogsMisc));
-        AutismAddons.modules().register(new FakePlayerModule(catDogsMisc));
-        AutismAddons.modules().register(new AutoLogModule(catDogsMisc));
-        AutismAddons.modules().register(new FlagDetectorModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.MacroProtectorModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.SpectatorDetectorModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.PanicPayModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.AntiCheatGuesserModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.FakeLatencyModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.PositionPacketFilterModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.CoordinateProtectorModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.AutoStoreModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.AutoSmeltModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.ChestStealerModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.AutoReplenishModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.BalanceTagsModule(catDogsMisc));
-        AutismAddons.modules().register(new AutoToolModule(catDogsMisc));
-        AutismAddons.modules().register(new TPASpammerModule(catDogsMisc));
-        AutismAddons.modules().register(new TabDetectorModule(catDogsMisc));
-        AutismAddons.modules().register(new WeatherNotifierModule(catDogsMisc));
-        AutismAddons.modules().register(new HomeSetterModule(catDogsMisc));
-        AutismAddons.modules().register(new SkinChangerModule(catDogsMisc));
-        AutismAddons.modules().register(new ChatGamesModule(catDogsMisc));
-        AutismAddons.modules().register(new RegionMapModule(catDogsMisc));
-        AutismAddons.modules().register(new SchematicBuilderModule(catDogsMisc));
-        AutismAddons.modules().register(new ElytraWarnerModule(catDogsMisc));
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.TranslateModule(catDogsMisc));
+        String dogs = "Dogs Misc Tools";
+        regTab(new SprintModule(), dogs);
+        regTab(new AntiAFKModule(), dogs);
+        regTab(new FastPlaceModule(), dogs);
+        regTab(new FreeLookModule(), dogs);
+        regTab(new AutoEatModule(), dogs);
+        regTab(new AutoMineModule(), dogs);
+        regTab(new SwingSpeedModule(), dogs);
+        regTab(new CoordSnapperModule(), dogs);
+        regTab(new FakePlayerModule(), dogs);
+        regTab(new AutoLogModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.PlayerPanicModule(), dogs);
+        regTab(new FlagDetectorModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.MacroProtectorModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.SpectatorDetectorModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.PanicPayModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.AntiCheatGuesserModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.FakeLatencyModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.PositionPacketFilterModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.CoordinateProtectorModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.AutoStoreModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.AutoSmeltModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.ChestStealerModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.AutoReplenishModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.BalanceTagsModule(), dogs);
+        regTab(new AutoToolModule(), dogs);
+        regTab(new TPASpammerModule(), dogs);
+        regTab(new TabDetectorModule(), dogs);
+        regTab(new WeatherNotifierModule(), dogs);
+        regTab(new HomeSetterModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.HomeMetaModule(), dogs);
+        regTab(new SkinChangerModule(), dogs);
+        regTab(new ChatGamesModule(), dogs);
+        regTab(new RegionMapModule(), dogs);
+        regTab(new SchematicBuilderModule(), dogs);
+        regTab(new ElytraWarnerModule(), dogs);
+        regTab(new com.autism.seedcracker.modules.TranslateModule(), dogs);
 
         // ESP (moved to the Dogs tab).
-        AutismAddons.modules().register(new HoleEspModule(catDogsMisc));
-        AutismAddons.modules().register(new HoleTunnelStairsEspModule(catDogsMisc));
-        AutismAddons.modules().register(new AmethystEspModule(catDogsMisc));
-        AutismAddons.modules().register(new BedrockHoleEspModule(catDogsMisc));
+        regTab(new HoleEspModule(), dogs);
+        regTab(new HoleTunnelStairsEspModule(), dogs);
+        regTab(new AmethystEspModule(), dogs);
+        regTab(new BedrockHoleEspModule(), dogs);
 
         // Krypton misc modules (ported).
-        AutismAddons.modules().register(new KeyPearlModule(catDogsMisc));
-        AutismAddons.modules().register(new AutoFireworkModule(catDogsMisc));
-        AutismAddons.modules().register(new AutoTPAModule(catDogsMisc));
-        AutismAddons.modules().register(new QuickMacroModule(catDogsMisc));
-        AutismAddons.modules().register(new NameProtectModule(catDogsMisc));
+        regTab(new KeyPearlModule(), dogs);
+        regTab(new AutoFireworkModule(), dogs);
+        regTab(new AutoTPAModule(), dogs);
+        regTab(new QuickMacroModule(), dogs);
+        regTab(new NameProtectModule(), dogs);
 
         // Combat suite (subtle mace PVP).
-        AutismAddons.modules().register(new com.autism.seedcracker.modules.MacePvpModule(catDogsMisc));
+        regTab(new com.autism.seedcracker.modules.MacePvpModule(), dogs);
 
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());

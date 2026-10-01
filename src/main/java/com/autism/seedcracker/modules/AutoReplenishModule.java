@@ -43,8 +43,8 @@ public final class AutoReplenishModule extends Module {
     private int moveToSlot = -1;
     private int cooldown = 0;
 
-    public AutoReplenishModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":auto-replenish", "Auto Replenish", category,
+    public AutoReplenishModule() {
+        super(SeedcrackerAddon.ID + ":auto-replenish", "Auto Replenish",
             "Refills your held stack from the hotbar or inventory when it runs low.");
     }
 

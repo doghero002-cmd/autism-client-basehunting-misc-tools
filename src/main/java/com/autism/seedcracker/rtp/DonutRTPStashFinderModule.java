@@ -1,5 +1,7 @@
 package com.autism.seedcracker.rtp;
 
+import com.autism.seedcracker.compat.BaritoneCompat;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -28,7 +30,7 @@ import autismclient.api.module.StringListSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismCompatManager;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
@@ -264,9 +266,9 @@ public final class DonutRTPStashFinderModule extends Module {
         loggedThisLanding = false;
         ACTIVE = true;
         AutismClientMessaging.sendPrefixed("§c§l[Warning] §cDonut RTP Stash Finder uses automated RTP/Baritone movement that anti-cheats may flag. Use at your own risk.");
-        autismclient.util.AutismNotifications.warning("RTP Stash Finder: may flag anti-cheat");
+        ClientNotify.warning("RTP Stash Finder: may flag anti-cheat");
         AutismClientMessaging.sendPrefixed("§aDonut RTP Stash Finder enabled. Mode: " + mode.get());
-        if (!AutismCompatManager.isBaritoneAvailable()) {
+        if (!BaritoneCompat.isBaritoneAvailable()) {
             AutismClientMessaging.sendPrefixed("§eBaritone not detected - base-search (dig/mine) disabled; detection still works.");
         }
         Minecraft mc = Minecraft.getInstance();
@@ -391,10 +393,10 @@ public final class DonutRTPStashFinderModule extends Module {
             waterMineDir = horizontals[WANDER_RNG.nextInt(horizontals.length)];
             waterPlaceAttempts = 0;
             AutismClientMessaging.sendPrefixed("§7Water-mining down to Y=" + waterTargetY.get() + ", then tunneling " + waterMineDir.getName() + "... (raw movement - watch for flags)");
-        } else if (scanMode.get() == ScanMode.BARITONE_MINE && AutismCompatManager.isBaritoneAvailable()) {
+        } else if (scanMode.get() == ScanMode.BARITONE_MINE && BaritoneCompat.isBaritoneAvailable()) {
             applyBaritoneSettings();
             // Dig down to the deepslate level first; tickWander handles the descent until reachedDepth.
-            AutismCompatManager.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
+            BaritoneCompat.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
             AutismClientMessaging.sendPrefixed("§7Digging down to Y=" + digDepth.get() + ", then wandering underground (r=" + wanderRadius.get() + ")...");
         } else {
             AutismClientMessaging.sendPrefixed("§7Searching around " + (int) wanderCenterX + ", " + (int) wanderCenterZ + "...");
@@ -535,21 +537,21 @@ public final class DonutRTPStashFinderModule extends Module {
 
     private void stopBaritone() {
         try {
-            if (AutismCompatManager.isBaritoneAvailable()) AutismCompatManager.stopBaritone(Minecraft.getInstance());
+            if (BaritoneCompat.isBaritoneAvailable()) BaritoneCompat.stopBaritone(Minecraft.getInstance());
         } catch (Throwable ignored) {}
     }
 
     /** Descend to the dig depth, then roam random points underground so Baritone mines/covers ground. */
     private void tickWander(Minecraft mc) {
-        if (!AutismCompatManager.isBaritoneAvailable()) return;
+        if (!BaritoneCompat.isBaritoneAvailable()) return;
 
         // Phase 1: get underground first (auto-mine down to the dig depth).
         if (!reachedDepth) {
             if ((int) mc.player.getY() <= digDepth.get()) {
                 reachedDepth = true;
                 applyBaritoneSettings(); // re-enable sprint now that we're at depth
-            } else if (!AutismCompatManager.isBaritoneBusy()) {
-                AutismCompatManager.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
+            } else if (!BaritoneCompat.isBaritoneBusy()) {
+                BaritoneCompat.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
             }
             return;
         }
@@ -558,7 +560,7 @@ public final class DonutRTPStashFinderModule extends Module {
         double dx = mc.player.getX() - wanderCenterX;
         double dz = mc.player.getZ() - wanderCenterZ;
         double maxR = wanderRadius.get();
-        if (!AutismCompatManager.isBaritoneBusy()) {
+        if (!BaritoneCompat.isBaritoneBusy()) {
             double tx, tz;
             if (dx * dx + dz * dz > maxR * maxR) {
                 tx = wanderCenterX;
@@ -572,7 +574,7 @@ public final class DonutRTPStashFinderModule extends Module {
             }
             // Stay underground at the dig depth (clamped to the detection Y range).
             int ty = Math.max(minY.get(), Math.min(maxY.get(), digDepth.get()));
-            wandering = AutismCompatManager.startBaritoneGoTo(mc, (int) tx, ty, (int) tz);
+            wandering = BaritoneCompat.startBaritoneGoTo(mc, (int) tx, ty, (int) tz);
         }
     }
 
@@ -672,7 +674,7 @@ public final class DonutRTPStashFinderModule extends Module {
 
     /** Pushes all configured Baritone settings via #set commands. */
     private void applyBaritoneSettings() {
-        if (!AutismCompatManager.isBaritoneAvailable()) return;
+        if (!BaritoneCompat.isBaritoneAvailable()) return;
         Minecraft mc = Minecraft.getInstance();
         // Core
         set(mc, "allowBreak", allowBreak.get());
@@ -720,11 +722,11 @@ public final class DonutRTPStashFinderModule extends Module {
     }
 
     private static void set(Minecraft mc, String name, boolean value) {
-        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+        BaritoneCompat.sendBaritoneCommand(mc, "#set " + name + " " + value);
     }
 
     private static void set(Minecraft mc, String name, int value) {
-        AutismCompatManager.sendBaritoneCommand(mc, "#set " + name + " " + value);
+        BaritoneCompat.sendBaritoneCommand(mc, "#set " + name + " " + value);
     }
 
     private void logBase(Minecraft mc, BlockPos found) {

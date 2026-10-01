@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ModuleLookup;
+
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.util.FlagLog;
 
@@ -7,7 +9,7 @@ import autismclient.api.module.BoolSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
@@ -55,8 +57,8 @@ public final class MacroProtectorModule extends Module {
 
     private long lastTripMs = 0;
 
-    public MacroProtectorModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":macro-protector", "Macro Protector", category,
+    public MacroProtectorModule() {
+        super(SeedcrackerAddon.ID + ":macro-protector", "Macro Protector",
             "Kills all automation the instant the server force-rotates/teleports you or swaps your slot (staff control check).");
     }
 
@@ -88,7 +90,7 @@ public final class MacroProtectorModule extends Module {
         if (mc.player.tickCount < 100) return;
 
         java.util.List<String> stopped = new java.util.ArrayList<>();
-        for (autismclient.modules.Module m : autismclient.modules.ModuleRegistry.all()) {
+        for (autismclient.modules.Module m : ModuleLookup.all()) {
             if (!m.isEnabled()) continue;
             String simple = m.getClass().getSimpleName();
             if (AUTOMATION_IDS.contains(simple)) {
@@ -109,7 +111,7 @@ public final class MacroProtectorModule extends Module {
                 + " detected! Stopped: §e" + String.join("§f, §e", stopped));
         }
         if (notifyToast.get()) {
-            AutismNotifications.warning("Control check: " + reason + " - automation stopped!");
+            ClientNotify.warning("Control check: " + reason + " - automation stopped!");
         }
     }
 }

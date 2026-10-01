@@ -109,8 +109,8 @@ public final class RegionMapModule extends Module {
     private record Dot(float fx, float fz, RegionMapHud.Cluster cluster) {}
     private final List<Dot> dots = new ArrayList<>();
 
-    public RegionMapModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":region-map", "Region Map", category,
+    public RegionMapModule() {
+        super(SeedcrackerAddon.ID + ":region-map", "Region Map",
             "Interactive DonutSMP region map with colour-coded RTP dots, hover coords and dimensions.");
     }
 

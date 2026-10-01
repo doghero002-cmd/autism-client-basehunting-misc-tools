@@ -22,8 +22,8 @@ public final class SwingSpeedModule extends Module {
         .description("Arm-swing speed multiplier (1.0 = normal).")
         .group("General"));
 
-    public SwingSpeedModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-swing-speed", "Swing Speed", category,
+    public SwingSpeedModule() {
+        super(SeedcrackerAddon.ID + ":z-swing-speed", "Swing Speed",
             "Adjusts the speed of your arm-swing animation.");
     }
 

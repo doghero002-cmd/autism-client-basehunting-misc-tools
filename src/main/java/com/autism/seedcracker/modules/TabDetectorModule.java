@@ -6,7 +6,7 @@ import autismclient.api.module.BoolSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
 
@@ -45,8 +45,8 @@ public final class TabDetectorModule extends Module {
     private final Set<String> online = new HashSet<>();
     private int pollTicks = 0;
 
-    public TabDetectorModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-tab-detector", "Tab Detector", category,
+    public TabDetectorModule() {
+        super(SeedcrackerAddon.ID + ":z-tab-detector", "Tab Detector",
             "Detects specific players in the tab list and notifies when they join or leave.");
     }
 
@@ -131,7 +131,7 @@ public final class TabDetectorModule extends Module {
             AutismClientMessaging.sendPrefixed((joined ? "§a[Tab Detector] " : "§e[Tab Detector] ") + message);
         }
         if (toast.get()) {
-            AutismNotifications.warning("Tab Detector: " + message);
+            ClientNotify.warning("Tab Detector: " + message);
         }
     }
 

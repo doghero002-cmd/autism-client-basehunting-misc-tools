@@ -39,8 +39,8 @@ public final class PanicPayModule extends Module {
     private long enabledAtMs = 0;
     private boolean fired = false;
 
-    public PanicPayModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":panic-pay", "Panic Pay", category,
+    public PanicPayModule() {
+        super(SeedcrackerAddon.ID + ":panic-pay", "Panic Pay",
             "Player detected nearby -> /pay your alt everything + disconnect (dead-man's switch).");
     }
 

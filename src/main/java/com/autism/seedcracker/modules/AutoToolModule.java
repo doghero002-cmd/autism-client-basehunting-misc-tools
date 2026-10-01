@@ -48,8 +48,8 @@ public final class AutoToolModule extends Module {
         .description("Skip tools whose remaining durability is below this % of max.")
         .group("General").visibleWhen(() -> antiBreak.get()));
 
-    public AutoToolModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-auto-tool", "Auto Tool", category,
+    public AutoToolModule() {
+        super(SeedcrackerAddon.ID + ":z-auto-tool", "Auto Tool",
             "Automatically swaps to the best hotbar tool for the block or entity you're attacking.");
     }
 

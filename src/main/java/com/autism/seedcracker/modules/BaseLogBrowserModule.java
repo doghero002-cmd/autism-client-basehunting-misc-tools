@@ -16,8 +16,8 @@ import net.minecraft.client.Minecraft;
  */
 public final class BaseLogBrowserModule extends Module {
 
-    public BaseLogBrowserModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":base-log-browser", "Base Log Browser", category,
+    public BaseLogBrowserModule() {
+        super(SeedcrackerAddon.ID + ":base-log-browser", "Base Log Browser",
             "Browse bases logged to bases.txt. Enable (or press the button) to open the browser.");
 
         add(new ActionSetting("open", "Open Base Log Browser", BaseLogBrowserModule::open)

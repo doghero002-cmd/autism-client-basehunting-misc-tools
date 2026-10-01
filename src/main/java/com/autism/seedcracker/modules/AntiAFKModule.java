@@ -50,8 +50,8 @@ public final class AntiAFKModule extends Module {
     private boolean strafeLeft;
     private float yaw;
 
-    public AntiAFKModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-anti-afk", "Anti AFK", category,
+    public AntiAFKModule() {
+        super(SeedcrackerAddon.ID + ":z-anti-afk", "Anti AFK",
             "Performs small random actions so you do not get kicked for being AFK.");
     }
 

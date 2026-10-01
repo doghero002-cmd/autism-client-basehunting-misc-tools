@@ -5,3 +5,6 @@ run/
 *.log
 .idea/
 *.iml
+
+libs/autism-earlyfix.jar
+

@@ -83,8 +83,8 @@ public final class TextureCrackerModule extends Module {
         .description("Print the current grid + search settings.")
         .group("General"));
 
-    public TextureCrackerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":texture-cracker", "Texture Cracker", category,
+    public TextureCrackerModule() {
+        super(SeedcrackerAddon.ID + ":texture-cracker", "Texture Cracker",
             "Cracks coordinates from block-texture rotations on a screenshot (corner-picker GUI + GPU search).");
     }
 

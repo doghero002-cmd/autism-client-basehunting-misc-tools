@@ -22,8 +22,8 @@ public final class ChunkWaypointsModule extends Module {
         .description("World Y where all finder chunk markers are drawn. Markers always stay pinned here - they never follow the camera.")
         .group("General"));
 
-    public ChunkWaypointsModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":chunk-waypoints", "Chunk Waypoints", category,
+    public ChunkWaypointsModule() {
+        super(SeedcrackerAddon.ID + ":chunk-waypoints", "Chunk Waypoints",
             "Pins all finder chunk markers at a fixed Y level instead of your camera height.");
     }
 

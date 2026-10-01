@@ -51,8 +51,8 @@ public final class PrimeChunkFinderModule extends Module {
     private int cursor = 0;
     private int lastSensitivity = -1;
 
-    public PrimeChunkFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":prime-chunk-finder", "Prime Chunk Finder", category,
+    public PrimeChunkFinderModule() {
+        super(SeedcrackerAddon.ID + ":prime-chunk-finder", "Prime Chunk Finder",
             "Flags chunks with stranded fluid-flow signatures of past player activity.");
     }
 

@@ -51,8 +51,8 @@ public final class BaseWebhookModule extends Module {
     private final java.util.Map<Long, Long> posted = new java.util.concurrent.ConcurrentHashMap<>();
     private int pollTicks = 0;
 
-    public BaseWebhookModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":base-webhook", "Base Webhook", category,
+    public BaseWebhookModule() {
+        super(SeedcrackerAddon.ID + ":base-webhook", "Base Webhook",
             "Posts a Discord webhook the first time any finder confirms a new base location.");
     }
 

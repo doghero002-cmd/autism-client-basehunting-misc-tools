@@ -47,8 +47,8 @@ public final class HeatMapRadarModule extends Module {
     private int saveTicks = 0;
     private boolean dirty = false;
 
-    public HeatMapRadarModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":heatmap-radar", "HeatMap Radar", category,
+    public HeatMapRadarModule() {
+        super(SeedcrackerAddon.ID + ":heatmap-radar", "HeatMap Radar",
             "Per-server visited-chunk heat map so you never sweep the same area twice.");
     }
 

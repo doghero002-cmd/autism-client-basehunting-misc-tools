@@ -52,8 +52,8 @@ public final class FakeRolesModule extends Module {
         .group("Custom")
         .visibleWhen(() -> role.get() == Role.CUSTOM));
 
-    public FakeRolesModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-fake-roles", "Fake Roles", category,
+    public FakeRolesModule() {
+        super(SeedcrackerAddon.ID + ":z-fake-roles", "Fake Roles",
             "Shows a fake role/tag on your nametag in chat.");
         instance = this;
     }

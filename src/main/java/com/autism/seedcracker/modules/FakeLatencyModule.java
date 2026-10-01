@@ -38,8 +38,8 @@ public final class FakeLatencyModule extends Module {
     /** Re-entrancy guard: our own flushed packets pass through the hook again. */
     private boolean flushing = false;
 
-    public FakeLatencyModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":fake-latency", "Fake Latency", category,
+    public FakeLatencyModule() {
+        super(SeedcrackerAddon.ID + ":fake-latency", "Fake Latency",
             "Holds keep-alive/transaction replies to fake a laggy connection.");
     }
 
