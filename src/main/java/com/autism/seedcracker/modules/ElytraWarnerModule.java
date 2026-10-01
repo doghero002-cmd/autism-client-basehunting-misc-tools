@@ -6,7 +6,7 @@ import autismclient.api.module.BoolSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
@@ -31,8 +31,8 @@ public final class ElytraWarnerModule extends Module {
 
     private boolean warned = false;
 
-    public ElytraWarnerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":elytra-warner", "Elytra Warner", category,
+    public ElytraWarnerModule() {
+        super(SeedcrackerAddon.ID + ":elytra-warner", "Elytra Warner",
             "Warns when your elytra is about to break (and can auto-swap to a spare).");
     }
 
@@ -70,7 +70,7 @@ public final class ElytraWarnerModule extends Module {
                 warned = true;
                 if (notify.get()) {
                     String msg = "Elytra low: " + pct + "% (" + remaining + "/" + max + ")";
-                    AutismNotifications.warning(msg);
+                    ClientNotify.warning(msg);
                     AutismClientMessaging.sendPrefixed("§c[Elytra Warner] §f" + msg);
                     mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.6f);
                 }

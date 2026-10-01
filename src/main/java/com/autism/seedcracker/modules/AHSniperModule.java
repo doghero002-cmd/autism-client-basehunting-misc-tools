@@ -90,8 +90,8 @@ public final class AHSniperModule extends Module {
     private String currentSeller = "";
     private long lastApiCall;
 
-    public AHSniperModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper", category,
+    public AHSniperModule() {
+        super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper",
             "Buys a target item the instant it appears at/under your price (manual GUI or API mode).");
     }
 

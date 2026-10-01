@@ -30,8 +30,8 @@ public final class AntiCheatGuesserModule extends Module {
     private String guess = "unknown";
     private boolean announced = false;
 
-    public AntiCheatGuesserModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":ac-guesser", "AntiCheat Guesser", category,
+    public AntiCheatGuesserModule() {
+        super(SeedcrackerAddon.ID + ":ac-guesser", "AntiCheat Guesser",
             "Fingerprints the server's anti-cheat from transaction/ping ID patterns.");
     }
 

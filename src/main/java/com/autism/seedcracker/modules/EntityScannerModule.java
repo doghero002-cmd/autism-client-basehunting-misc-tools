@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ClientNotify;
+
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.finder.ChunkScanHelper;
 
@@ -68,8 +70,8 @@ public final class EntityScannerModule extends Module {
         .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.").group("Performance"));
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
-    public EntityScannerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-entity-scanner", "Entity Scanner", category,
+    public EntityScannerModule() {
+        super(SeedcrackerAddon.ID + ":z-entity-scanner", "Entity Scanner",
             "Flags chunks with lots of entity activity (possible bases).");
     }
 
@@ -108,7 +110,7 @@ public final class EntityScannerModule extends Module {
             scores.put(cpos, score);
             if (score >= sensitivity.get().scale(threshold.get()) && notified.add(cpos) && notifiedThisPass < maxNotify.get()) {
                 notifiedThisPass++;
-                autismclient.util.AutismNotifications.warning(
+                ClientNotify.warning(
                     "Active chunk X:" + cpos.getMiddleBlockX() + " Z:" + cpos.getMiddleBlockZ() + " (score " + (int) score + ")");
             }
         }

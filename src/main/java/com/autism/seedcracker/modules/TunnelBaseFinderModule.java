@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ModuleLookup;
+
 import com.autism.seedcracker.SeedcrackerAddon;
 
 import autismclient.api.module.BoolSetting;
@@ -7,7 +9,6 @@ import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
-import autismclient.modules.ModuleRegistry;
 import autismclient.util.AutismClientMessaging;
 
 /**
@@ -24,8 +25,8 @@ import autismclient.util.AutismClientMessaging;
  */
 public final class TunnelBaseFinderModule extends Module {
 
-    public TunnelBaseFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":tunnel-base-finder", "TunnelBase Finder", category,
+    public TunnelBaseFinderModule() {
+        super(SeedcrackerAddon.ID + ":tunnel-base-finder", "TunnelBase Finder",
             "Digs a tunnel and alerts on bases using the Water engine (the reliable, non-flagging mode). Settings are shared with Tunnel Base (Water).");
 
         add(new EnumSetting<>("mining-style", "Mining style",
@@ -91,7 +92,7 @@ public final class TunnelBaseFinderModule extends Module {
     }
 
     private Module water() {
-        return ModuleRegistry.get(SeedcrackerAddon.ID + ":tunnel-base-water");
+        return ModuleLookup.get(SeedcrackerAddon.ID + ":tunnel-base-water");
     }
 
     // The mirrored settings store nothing locally: reads and writes route to the Water module's

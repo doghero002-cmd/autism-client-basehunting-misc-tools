@@ -57,8 +57,8 @@ public final class SchematicBuilderModule extends Module {
     private static final double MAX_REACH = 4.5;
     private static final double WALK_NEAR = 6.0;
 
-    public SchematicBuilderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":schematic-builder", "Schematic Builder", category,
+    public SchematicBuilderModule() {
+        super(SeedcrackerAddon.ID + ":schematic-builder", "Schematic Builder",
             "Loads a schematic and auto-builds it layer by layer with legit (human-like) placement.");
     }
 
@@ -325,35 +325,14 @@ public final class SchematicBuilderModule extends Module {
             return;
         }
 
-        // Placement solve: prefer the base client's AutismFaceScan (per-block face rects, raycast
-        // visibility, self-occlusion, sneak-unlock detection - the engine its own Scaffold uses).
-        // Falls back to our simpler face-centre scan when FaceScan has no candidate.
-        BlockHitResult hit = null;
+        // Placement solve. The base client's AutismFaceScan was renamed in later (obfuscated)
+        // client builds, so we use our own face-centre placement scan directly (findPlacementHit).
+        // That fallback was already the safety net when FaceScan had no candidate, so behaviour is
+        // unchanged on clients without the renamed class.
+        BlockHitResult hit = findPlacementHit(mc, task.worldPos);
         boolean scanSneak = false;
-        Vec3 eye = mc.player.getEyePosition();
-        try {
-            var placement = autismclient.util.AutismFaceScan.blockItem(
-                mc.player.getInventory().getItem(slot), mc.player, InteractionHand.MAIN_HAND);
-            if (placement != null) {
-                var req = new autismclient.util.AutismFaceScan.Request(
-                    task.worldPos, eye, reachFor(task.worldPos), placement)
-                    .sneakAllowed(true)
-                    .quantize(true);
-                var cand = autismclient.util.AutismFaceScan.best(req);
-                if (cand != null && cand.hit() != null) {
-                    hit = cand.hit();
-                    scanSneak = cand.option() != null && cand.option().requiresSneak();
-                }
-            }
-        } catch (Throwable t) {
-            if (!faceScanFailureLogged) { // one line, not silence - fallback path still works
-                faceScanFailureLogged = true;
-                com.autism.seedcracker.util.FlagLog.flag("INFO", "SchematicBuilder",
-                    "AutismFaceScan unavailable, using fallback placement: " + t);
-            }
-        }
-        if (hit == null) hit = findPlacementHit(mc, task.worldPos);
         if (hit == null) { layerIndex++; return; }
+        Vec3 eye = mc.player.getEyePosition();
         double dist = eye.distanceTo(hit.getLocation());
         double reach = reachFor(task.worldPos);
         if (dist > reach) {

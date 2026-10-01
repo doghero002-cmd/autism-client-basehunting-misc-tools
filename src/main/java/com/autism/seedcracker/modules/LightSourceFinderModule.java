@@ -13,7 +13,7 @@ import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
@@ -64,8 +64,8 @@ public final class LightSourceFinderModule extends Module {
     private final Set<ChunkPos> flagged = new HashSet<>();
     private final Set<ChunkPos> notified = new HashSet<>();
 
-    public LightSourceFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":light-finder", "Light Source Finder", category,
+    public LightSourceFinderModule() {
+        super(SeedcrackerAddon.ID + ":light-finder", "Light Source Finder",
             "Flags chunks with player-placed light sources below a Y level - bases are lit.");
     }
 
@@ -167,7 +167,7 @@ public final class LightSourceFinderModule extends Module {
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
         String msg = "Lit chunk at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ() + " (player lights below Y" + yLevel.get() + ")";
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§e[LightFinder] §f" + msg);
     }
 

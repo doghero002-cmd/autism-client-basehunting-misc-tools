@@ -5,7 +5,7 @@ import com.autism.seedcracker.SeedcrackerAddon;
 import autismclient.api.module.BoolSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -34,8 +34,8 @@ public final class WeatherNotifierModule extends Module {
     private Boolean raining = null;
     private Boolean thundering = null;
 
-    public WeatherNotifierModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-weather-notifier", "Weather Notifier", category,
+    public WeatherNotifierModule() {
+        super(SeedcrackerAddon.ID + ":z-weather-notifier", "Weather Notifier",
             "Notifies you when rain or a thunderstorm starts or stops.");
     }
 
@@ -83,7 +83,7 @@ public final class WeatherNotifierModule extends Module {
             AutismClientMessaging.sendPrefixed("§b[Weather] §f" + message);
         }
         if (toast.get()) {
-            AutismNotifications.warning("Weather: " + message);
+            ClientNotify.warning("Weather: " + message);
         }
     }
 }

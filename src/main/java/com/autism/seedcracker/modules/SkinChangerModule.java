@@ -30,8 +30,8 @@ public final class SkinChangerModule extends Module {
         .description("Use the slim-armed skin model instead of the classic model.")
         .group("General"));
 
-    public SkinChangerModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-skin-changer", "Skin Changer", category,
+    public SkinChangerModule() {
+        super(SeedcrackerAddon.ID + ":z-skin-changer", "Skin Changer",
             "Holds skin-spoof settings. True client-side skin replacement needs a renderer mixin.");
     }
 

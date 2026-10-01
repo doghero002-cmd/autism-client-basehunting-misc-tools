@@ -40,8 +40,8 @@ public final class EyeFinderModule extends Module {
     private final java.util.Map<String, BlockPos> lastTarget = new java.util.HashMap<>();
     private final java.util.Map<String, Integer> stareTicks = new java.util.HashMap<>();
 
-    public EyeFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":eye-finder", "Eye Finder", category,
+    public EyeFinderModule() {
+        super(SeedcrackerAddon.ID + ":eye-finder", "Eye Finder",
             "Highlights the block every other player is looking at (gaze intel).");
     }
 

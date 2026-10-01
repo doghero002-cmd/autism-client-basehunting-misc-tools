@@ -15,7 +15,6 @@
     "LocalPlayerMixin",
     "ModuleLifecycleMixin",
     "MouseHandlerAccessor",
-    "MouseHandlerMixin",
     "TranslateChatMixin"
   ],
   "injectors": {

@@ -25,8 +25,8 @@ public final class CoordinateProtectorModule extends Module {
 
     private Boolean savedReduced = null;
 
-    public CoordinateProtectorModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":coord-protector", "Coord Protector", category,
+    public CoordinateProtectorModule() {
+        super(SeedcrackerAddon.ID + ":coord-protector", "Coord Protector",
             "Hides F3 coordinates and blocks accidental coordinate pastes into chat.");
     }
 

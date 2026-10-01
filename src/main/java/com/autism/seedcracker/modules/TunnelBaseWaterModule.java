@@ -167,8 +167,8 @@ public final class TunnelBaseWaterModule extends Module {
     private final com.autism.seedcracker.util.StuckDetector stuck = new com.autism.seedcracker.util.StuckDetector("TunnelBaseWaterModule",
         com.autism.seedcracker.util.Tuning.STUCK_TICKS_TUNNEL, com.autism.seedcracker.util.Tuning.STUCK_EPSILON);
 
-    public TunnelBaseWaterModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":tunnel-base-water", "Tunnel Base (Water) [BETA]", category,
+    public TunnelBaseWaterModule() {
+        super(SeedcrackerAddon.ID + ":tunnel-base-water", "Tunnel Base (Water) [BETA]",
             "Water Client autonomous tunnel base-finder (beta). Digs until it finds a base, with shop restock + auto-mend/eat.");
     }
 

@@ -73,8 +73,8 @@ public final class PaperRigModule extends Module {
     private int dispenserScanTicks = 0;
     private String statusMessage = "Searching for dispensers...";
 
-    public PaperRigModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-paper-rig", "Paper Rig", category,
+    public PaperRigModule() {
+        super(SeedcrackerAddon.ID + ":z-paper-rig", "Paper Rig",
             "Predicts and rigs the PaperMC dispenser RNG using two nearby dispensers.");
     }
 

@@ -62,8 +62,8 @@ public final class FakePaymentsModule extends Module {
         .description("Play a ding on each fake payment.")
         .group("General"));
 
-    public FakePaymentsModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-fake-payments", "Fake Payments", category,
+    public FakePaymentsModule() {
+        super(SeedcrackerAddon.ID + ":z-fake-payments", "Fake Payments",
             "Shows fake incoming payments in chat on a timer.");
     }
 

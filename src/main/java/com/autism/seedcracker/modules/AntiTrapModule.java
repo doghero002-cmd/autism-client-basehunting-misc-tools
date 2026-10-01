@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ClientNotify;
+
 import com.autism.seedcracker.SeedcrackerAddon;
 
 import autismclient.api.module.BoolSetting;
@@ -42,8 +44,8 @@ public final class AntiTrapModule extends Module {
     private final BoolSetting notify = add(new BoolSetting("notify", "Notifications", true)
         .description("Chat + toast when a trap entity is destroyed.").group("General"));
 
-    public AntiTrapModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-anti-trap", "Anti Trap", category,
+    public AntiTrapModule() {
+        super(SeedcrackerAddon.ID + ":z-anti-trap", "Anti Trap",
             "Attacks armor stands and minecarts used to trap you.");
     }
 
@@ -70,7 +72,7 @@ public final class AntiTrapModule extends Module {
             if (notify.get()) {
                 String msg = "Removed trap entity (" + e.getName().getString() + ")";
                 autismclient.util.AutismClientMessaging.sendPrefixed("§c[AntiTrap] §f" + msg);
-                autismclient.util.AutismNotifications.warning("AntiTrap: " + msg);
+                ClientNotify.warning("AntiTrap: " + msg);
             }
             break; // one per cooldown, like a real player clicking
         }

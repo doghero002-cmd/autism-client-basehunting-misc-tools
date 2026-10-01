@@ -29,8 +29,8 @@ public final class PositionPacketFilterModule extends Module {
 
     private long dropped = 0;
 
-    public PositionPacketFilterModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":pos-packet-filter", "Position Filter", category,
+    public PositionPacketFilterModule() {
+        super(SeedcrackerAddon.ID + ":pos-packet-filter", "Position Filter",
             "Drops NaN/absurd entity position packets (anti-ESP-grief, anti-crash).");
     }
 

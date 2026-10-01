@@ -38,8 +38,8 @@ public final class FreeLookModule extends Module {
     private float cameraPitch;
     private CameraType previousPerspective;
 
-    public FreeLookModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-free-look", "Free Look", category,
+    public FreeLookModule() {
+        super(SeedcrackerAddon.ID + ":z-free-look", "Free Look",
             "Look around freely without changing your movement direction.");
     }
 

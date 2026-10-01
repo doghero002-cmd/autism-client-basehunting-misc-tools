@@ -23,8 +23,8 @@ public final class SprintModule extends Module {
 
     private boolean wasSprinting;
 
-    public SprintModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-sprint", "Sprint", category,
+    public SprintModule() {
+        super(SeedcrackerAddon.ID + ":z-sprint", "Sprint",
             "Keeps you sprinting while enabled, restoring your previous sprint state on disable.");
     }
 

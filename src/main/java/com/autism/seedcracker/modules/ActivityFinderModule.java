@@ -13,7 +13,7 @@ import autismclient.api.module.ColorSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
@@ -88,8 +88,8 @@ public final class ActivityFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public ActivityFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-activity-finder", "Activity Finder", category,
+    public ActivityFinderModule() {
+        super(SeedcrackerAddon.ID + ":z-activity-finder", "Activity Finder",
             "Flags chunks with block-entity activity at or below a Y level - signs of a worked area.");
     }
 
@@ -190,7 +190,7 @@ public final class ActivityFinderModule extends Module {
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
         String msg = "Activity detected in chunk " + pos.x() + ", " + pos.z() + " (Y<=" + yLevel.get() + ")";
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§e[ActivityFinder] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {

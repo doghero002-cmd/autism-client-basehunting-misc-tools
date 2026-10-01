@@ -5,6 +5,7 @@ import com.autism.seedcracker.SeedcrackerAddon;
 import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
+import com.autism.seedcracker.compat.ClientInventory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -34,8 +35,8 @@ public final class BoneDropperModule extends Module {
     private int restoreSlot = -1;
     private int dropGapTicks = 0;
 
-    public BoneDropperModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-bone-dropper", "Bone Dropper", category,
+    public BoneDropperModule() {
+        super(SeedcrackerAddon.ID + ":z-bone-dropper", "Bone Dropper",
             "Periodically drops a chosen item from your inventory.");
     }
 
@@ -118,7 +119,7 @@ public final class BoneDropperModule extends Module {
             if (slot != selected) com.autism.seedcracker.util.InvSync.select(mc, slot);
         } else {
             // Main inventory: swap the stack into the current hotbar slot first.
-            autismclient.util.AutismInventoryHelper.swapInventorySlots(mc, slot, selected);
+            ClientInventory.swapInventorySlots(mc, slot, selected);
             restoreSlot = -1; // nothing to restore; the stack is now in hand
         }
         dropsQueued = count;

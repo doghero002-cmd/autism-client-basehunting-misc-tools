@@ -1,5 +1,7 @@
 package com.autism.seedcracker.modules;
 
+import com.autism.seedcracker.compat.ModuleLookup;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -97,10 +99,10 @@ public final class StorageRecorderModule extends Module {
         espAvailable = false;
         if (!syncEsp.get()) return;
         try {
-            autismclient.modules.Module esp = autismclient.modules.ModuleRegistry.get("storage-esp");
+            autismclient.modules.Module esp = ModuleLookup.get("storage-esp");
             if (esp == null) return;
             for (int i = 0; i < ESP_COLOR_OPTIONS.length; i++) {
-                espColors[i] = autismclient.modules.ModuleRenderUtil.color(esp, ESP_COLOR_OPTIONS[i], ESP_COLOR_DEFAULTS[i]);
+                espColors[i] = com.autism.seedcracker.compat.ClientCompatUtil.moduleColor(esp, ESP_COLOR_OPTIONS[i], ESP_COLOR_DEFAULTS[i]);
             }
             String list = esp.value("storage-list");
             java.util.Map<Block, Byte> kinds = new java.util.HashMap<>();
@@ -148,8 +150,8 @@ public final class StorageRecorderModule extends Module {
         return isStorageBlock(b);
     }
 
-    public StorageRecorderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":storage-recorder", "Storage Recorder", category,
+    public StorageRecorderModule() {
+        super(SeedcrackerAddon.ID + ":storage-recorder", "Storage Recorder",
             "Remembers storage/spawners it saw and ghost-renders them after the server re-hides the chunks.");
     }
 

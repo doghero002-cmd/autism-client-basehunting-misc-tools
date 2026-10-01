@@ -19,6 +19,7 @@ import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -85,8 +86,8 @@ public final class SpawnerProtectModule extends Module {
     private int minedCount;
     private boolean posting;
 
-    public SpawnerProtectModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":z-spawner-protect", "Spawner Protect", category,
+    public SpawnerProtectModule() {
+        super(SeedcrackerAddon.ID + ":z-spawner-protect", "Spawner Protect",
             "Mines out nearby spawners with a Silk Touch pickaxe when an enemy approaches.");
     }
 
@@ -189,7 +190,7 @@ public final class SpawnerProtectModule extends Module {
             if (other == mc.player) continue;
             if (other.isSpectator()) continue;
             if (isWhitelisted(other)) continue;
-            if (autismclient.modules.TeamsModule.isFriendOrTeam(other)) continue; // friends never count as enemies
+            if (com.autism.seedcracker.compat.ClientCompatUtil.isFriendOrTeam(other)) continue; // friends never count as enemies
             if (other.distanceTo(mc.player) <= r) return true;
         }
         return false;
@@ -337,7 +338,7 @@ public final class SpawnerProtectModule extends Module {
     /** Unified local feedback (chat prefix + toast), matching the other finder modules. */
     private void notifyLocal(String msg) {
         autismclient.util.AutismClientMessaging.sendPrefixed("§5[SpawnerProtect] §f" + msg);
-        autismclient.util.AutismNotifications.warning("SpawnerProtect: " + msg);
+        ClientNotify.warning("SpawnerProtect: " + msg);
     }
 
     // ========================================================================

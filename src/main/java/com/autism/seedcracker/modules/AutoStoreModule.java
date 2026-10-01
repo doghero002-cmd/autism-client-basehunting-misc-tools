@@ -52,8 +52,8 @@ public final class AutoStoreModule extends Module {
 
     private int cooldown = 0;
 
-    public AutoStoreModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":auto-store", "Auto Store", category,
+    public AutoStoreModule() {
+        super(SeedcrackerAddon.ID + ":auto-store", "Auto Store",
             "Shift-deposits filtered inventory items into any open container.");
     }
 

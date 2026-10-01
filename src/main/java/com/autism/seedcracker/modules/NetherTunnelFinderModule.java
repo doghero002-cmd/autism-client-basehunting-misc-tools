@@ -11,7 +11,7 @@ import autismclient.api.module.ColorSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
-import autismclient.util.AutismNotifications;
+import com.autism.seedcracker.compat.ClientNotify;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.ChunkPos;
@@ -60,8 +60,8 @@ public final class NetherTunnelFinderModule extends Module {
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
-    public NetherTunnelFinderModule(autismclient.modules.ModuleCategory category) {
-        super(SeedcrackerAddon.ID + ":nether-tunnel-finder", "Nether Tunnel Finder", category,
+    public NetherTunnelFinderModule() {
+        super(SeedcrackerAddon.ID + ":nether-tunnel-finder", "Nether Tunnel Finder",
             "Detects player-dug nether highways (long straight walkable corridors).");
     }
 
@@ -166,7 +166,7 @@ public final class NetherTunnelFinderModule extends Module {
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
         String msg = "Nether tunnel at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
-        AutismNotifications.warning(msg);
+        ClientNotify.warning(msg);
         AutismClientMessaging.sendPrefixed("§6[NetherTunnel] §f" + msg);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
