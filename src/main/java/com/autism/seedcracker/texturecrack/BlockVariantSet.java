@@ -129,8 +129,10 @@ public final class BlockVariantSet {
             }
             JsonObject variants = root.getAsJsonObject("variants");
             if (variants == null) throw new IllegalStateException(key + " uses multipart (unsupported)");
-            // Default entry: "" if present, else prefer snowy=false / axis=y style defaults, else first.
+            // Default entry: "" if present, else axis=y (natural pillar orientation - axis=x/z carry
+            // x-rotations we can't model), else snowy=false style defaults, else first.
             JsonElement entry = variants.get("");
+            if (entry == null && variants.has("axis=y")) entry = variants.get("axis=y");
             if (entry == null) {
                 for (String k : variants.keySet()) {
                     if (k.contains("=false") || entry == null) entry = variants.get(k);

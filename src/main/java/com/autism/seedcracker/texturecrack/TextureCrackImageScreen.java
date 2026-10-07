@@ -30,7 +30,7 @@ import net.minecraft.resources.Identifier;
  * left-dragging near a corner nudges it. The projected cell grid is drawn live through the same
  * homography the reader samples with, so what you see is exactly what gets matched.
  */
-public final class TextureCrackImageScreen extends Screen {
+public final class TextureCrackImageScreen extends com.autism.seedcracker.gui.AddonScreen {
 
     private static final String[] CORNER_LABELS = {"TL", "TR", "BR", "BL"};
     private static final int[] CORNER_COLORS = {0xFF55FF55, 0xFF55FFFF, 0xFFFF9955, 0xFFFF55FF};
@@ -75,26 +75,26 @@ public final class TextureCrackImageScreen extends Screen {
         super.init();
         if (image == null) loadImage();
 
-        int panelX = this.width - 150;
+        int panelX = screenWidth() - 150;
         this.blockField = new EditBox(this.font, panelX, 30, 140, 18, Component.literal("Block"));
         this.blockField.setMaxLength(48);
         this.blockField.setValue(initialBlock);
         this.addRenderableWidget(this.blockField);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Read grid"), b -> readGrid())
+        this.addRenderableWidget(button(Component.literal("Read grid"), b -> readGrid())
             .bounds(panelX, 54, 140, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Solve"), b -> solve())
+        this.addRenderableWidget(button(Component.literal("Solve"), b -> solve())
             .bounds(panelX, 78, 140, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Clear corners"), b -> {
+        this.addRenderableWidget(button(Component.literal("Clear corners"), b -> {
             cornerCount = 0;
             result = null;
             status = "Click the TOP-LEFT corner of the floor region";
         }).bounds(panelX, 102, 140, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Reset view"), b -> fitView())
+        this.addRenderableWidget(button(Component.literal("Reset view"), b -> fitView())
             .bounds(panelX, 126, 140, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Export GPU"), b -> exportForGpu())
+        this.addRenderableWidget(button(Component.literal("Export GPU"), b -> exportForGpu())
             .bounds(panelX, 150, 140, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("GPU search"), b -> gpuSearch())
+        this.addRenderableWidget(button(Component.literal("GPU search"), b -> gpuSearch())
             .bounds(panelX, 174, 140, 20).build());
         // CPU load cap for the solver (duty-cycles its scan threads like the bedrock finder).
         this.addRenderableWidget(new net.minecraft.client.gui.components.AbstractSliderButton(
@@ -111,7 +111,7 @@ public final class TextureCrackImageScreen extends Screen {
                 TextureCrackEngine.cpuLoadPercent = percent();
             }
         });
-        this.addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose())
+        this.addRenderableWidget(button(Component.literal("Close"), b -> onClose())
             .bounds(panelX, 222, 140, 20).build());
     }
 
@@ -226,8 +226,8 @@ public final class TextureCrackImageScreen extends Screen {
     /** Fits the whole image into the canvas area (left of the side panel). */
     private void fitView() {
         if (image == null) return;
-        int availW = this.width - 160;
-        int availH = this.height - 20;
+        int availW = screenWidth() - 160;
+        int availH = screenHeight() - 20;
         viewScale = Math.min((double) availW / imgW, (double) availH / imgH);
         viewX = (availW - imgW * viewScale) / 2.0;
         viewY = 10 + (availH - imgH * viewScale) / 2.0;
@@ -294,15 +294,14 @@ public final class TextureCrackImageScreen extends Screen {
     private int toScrY(double imgY) { return (int) Math.round(viewY + imgY * viewScale); }
 
     private boolean inCanvas(double x, double y) {
-        return x < this.width - 160 && (blockField == null || !blockField.isFocused());
+        return x < screenWidth() - 160 && (blockField == null || !blockField.isFocused());
     }
 
     // ---- render ----
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
-        super.extractRenderState(ctx, mouseX, mouseY, delta);
-        ctx.fill(0, 0, this.width, this.height, 0xF0101018);
+    protected void renderContent(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
+        ctx.fill(0, 0, screenWidth(), screenHeight(), 0xF0101018);
 
         if (textureId != null && image != null) {
             int dx = toScrX(0), dy = toScrY(0);
@@ -355,8 +354,8 @@ public final class TextureCrackImageScreen extends Screen {
         }
 
         // Side panel.
-        int panelX = this.width - 150;
-        ctx.fill(panelX - 10, 0, this.width, this.height, 0xF0181820);
+        int panelX = screenWidth() - 150;
+        ctx.fill(panelX - 10, 0, screenWidth(), screenHeight(), 0xF0181820);
         ctx.text(this.font, Component.literal("Texture Crack"), panelX, 8, 0xFFFFFFFF, false);
         ctx.text(this.font, Component.literal("Block:"), panelX, 20, 0xFFA0A0A0, false);
         ctx.text(this.font, Component.literal(rows + "x" + cols + " grid"), panelX, 176, 0xFFA0A0A0, false);
@@ -366,7 +365,7 @@ public final class TextureCrackImageScreen extends Screen {
         ctx.text(this.font, Component.literal("Drag a corner to nudge"), panelX, 222, 0xFF808080, false);
 
         // Status line (bottom of the canvas).
-        ctx.text(this.font, Component.literal(status), 8, this.height - 12, 0xFFFFFF80, false);
+        ctx.text(this.font, Component.literal(status), 8, screenHeight() - 12, 0xFFFFFF80, false);
     }
 
     /** Straight screen-space segment between two projected unit-square points, stepped for perspective. */
@@ -392,7 +391,7 @@ public final class TextureCrackImageScreen extends Screen {
     // ---- input ----
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    protected boolean onClick(MouseButtonEvent event, boolean doubleClick) {
         if (event != null && event.buttonInfo() != null && inCanvas(event.x(), event.y())) {
             int button = event.buttonInfo().button();
             if (button == 1) { // right = pan
@@ -427,7 +426,7 @@ public final class TextureCrackImageScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return false;
     }
 
     private static String fullName(int i) {
@@ -439,7 +438,7 @@ public final class TextureCrackImageScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+    protected boolean onDrag(MouseButtonEvent event, double dx, double dy) {
         if (event != null) {
             if (panning) {
                 viewX += event.x() - panLastX;
@@ -455,18 +454,18 @@ public final class TextureCrackImageScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseDragged(event, dx, dy);
+        return false;
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    protected boolean onRelease(MouseButtonEvent event) {
         panning = false;
         dragCorner = -1;
-        return super.mouseReleased(event);
+        return false;
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    protected boolean onScroll(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (inCanvas(mouseX, mouseY) && image != null) {
             double factor = scrollY > 0 ? 1.25 : 0.8;
             double newScale = clamp(viewScale * factor, 0.02, 40.0);
@@ -476,7 +475,7 @@ public final class TextureCrackImageScreen extends Screen {
             viewScale = newScale;
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return false;
     }
 
     private static double clamp(double v, double lo, double hi) {

@@ -85,6 +85,8 @@ public final class ActivityFinderModule extends Module {
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     private final Set<ChunkPos> flagged = new HashSet<>();
+    private final com.autism.seedcracker.finder.FinderReport reporter =
+        new com.autism.seedcracker.finder.FinderReport("Activity", 40);
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
@@ -127,6 +129,7 @@ public final class ActivityFinderModule extends Module {
 
         scan(mc);
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-activity-finder", flagged, color.get(), tracer.get());
+        reporter.tick(mc, flagged);
     }
 
     private void scan(Minecraft mc) {
@@ -189,12 +192,12 @@ public final class ActivityFinderModule extends Module {
 
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
-        String msg = "Activity detected in chunk " + pos.x() + ", " + pos.z() + " (Y<=" + yLevel.get() + ")";
-        ClientNotify.warning(msg);
-        AutismClientMessaging.sendPrefixed("§e[ActivityFinder] §f" + msg);
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-        }
+        com.autism.seedcracker.finder.FinderNotify.flag("§e[ActivityFinder]",
+            "Activity detected in chunk " + pos.x() + ", " + pos.z() + " (Y<=" + yLevel.get() + ")", true);
+    }
+
+    @Override
+    public String info() {
+        return flagged.isEmpty() ? "" : flagged.size() + " flagged";
     }
 }

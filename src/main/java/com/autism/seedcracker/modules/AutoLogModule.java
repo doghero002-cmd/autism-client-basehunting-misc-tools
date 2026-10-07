@@ -81,6 +81,7 @@ public final class AutoLogModule extends Module {
     public void onEnable() {
         lastHealth = -1.0f;
         lastRawHealth = -1.0f;
+        lastTotemCount = -1; // else fewer totems than last session = false "totem popped" log
         loggedOut = false;
     }
 
@@ -90,6 +91,7 @@ public final class AutoLogModule extends Module {
         loggedOut = false;
         lastHealth = -1.0f;
         lastRawHealth = -1.0f;
+        lastTotemCount = -1;
     }
 
     @Override
@@ -114,12 +116,12 @@ public final class AutoLogModule extends Module {
             reason = "took damage";
         }
 
-        // Recently hurt by another player (age-based: within the last second).
+        // Hurt by another player. getLastHurtByPlayer() is only ever set server-side (hurtServer), so on a
+        // server it was always null and this never fired. The client does get the damage event packet, which
+        // stores the DamageSource (with the attacker, or the shooter for arrows/tridents) and its game time.
         if (reason == null && onPlayerHurt.get()) {
-            Player attacker = mc.player.getLastHurtByPlayer();
-            if (attacker != null && attacker != mc.player && !attacker.isSpectator()
-                && !isWhitelisted(attacker.getName().getString())
-                && (mc.player.tickCount - mc.player.getLastHurtByPlayerMemoryTime()) < 20) {
+            Player attacker = recentPlayerAttacker(mc);
+            if (attacker != null && !isWhitelisted(attacker.getName().getString())) {
                 reason = "hurt by " + attacker.getName().getString();
             }
         }
@@ -172,38 +174,51 @@ public final class AutoLogModule extends Module {
         }
     }
 
-    /** True if a totem was used this tick (health dropped to ~0 then a totem restored it). */
+    /** The player behind damage taken in the last second, from the client's copy of the damage event. */
+    private static Player recentPlayerAttacker(Minecraft mc) {
+        var src = mc.player.getLastDamageSource();
+        if (src == null || mc.player.hurtTime <= 0) return null;
+        Entity e = src.getEntity();
+        if (!(e instanceof Player p) || p == mc.player || p.isSpectator()) return null;
+        return p;
+    }
+
+    /**
+     * A totem saved us this tick. The old "totem count went down" check also fired on moving a totem into a chest
+     * or dropping one. A real pop consumes the one in a HAND (main or off) and comes with the totem particles +
+     * health snapping back from a lethal hit, so count only the held totems and require the hurt animation.
+     */
     private int lastTotemCount = -1;
     private boolean usedTotem(Minecraft mc) {
-        int count = countTotems(mc);
-        if (lastTotemCount >= 0 && count < lastTotemCount) {
-            lastTotemCount = count;
-            return true;
-        }
-        lastTotemCount = count;
-        return false;
+        int held = (mc.player.getMainHandItem().is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING) ? 1 : 0)
+            + (mc.player.getOffhandItem().is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING) ? 1 : 0);
+        boolean popped = lastTotemCount >= 0 && held < lastTotemCount && mc.gui.screen() == null
+            && (mc.player.hurtTime > 0 || mc.player.hasEffect(net.minecraft.world.effect.MobEffects.ABSORPTION));
+        lastTotemCount = held;
+        return popped;
     }
 
-    private int countTotems(Minecraft mc) {
-        int n = 0;
-        for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
-            if (mc.player.getInventory().getItem(i).is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING)) n++;
-        }
-        return n;
-    }
-
-    private boolean isWhitelisted(String name) {        if (name == null) return false;
+    private boolean isWhitelisted(String name) {
+        if (name == null) return false;
         return whitelistNames().contains(name.toLowerCase(Locale.ROOT));
     }
 
+    /** Parsed-whitelist cache: rebuilding the set per player per tick was wasted churn. */
+    private String whitelistRawCache;
+    private Set<String> whitelistSetCache = java.util.Set.of();
+
     private Set<String> whitelistNames() {
         String raw = whitelist.get();
+        if (java.util.Objects.equals(raw, whitelistRawCache)) return whitelistSetCache;
         Set<String> out = new LinkedHashSet<>();
-        if (raw == null || raw.isBlank()) return out;
-        for (String part : raw.replace('\n', ',').replace('\r', ',').split(",")) {
-            String trimmed = part == null ? "" : part.trim();
-            if (!trimmed.isEmpty()) out.add(trimmed.toLowerCase(Locale.ROOT));
+        if (raw != null && !raw.isBlank()) {
+            for (String part : raw.replace('\n', ',').replace('\r', ',').split(",")) {
+                String trimmed = part == null ? "" : part.trim();
+                if (!trimmed.isEmpty()) out.add(trimmed.toLowerCase(Locale.ROOT));
+            }
         }
+        whitelistRawCache = raw;
+        whitelistSetCache = out;
         return out;
     }
 }

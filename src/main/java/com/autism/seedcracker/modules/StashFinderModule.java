@@ -162,16 +162,24 @@ public final class StashFinderModule extends Module {
         // Feed the renderer every tick so markers stay alive.
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-stash-finder", flagged, color.get(), tracer.get());
 
-        // Report flagged chunks to the Base Tracker HUD (with confidence) for the merged view.
-        for (ChunkPos pos : flagged) {
-            int conf = 50;
-            LevelChunk chunk = mc.level.hasChunk(pos.x(), pos.z()) ? mc.level.getChunk(pos.x(), pos.z()) : null;
-            if (chunk != null) {
-                conf = com.autism.seedcracker.finder.BaseConfidence.score(chunk).score();
+        // Report to the Base Tracker HUD once a second with CACHED confidences - BaseConfidence
+        // walks every section of the chunk, so computing it per flagged chunk per tick was a
+        // full-chunk scan x flagged-count x 20/s.
+        if (++reportTicks >= 20) {
+            reportTicks = 0;
+            confidenceCache.keySet().retainAll(flagged);
+            for (ChunkPos pos : flagged) {
+                int conf = confidenceCache.computeIfAbsent(pos, p -> {
+                    LevelChunk chunk = mc.level.hasChunk(p.x(), p.z()) ? mc.level.getChunk(p.x(), p.z()) : null;
+                    return chunk != null ? com.autism.seedcracker.finder.BaseConfidence.score(chunk).score() : 50;
+                });
+                com.autism.seedcracker.finder.BaseTracker.report(pos.getMinBlockX() + 8, pos.getMinBlockZ() + 8, conf, "Stash");
             }
-            com.autism.seedcracker.finder.BaseTracker.report(pos.getMinBlockX() + 8, pos.getMinBlockZ() + 8, conf, "Stash");
         }
     }
+
+    private int reportTicks = 0;
+    private final java.util.Map<ChunkPos, Integer> confidenceCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     private void scan(Minecraft mc) {
         ChunkPos playerChunk = mc.player.chunkPosition();
@@ -516,4 +524,8 @@ public final class StashFinderModule extends Module {
             }
         }
     }
-}
+
+    @Override
+    public String info() {
+        return flagged.isEmpty() ? "" : flagged.size() + " flagged";
+    }}

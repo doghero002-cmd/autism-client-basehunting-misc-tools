@@ -56,12 +56,18 @@ public final class TPASpammerModule extends Module {
         AutismClientMessaging.sendPrefixed("§c[TPA Spammer] Stopped.");
     }
 
+    private int nextSendAt = 0;
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.getConnection() == null) return;
-        if (++tickCounter < delay.get()) return;
+        // Jittered interval: /tpa on an exact N-tick metronome is trivially flagged by server
+        // command logs (and most TPA plugins rate-limit it anyway).
+        if (nextSendAt <= 0) nextSendAt = com.autism.seedcracker.util.Humanizer.delay(delay.get());
+        if (++tickCounter < nextSendAt) return;
         tickCounter = 0;
+        nextSendAt = com.autism.seedcracker.util.Humanizer.delay(delay.get());
 
         String name = target.get().trim();
         if (name.isEmpty()) {

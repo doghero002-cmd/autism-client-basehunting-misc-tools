@@ -49,6 +49,23 @@ public final class AutoEatModule extends Module {
     }
 
     @Override
+    public void onGameLeft() {
+        // Zero state across worlds: a stale foodSlot/eating flag from the last server would
+        // make the first tick on the next one click-use whatever happens to be in that slot.
+        eating = false;
+        foodSlot = -1;
+        prevSlot = -1;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.options != null) mc.options.keyUse.setDown(false);
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+
+    @Override
+    public String info() {
+        return eating ? "eating" : "";
+    }
+
+    @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;

@@ -80,16 +80,21 @@ public final class RaidPlannerModule extends Module {
         if (++pollTicks < 20) return;
         pollTicks = 0;
 
-        for (BaseTracker.Entry e : BaseTracker.nearest(mc.player.getX(), mc.player.getZ(), 64)) {
+        // Fused clusters (noisy-OR across finders) - one candidate per base, not per finder.
+        for (BaseTracker.Fused e : BaseTracker.fusedNearest(mc.player.getX(), mc.player.getZ(), 64)) {
             long key = cellKey(e.blockX(), e.blockZ());
             Candidate c = candidates.computeIfAbsent(key, k -> new Candidate());
             c.blockX = e.blockX();
             c.blockZ = e.blockZ();
             c.peakConfidence = Math.max(c.peakConfidence, e.confidence());
-            c.sources.add(e.source());
+            for (String s : e.sources().split("\\+")) c.sources.add(s);
             c.sightings++;
             c.lastSeenMs = System.currentTimeMillis();
         }
+
+        // Age out candidates not re-sighted for an hour (stale intel ranks above fresh finds otherwise).
+        long cutoff = System.currentTimeMillis() - 3600_000L;
+        candidates.values().removeIf(c -> c.lastSeenMs < cutoff);
 
         if (reportChat.get()
             && System.currentTimeMillis() - lastReportMs > reportMinutes.get() * 60_000L

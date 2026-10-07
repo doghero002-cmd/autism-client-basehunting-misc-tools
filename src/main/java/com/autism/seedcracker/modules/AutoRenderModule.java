@@ -89,7 +89,9 @@ public final class AutoRenderModule extends Module {
                 mc.options.simulationDistance().set(2);
             } catch (Throwable ignored) {}
             if (notification.get() && !notified) {
-                AutismClientMessaging.sendPrefixed("§7Auto Render: boosting render/sim distance below Y=-2.");
+                // Not a boost: dropping sim distance then restoring forces a chunk re-render
+                // (fixes the void-farm render glitch).
+                AutismClientMessaging.sendPrefixed("§7Auto Render: cycling sim distance to force a re-render (below Y=-2).");
                 if (sound.get()) {
                     mc.player.playSound(net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
                 }

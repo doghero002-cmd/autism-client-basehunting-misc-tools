@@ -60,6 +60,8 @@ public final class SpawnerFinderModule extends Module {
         .group("General"));
 
     private final Set<ChunkPos> flagged = new HashSet<>();
+    private final com.autism.seedcracker.finder.FinderReport reporter =
+        new com.autism.seedcracker.finder.FinderReport("Spawner", 50);
     private final Set<ChunkPos> notified = new HashSet<>();
     private final Set<net.minecraft.core.BlockPos> activatedNotified = new HashSet<>();
     private int tickCounter = 0;
@@ -95,6 +97,7 @@ public final class SpawnerFinderModule extends Module {
 
         scan(mc);
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-spawner-finder", flagged, color.get(), tracer.get());
+        reporter.tick(mc, flagged);
     }
 
     private void scan(Minecraft mc) {
@@ -156,12 +159,12 @@ public final class SpawnerFinderModule extends Module {
 
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
-        String msg = "Spawner found at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ();
-        ClientNotify.warning(msg);
-        AutismClientMessaging.sendPrefixed("§c[SpawnerFinder] §f" + msg);
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-        }
+        com.autism.seedcracker.finder.FinderNotify.flag("§c[SpawnerFinder]",
+            "Spawner found at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ(), true);
+    }
+
+    @Override
+    public String info() {
+        return flagged.isEmpty() ? "" : flagged.size() + " flagged";
     }
 }

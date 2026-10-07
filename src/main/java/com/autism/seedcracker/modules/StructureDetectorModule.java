@@ -63,8 +63,11 @@ public final class StructureDetectorModule extends Module {
         .group("General"));
 
     private int cooldown = 0;
-    private BlockPos located = null;
-    private String locatedName = null;
+    // Written on the netty thread, read in tick().
+    private volatile BlockPos located = null;
+    private volatile String locatedName = null;
+    /** Tick deadline while a /locate reply is pending (0 = no query out). */
+    private volatile long queryDeadline = 0;
 
     // Parses "The nearest minecraft:trial_chambers is at [123, ~, -456]" / "... is at 123 ~ -456".
     private static final Pattern COORDS = Pattern.compile("\\[?(-?\\d+)\\s*[,\\s]+~?\\s*[,\\s]+(-?\\d+)\\]?");
@@ -108,6 +111,7 @@ public final class StructureDetectorModule extends Module {
         if (cooldown < 0) return; // no auto rescan
         if (cooldown > 0) { cooldown--; return; }
         mc.getConnection().sendCommand("locate structure minecraft:" + structure.get().id);
+        queryDeadline = System.currentTimeMillis() + 5000; // only accept replies for 5s
         cooldown = rescanTicks.get() <= 0 ? -1 : rescanTicks.get();
     }
 
@@ -118,12 +122,12 @@ public final class StructureDetectorModule extends Module {
         if (content == null) return false;
         String raw = content.getString();
         if (raw == null || !raw.toLowerCase(java.util.Locale.ROOT).contains("nearest")) return false;
-        if (!raw.toLowerCase(java.util.Locale.ROOT).contains(structure.get().id.replace('_', ' '))
-            && !raw.contains(structure.get().id) && !raw.contains("minecraft:")) {
-            // Accept any locate reply while a query is pending.
-        }
+        // Only parse while OUR /locate query is pending - any server line containing "nearest"
+        // plus numbers (e.g. "nearest player is...") would otherwise overwrite the result.
+        if (System.currentTimeMillis() > queryDeadline) return false;
         BlockPos found = parseCoords(raw);
         if (found == null) return false;
+        queryDeadline = 0; // consumed
 
         Minecraft mc = Minecraft.getInstance();
         located = found;

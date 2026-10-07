@@ -23,7 +23,7 @@ import net.minecraft.network.chat.Component;
  * columns can be aligned across layers (each extra layer multiplies the match evidence).
  * "Export GPU" writes the pattern file consumed by the standalone bedrock-gpu-cracker tool.
  */
-public final class BedrockFinderScreen extends Screen {
+public final class BedrockFinderScreen extends com.autism.seedcracker.gui.AddonScreen {
     public static final int GRID = 16;
     public static final int LAYERS = 4;
     /** [layer][row][col]; floor layer i = Y -60-i, roof layer i = Y 126-i. */
@@ -36,6 +36,17 @@ public final class BedrockFinderScreen extends Screen {
     /** Cached device probe (runs once; null = no OpenCL GPU). */
     private static String gpuName;
     private static boolean gpuProbed;
+
+    /** One search hit shown in the in-screen results table. */
+    public record ResultRow(long x, long z, String label) {}
+    /** Results survive screen reopen (same lifetime as the grids). */
+    public static final List<ResultRow> results = java.util.Collections.synchronizedList(new ArrayList<>());
+    private int resultsScroll = 0;
+
+    // SWCCS palette (matches the client theme).
+    private static final int BG_PANEL = 0xFF1A1A24;
+    private static final int BORDER = 0xFF3A3A46;
+    private static final int ACCENT = 0xFF3BD7FF;
 
     private final Screen parent;
     private EditBox seedField;
@@ -65,15 +76,15 @@ public final class BedrockFinderScreen extends Screen {
     protected void init() {
         super.init();
         int px = gridPx();
-        this.gridX = (this.width - px) / 2 - 70;
-        this.gridY = (this.height - px) / 2;
+        this.gridX = (screenWidth() - px) / 2 - 70;
+        this.gridY = (screenHeight() - px) / 2;
         int panelX = this.gridX + px + 20;
 
         // Layer tabs above the grid.
         int tabW = px / LAYERS - 2;
         for (int i = 0; i < LAYERS; i++) {
             final int layer = i;
-            layerButtons[i] = Button.builder(Component.literal("Y" + layerY(i)), b -> {
+            layerButtons[i] = button(Component.literal("Y" + layerY(i)), b -> {
                 activeLayer = layer;
                 refreshLayerButtons();
             }).bounds(this.gridX + i * (tabW + 2), this.gridY - 24, tabW, 20).build();
@@ -93,7 +104,7 @@ public final class BedrockFinderScreen extends Screen {
         this.radiusField.setResponder(s -> lastRadius = s);
         this.addRenderableWidget(this.radiusField);
 
-        this.roofButton = Button.builder(roofLabel(), b -> {
+        this.roofButton = button(roofLabel(), b -> {
             roofMode = !roofMode;
             b.setMessage(roofLabel());
             refreshLayerButtons();
@@ -105,7 +116,7 @@ public final class BedrockFinderScreen extends Screen {
             gpuProbed = true;
             new Thread(() -> gpuName = BedrockGpuEngine.availability(), "BedrockGpu-Probe").start();
         }
-        Button engineButton = Button.builder(engineLabel(), b -> {
+        Button engineButton = button(engineLabel(), b -> {
             if (gpuName == null) return;
             useGpu = !useGpu;
             b.setMessage(engineLabel());
@@ -121,19 +132,19 @@ public final class BedrockFinderScreen extends Screen {
         this.addRenderableWidget(new LoadSlider(panelX, this.gridY + 162, 160, "GPU load",
             BedrockGpuEngine.gpuLoadPercent, v -> BedrockGpuEngine.gpuLoadPercent = v));
 
-        this.addRenderableWidget(Button.builder(Component.literal("Use Cracked Seed"), b -> useCrackedSeed())
+        this.addRenderableWidget(button(Component.literal("Use Cracked Seed"), b -> useCrackedSeed())
             .bounds(panelX, this.gridY + 186, 160, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Clear Layer"), b -> grids[activeLayer] = new int[GRID][GRID])
+        this.addRenderableWidget(button(Component.literal("Clear Layer"), b -> grids[activeLayer] = new int[GRID][GRID])
             .bounds(panelX, this.gridY + 210, 78, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Clear All"), b -> clearAll())
+        this.addRenderableWidget(button(Component.literal("Clear All"), b -> clearAll())
             .bounds(panelX + 82, this.gridY + 210, 78, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Search"), b -> runSearch())
+        this.addRenderableWidget(button(Component.literal("Search"), b -> runSearch())
             .bounds(panelX, this.gridY + 234, 160, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Cancel"), b -> BedrockFinderEngine.cancel())
+        this.addRenderableWidget(button(Component.literal("Cancel"), b -> BedrockFinderEngine.cancel())
             .bounds(panelX, this.gridY + 258, 78, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Export GPU"), b -> exportForGpu())
+        this.addRenderableWidget(button(Component.literal("Export GPU"), b -> exportForGpu())
             .bounds(panelX + 82, this.gridY + 258, 78, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose())
+        this.addRenderableWidget(button(Component.literal("Close"), b -> onClose())
             .bounds(panelX, this.gridY + 282, 160, 20).build());
     }
 
@@ -300,6 +311,8 @@ public final class BedrockFinderScreen extends Screen {
         }
         int centerX = (int) Math.floor(player.getX());
         int centerZ = (int) Math.floor(player.getZ());
+        results.clear();
+        resultsScroll = 0;
 
         long totalChunks = (long) (2 * radius + 1) * (long) (2 * radius + 1);
         sendMessage(String.format("§a[BedrockFinder] Searching %,d chunks (radius ±%,d, %d layer%s, seed %d)...",
@@ -321,6 +334,7 @@ public final class BedrockFinderScreen extends Screen {
                 AtomicInteger count = new AtomicInteger(0);
                 java.util.function.Consumer<BedrockFinderEngine.Match> report = m -> {
                     count.incrementAndGet();
+                    results.add(new ResultRow(m.x, m.z, String.valueOf(m.rotation)));
                     mc.execute(() -> sendMessage(String.format("  §e-> Match at X: %d, Z: %d (%s)", m.x, m.z, m.rotation)));
                 };
                 List<BedrockFinderEngine.Match> matches;
@@ -402,10 +416,9 @@ public final class BedrockFinderScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
-        super.extractRenderState(ctx, mouseX, mouseY, delta);
+    protected void renderContent(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
         int px = gridPx();
-        ctx.centeredText(this.font, Component.literal("Bedrock Finder"), this.width / 2, 12, 0xFFFFFFFF);
+        ctx.centeredText(this.font, Component.literal("Bedrock Finder"), screenWidth() / 2, 12, 0xFFFFFFFF);
 
         int panelX = this.gridX + px + 20;
         ctx.text(this.font, Component.literal("World seed:"), panelX, this.gridY + 6, 0xFFA0A0A0, false);
@@ -459,6 +472,99 @@ public final class BedrockFinderScreen extends Screen {
             ctx.fill(this.gridX + 1, barY + 1, this.gridX + 1 + w, barY + barH - 1, 0xFF2E7D32);
         }
         ctx.centeredText(this.font, Component.literal(BedrockFinderEngine.statusText), this.gridX + barW / 2, barY + 3, 0xFFFFFFFF);
+
+        renderResults(ctx, mouseX, mouseY);
+    }
+
+    // ---- in-screen results table (replaces chat-only reporting) ----
+
+    private int[] resultsBounds() {
+        int px = gridPx();
+        int x = this.gridX + px + 20 + 170;      // right of the settings column
+        int w = Math.max(150, screenWidth() - x - 12);
+        int y = this.gridY - 24;
+        int h = px + 24;
+        return new int[]{x, y, w, h};
+    }
+
+    private int resultRowsVisible(int h) {
+        return Math.max(1, (h - 18) / 12);
+    }
+
+    private void renderResults(GuiGraphicsExtractor ctx, int mouseX, int mouseY) {
+        int[] rb = resultsBounds();
+        int x = rb[0], y = rb[1], w = rb[2], h = rb[3];
+        if (w < 120) return; // window too narrow
+        ctx.fill(x, y, x + w, y + h, BG_PANEL);
+        ctx.fill(x, y, x + w, y + 1, BORDER);
+        ctx.fill(x, y + h - 1, x + w, y + h, BORDER);
+        ctx.fill(x, y, x + 1, y + h, BORDER);
+        ctx.fill(x + w - 1, y, x + w, y + h, BORDER);
+        java.util.List<ResultRow> snapshot;
+        synchronized (results) { snapshot = new ArrayList<>(results); }
+        // Nearest-first feels right for basehunting.
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            long px0 = (long) mc.player.getX(), pz0 = (long) mc.player.getZ();
+            snapshot.sort(java.util.Comparator.comparingLong(r ->
+                (r.x - px0) * (r.x - px0) + (r.z - pz0) * (r.z - pz0)));
+        }
+        ctx.text(this.font, Component.literal("Results (" + snapshot.size() + ") §8click=copy §7right=/tp"),
+            x + 6, y + 5, ACCENT, false);
+        int rows = resultRowsVisible(h);
+        resultsScroll = Math.max(0, Math.min(resultsScroll, Math.max(0, snapshot.size() - rows)));
+        int rowY = y + 18;
+        for (int i = resultsScroll; i < Math.min(snapshot.size(), resultsScroll + rows); i++) {
+            ResultRow r = snapshot.get(i);
+            boolean hover = mouseX >= x + 1 && mouseX < x + w - 1 && mouseY >= rowY && mouseY < rowY + 12;
+            if (hover) ctx.fill(x + 1, rowY, x + w - 1, rowY + 12, 0xFF2A2A38);
+            String dist = mc.player != null
+                ? "  §8" + (int) Math.sqrt(Math.pow(r.x - mc.player.getX(), 2) + Math.pow(r.z - mc.player.getZ(), 2)) + "m"
+                : "";
+            ctx.text(this.font, Component.literal("§f" + r.x + ", " + r.z + " §7" + r.label + dist),
+                x + 6, rowY + 2, 0xFFDDDDDD, false);
+            rowY += 12;
+        }
+        if (snapshot.size() > rows) {
+            // slim scrollbar
+            int trackH = h - 20;
+            int thumbH = Math.max(10, trackH * rows / snapshot.size());
+            int thumbY = y + 18 + (trackH - thumbH) * resultsScroll / Math.max(1, snapshot.size() - rows);
+            ctx.fill(x + w - 4, y + 18, x + w - 2, y + 18 + trackH, 0xFF2A2A38);
+            ctx.fill(x + w - 4, thumbY, x + w - 2, thumbY + thumbH, ACCENT);
+        }
+    }
+
+    /** Row index under the mouse in the (sorted) results list, or -1. */
+    private int resultRowAt(double mx, double my) {
+        int[] rb = resultsBounds();
+        int x = rb[0], y = rb[1], w = rb[2], h = rb[3];
+        if (w < 120 || mx < x || mx >= x + w || my < y + 18 || my >= y + h) return -1;
+        int idx = resultsScroll + (int) ((my - (y + 18)) / 12);
+        return idx < results.size() ? idx : -1;
+    }
+
+    /** Results re-sorted the same way the renderer sorts, so click rows line up. */
+    private List<ResultRow> sortedResults() {
+        java.util.List<ResultRow> snapshot;
+        synchronized (results) { snapshot = new ArrayList<>(results); }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            long px0 = (long) mc.player.getX(), pz0 = (long) mc.player.getZ();
+            snapshot.sort(java.util.Comparator.comparingLong(r ->
+                (r.x - px0) * (r.x - px0) + (r.z - pz0) * (r.z - pz0)));
+        }
+        return snapshot;
+    }
+
+    @Override
+    protected boolean onScroll(double mx, double my, double hx, double vy) {
+        int[] rb = resultsBounds();
+        if (rb[2] >= 120 && mx >= rb[0] && mx < rb[0] + rb[2] && my >= rb[1] && my < rb[1] + rb[3]) {
+            resultsScroll -= (int) Math.signum(vy);
+            return true;
+        }
+        return false;
     }
 
     private int cellAt(double mx, double my) {
@@ -471,8 +577,20 @@ public final class BedrockFinderScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    protected boolean onClick(MouseButtonEvent event, boolean doubleClick) {
         if (event != null && event.buttonInfo() != null) {
+            int rowIdx = resultRowAt(event.x(), event.y());
+            if (rowIdx >= 0) {
+                List<ResultRow> sorted = sortedResults();
+                if (rowIdx < sorted.size()) {
+                    ResultRow r = sorted.get(rowIdx);
+                    boolean right = event.buttonInfo().button() == 1;
+                    String text = right ? "/tp " + r.x + " ~ " + r.z : r.x + " " + r.z;
+                    Minecraft.getInstance().keyboardHandler.setClipboard(text);
+                    sendMessage("§a[BedrockFinder] Copied: §f" + text);
+                }
+                return true;
+            }
             int index = cellAt(event.x(), event.y());
             if (index >= 0) {
                 int button = event.buttonInfo().button();
@@ -485,11 +603,11 @@ public final class BedrockFinderScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return false;
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+    protected boolean onDrag(MouseButtonEvent event, double dx, double dy) {
         if (this.paintValue >= 0 && event != null) {
             int index = cellAt(event.x(), event.y());
             if (index >= 0) {
@@ -497,12 +615,12 @@ public final class BedrockFinderScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseDragged(event, dx, dy);
+        return false;
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    protected boolean onRelease(MouseButtonEvent event) {
         this.paintValue = -1;
-        return super.mouseReleased(event);
+        return false;
     }
 }

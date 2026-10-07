@@ -33,6 +33,17 @@ public final class SwingSpeedModule extends Module {
         return Math.max(0.1f, Math.min(2.0f, value));
     }
 
+    /** Fractional speed-up carry: 1.5x = +0.5/tick accumulated, applied as whole ticks. */
+    private float speedCarry = 0f;
+    /** Slow-down carry: 0.5x holds the timer back every other tick, not every tick. */
+    private float slowCarry = 0f;
+
+    @Override
+    public void onEnable() {
+        speedCarry = 0f;
+        slowCarry = 0f;
+    }
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
@@ -42,12 +53,23 @@ public final class SwingSpeedModule extends Module {
         if (multiplier == 1.0f) return;
 
         if (multiplier > 1.0f) {
-            // Advance the swing timer by the extra whole ticks so the animation finishes sooner.
-            mc.player.swingTime += (int) Math.floor(multiplier - 1.0f);
+            // Accumulate the fractional extra across ticks: floor(mult-1) alone was 0 for the
+            // whole 1.1-1.9 range, making most of the slider dead.
+            speedCarry += multiplier - 1.0f;
+            int whole = (int) speedCarry;
+            if (whole > 0) {
+                speedCarry -= whole;
+                mc.player.swingTime += whole;
+            }
         } else if (mc.player.swingTime > 0) {
-            // Hold the swing back so the animation plays slower.
-            mc.player.swingTime -= 1;
-            if (mc.player.swingTime < 0) mc.player.swingTime = 0;
+            // Hold back only (1-mult) of the time: an every-tick -1 exactly cancelled vanilla's
+            // ++ and froze the animation mid-arc forever.
+            slowCarry += 1.0f - multiplier;
+            if (slowCarry >= 1.0f) {
+                slowCarry -= 1.0f;
+                mc.player.swingTime -= 1;
+                if (mc.player.swingTime < 0) mc.player.swingTime = 0;
+            }
         }
     }
 }

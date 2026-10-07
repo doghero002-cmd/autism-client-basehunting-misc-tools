@@ -107,6 +107,8 @@ public final class ChunkFinderModule extends Module {
         .group("General"));
 
     private final Set<ChunkPos> flagged = ConcurrentHashMap.newKeySet();
+    private final com.autism.seedcracker.finder.FinderReport reporter =
+        new com.autism.seedcracker.finder.FinderReport("Chunk", 55);
     private final Set<ChunkPos> notified = ConcurrentHashMap.newKeySet();
     private final Map<ChunkPos, Long> scannedAt = new ConcurrentHashMap<>();
     private final Map<ChunkPos, Integer> itemCounts = new ConcurrentHashMap<>();
@@ -174,7 +176,19 @@ public final class ChunkFinderModule extends Module {
         if (tickCounter % 6 == 0) {
             dispatchScans(mc);
         }
+        // Prune state for chunks far outside scan range - flagged/scannedAt otherwise grow
+        // without bound as you travel (and renderers keep drawing markers 10k blocks away).
+        if (tickCounter % 100 == 0) {
+            ChunkPos center = mc.player.chunkPosition();
+            int keep = scanRadius.get() + 16;
+            java.util.function.Predicate<ChunkPos> far = p ->
+                Math.abs(p.x() - center.x()) > keep || Math.abs(p.z() - center.z()) > keep;
+            flagged.removeIf(far);
+            notified.removeIf(far);
+            scannedAt.keySet().removeIf(far);
+        }
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-chunk-finder", flagged, color.get(), tracer.get());
+        reporter.tick(mc, flagged);
     }
 
     /** Queue background scans for in-range chunks that are due a (re)scan. */
@@ -393,6 +407,10 @@ public final class ChunkFinderModule extends Module {
                 String r = String.join(" ", reasons);
                 mc.execute(() -> onNewFlag(pos, r, x, z));
             }
+        } else {
+            // A clean rescan clears the flag - signals were removed (mined kelp, broken
+            // dripstone, etc). Flags used to be permanent for the session.
+            flagged.remove(pos);
         }
     }
 
@@ -427,10 +445,12 @@ public final class ChunkFinderModule extends Module {
 
     private void onNewFlag(ChunkPos pos, String reasons, int x, int z) {
         if (!notify.get()) return;
-        String msg = reasons + " (X:" + x + " Z:" + z + ")";
-        ClientNotify.warning("Chunk: " + msg);
-        AutismClientMessaging.sendPrefixed("§6[ChunkFinder] §f" + msg);
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.9f);
+        com.autism.seedcracker.finder.FinderNotify.flag("§6[ChunkFinder]",
+            reasons + " (X:" + x + " Z:" + z + ")", true);
+    }
+
+    @Override
+    public String info() {
+        return flagged.isEmpty() ? "" : flagged.size() + " flagged";
     }
 }

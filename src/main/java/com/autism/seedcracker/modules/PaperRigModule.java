@@ -170,7 +170,9 @@ public final class PaperRigModule extends Module {
                         predictedWinner = item2;
                         statusMessage = "D1: " + roll1 + " vs D2: " + predictedRoll;
                     }
-                    rigContainer(mc, item1);
+                    // Rig the stack belonging to the dispenser we want to WIN (always passing
+                    // item1 rigged the wrong dispenser whenever winner was 2).
+                    rigContainer(mc, winningItem.get() == 1 ? item1 : item2);
                 } else {
                     predictedWinner = null;
                     predictedRoll = 0;
@@ -196,6 +198,7 @@ public final class PaperRigModule extends Module {
         for (Slot slot : menu.slots) {
             ItemStack stack = slot.getItem();
             if (!stack.isEmpty() && stack.is(tracked)) {
+                if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return; // retried next pass
                 com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(
                     menu.containerId, slot.index, 0, ContainerInput.PICKUP, mc.player);
                 com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(
@@ -286,8 +289,8 @@ public final class PaperRigModule extends Module {
         String normalized = id.trim().toLowerCase(java.util.Locale.ROOT);
         Identifier key = Identifier.tryParse(normalized.contains(":") ? normalized : "minecraft:" + normalized);
         if (key == null) return null;
-        Item item = BuiltInRegistries.ITEM.getValue(key);
-        return item;
+        // getOptional: getValue returns AIR for unknown ids, which then "matches" empty tracking.
+        return BuiltInRegistries.ITEM.getOptional(key).orElse(null);
     }
 
     @Override

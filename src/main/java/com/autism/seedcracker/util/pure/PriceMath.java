@@ -1,0 +1,62 @@
+package com.autism.seedcracker.util.pure;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Price-text parsing (pure, no Minecraft types - unit tested).
+ *
+ * Shared by the auction/pay modules so the server-format assumptions live in ONE place:
+ * anchored price lines ($ prefix or price/cost/buy keyword, never "lowest number anywhere")
+ * and k/m/b shorthand amounts.
+ */
+public final class PriceMath {
+    private PriceMath() {}
+
+    private static final Pattern DOLLAR = Pattern.compile("\\$\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*([kKmMbB])?");
+    private static final Pattern KEYWORD = Pattern.compile("(?i)(?:price|cost|buy(?: it now)?)\\D{0,8}([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*([kKmMbB])?");
+
+    /** Price from one tooltip/chat line, or -1 if the line doesn't look like a price line. */
+    public static double parseLine(String line) {
+        if (line == null || line.isEmpty()) return -1;
+        Matcher m = DOLLAR.matcher(line);
+        if (!m.find()) {
+            m = KEYWORD.matcher(line);
+            if (!m.find()) return -1;
+        }
+        try {
+            double v = Double.parseDouble(m.group(1).replace(",", ""));
+            return v * suffixMultiplier(m.group(2));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Amount with optional k/m/b shorthand and commas ("166.3k", "1.8m", "30"); -1 if invalid. */
+    public static long parseAmount(String raw) {
+        if (raw == null) return -1;
+        String s = raw.replace(",", "").trim().toLowerCase(java.util.Locale.ROOT);
+        if (s.isEmpty()) return -1;
+        double mult = 1.0;
+        char last = s.charAt(s.length() - 1);
+        if (last == 't') { mult = 1_000_000_000_000.0; s = s.substring(0, s.length() - 1); }
+        else if (last == 'b') { mult = 1_000_000_000.0; s = s.substring(0, s.length() - 1); }
+        else if (last == 'm') { mult = 1_000_000.0; s = s.substring(0, s.length() - 1); }
+        else if (last == 'k') { mult = 1_000.0; s = s.substring(0, s.length() - 1); }
+        try {
+            return (long) (Double.parseDouble(s) * mult);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private static double suffixMultiplier(String suffix) {
+        if (suffix == null || suffix.isEmpty()) return 1.0;
+        return switch (Character.toLowerCase(suffix.charAt(0))) {
+            case 'k' -> 1_000.0;
+            case 'm' -> 1_000_000.0;
+            case 'b' -> 1_000_000_000.0;
+            default -> 1.0;
+        };
+    }
+}

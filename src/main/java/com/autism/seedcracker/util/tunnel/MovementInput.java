@@ -32,15 +32,34 @@ public final class MovementInput {
      * The desired world direction is snapped to the nearest 45-degree octant, then decomposed into
      * forward/back/left/right relative to the look yaw (wocky DirectionalInput logic).
      */
+    /** Last octant held, for key hysteresis (anti-chatter). */
+    private static int lastSector = -1;
+    /** Game-time of the last sector change; keys can't flip again for a couple ticks (anti-chatter). */
+    private static long lastChangeTick = Long.MIN_VALUE;
+
     public static Keys keysFor(double worldDirDeg) {
         float lookYaw = SilentRotation.isActive() ? SilentRotation.getYaw()
             : (mc.player != null ? mc.player.getYRot() : 0.0f);
         // Relative angle between where we want to go and where we're looking.
         double rel = Mth.wrapDegrees(worldDirDeg - lookYaw);
-        // Snap to the nearest 45-degree octant (8 movement sectors).
+        // Snap to the nearest 45-degree octant (8 movement sectors), with hysteresis: hold the current
+        // sector unless the angle clearly crosses into the next (+-33 deg instead of +-22.5), so yaw
+        // jitter near a boundary doesn't flap W<->W+D several times a second (an anti-cheat tell).
         double snapped = Math.round(rel / 45.0) * 45.0;
-        // Normalize into [0,360).
-        double sector = ((snapped % 360.0) + 360.0) % 360.0;
+        int cand = (int) (((snapped % 360.0) + 360.0) % 360.0 / 45.0);
+        long now = mc.level != null ? mc.level.getGameTime() : 0;
+        if (lastSector >= 0 && cand != lastSector) {
+            double centre = lastSector * 45.0;
+            double off = Math.abs(Mth.wrapDegrees(rel - centre));
+            // Keep the held sector while we're still near it, or if we only just changed (rough terrain
+            // swings the steering direction tick-to-tick; a 3-tick minimum hold stops the flap).
+            if (off < 33.0 || now - lastChangeTick < 3) cand = lastSector;
+            else lastChangeTick = now;
+        } else if (lastSector < 0 || cand != lastSector) {
+            lastChangeTick = now;
+        }
+        lastSector = cand;
+        double sector = cand * 45.0;
         return switch ((int) (sector / 45.0)) {
             case 0 -> new Keys(true, false, false, false);              // straight ahead
             case 1 -> new Keys(true, false, false, true);               // forward-right
@@ -85,8 +104,19 @@ public final class MovementInput {
         mc.options.keyDown.setDown(k.back);
         mc.options.keyLeft.setDown(k.left);
         mc.options.keyRight.setDown(k.right);
-        if (sprint && k.forward && !k.back) mc.options.keySprint.setDown(true);
-        else mc.options.keySprint.setDown(false);
+        hold(mc.options.keySprint, sprint && k.forward && !k.back);
+    }
+
+    /** Toggle-sneak/sprint keys flip on every press: only press when the state actually has to change. */
+    public static void hold(net.minecraft.client.KeyMapping key, boolean down) {
+        boolean toggle = key == mc.options.keyShift ? mc.options.toggleCrouch().get()
+            : key == mc.options.keySprint && mc.options.toggleSprint().get();
+        if (!toggle) key.setDown(down);
+        else if (key.isDown() != down) key.setDown(true);
+    }
+
+    public static void sneak(boolean down) {
+        if (mc.options != null) hold(mc.options.keyShift, down);
     }
 
     /** Release all movement keys. */
@@ -96,7 +126,7 @@ public final class MovementInput {
         mc.options.keyDown.setDown(false);
         mc.options.keyLeft.setDown(false);
         mc.options.keyRight.setDown(false);
-        mc.options.keySprint.setDown(false);
+        hold(mc.options.keySprint, false);
     }
 
     /** True if the player has any horizontal movement input held (wocky isMoving). */

@@ -139,11 +139,11 @@ From the project root, build the addon with either of these commands:
 .\gradlew.bat build --no-daemon
 ```
 
-The jar is produced in `build/libs/`.
+The jar is produced in `build/libs/`. A pre-built copy of the latest release is also tracked under `dist/`.
 
-> **AUTISM Client API:** the matching API jar is vendored in `libs/` and resolved via a `flatDir` repository, so the build is self-contained. It works on a fresh machine or CI runner with an empty `~/.m2` without needing `publishToMavenLocal`.
+> **Required for builds:** the AUTISM Client API jar must be present in `libs/` to compile. The build resolves it via a `flatDir` repository. The repo tracks the pinned compile target `libs/autism-5.0-26.2-dev.jar`. The additional client jars used during development (`autism-5.1-26.2.jar` = Client V4, `autism-earlyfix.jar`) are **not tracked** — if you need to build against Client V4 / EarlyFix, drop `autism-<version>.jar` into `libs/` and point `autism` in `gradle/libs.versions.toml` at that version, then rebuild.
 >
-> To upgrade the client, drop the new `autism-<version>.jar` into `libs/` and bump `autism` in `gradle/libs.versions.toml`. The project is currently pinned to AUTISM Client `5.0-26.2-dev`.
+> To upgrade the client, drop the new `autism-<version>.jar` into `libs/` and bump `autism` in `gradle/libs.versions.toml`. The project is currently pinned to AUTISM Client `5.1-26.2` (V4, addon API v4). At runtime the addon declares the lower of that and the installed client's API version, so the same jar also loads on the public `5.0-26.2` client (API v3).
 >
 > **AUTISM Client version:** the build resolves the API with a Maven version range (`[3.4,)`), so it uses the newest client you have published locally instead of locking to one exact version. The built jar declares `autism: "*"` and loads on compatible client versions. If a new major client release changes the API, the addon may need source updates. Incase for people with v6 (v 5.1 jar) put that in libs folder for build to be compatible 
 

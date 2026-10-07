@@ -39,22 +39,37 @@ public final class FlagLog {
         return file;
     }
 
+    /** In-memory ring of the latest entries for the /flaglog in-game viewer. */
+    private static final int RING_SIZE = 100;
+    private static final java.util.ArrayDeque<String> RING = new java.util.ArrayDeque<>(RING_SIZE);
+
     /** Log an event. Safe to call from any thread / any module; never throws. */
     public static void log(Severity severity, String category, String module, String detail) {
         try {
             ensureInit();
-            if (writer == null) return;
             String line = LocalDateTime.now().format(TS)
                 + " | " + severity
                 + " | " + safe(category)
                 + " | " + safe(module)
                 + " | " + safe(detail);
             synchronized (FlagLog.class) {
-                writer.write(line);
-                writer.newLine();
-                writer.flush(); // survive kicks/crashes
+                RING.addLast(line);
+                while (RING.size() > RING_SIZE) RING.removeFirst();
+                if (writer != null) {
+                    writer.write(line);
+                    writer.newLine();
+                    writer.flush(); // survive kicks/crashes
+                }
             }
         } catch (Throwable ignored) {}
+    }
+
+    /** The latest {@code n} entries, oldest first. */
+    public static java.util.List<String> recent(int n) {
+        synchronized (FlagLog.class) {
+            int skip = Math.max(0, RING.size() - Math.max(1, n));
+            return RING.stream().skip(skip).toList();
+        }
     }
 
     public static void info(String category, String module, String detail) { log(Severity.INFO, category, module, detail); }

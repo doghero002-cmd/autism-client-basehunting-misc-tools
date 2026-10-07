@@ -11,7 +11,8 @@ fabric-api = "0.152.2+26.2"
 # (autism-<version>.jar) and resolved via flatDir, so no maven repo is needed. Bump this and
 # drop the new jar in libs/ to upgrade.
 # Point at "earlyfix" to compile against the EarlyFix client jar (libs/autism-earlyfix.jar).
-autism = "5.0-26.2-dev"
+# 5.1-26.2 = AUTISM Client V4 (addon API v4). The addon's apiVersion() reports the API version of this jar.
+autism = "5.1-26.2"
 
 loom = "1.17.11"
 

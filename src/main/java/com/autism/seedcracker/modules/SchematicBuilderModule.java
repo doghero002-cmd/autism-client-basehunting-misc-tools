@@ -115,6 +115,9 @@ public final class SchematicBuilderModule extends Module {
     private final IntSetting chestDelay = add(new IntSetting("chest-delay", "Chest action delay", 4, 0, 20, 1)
         .description("Ticks between opening / taking from a chest.")
         .group("Restock").visibleWhen(() -> restock.get()));
+    private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
+        .description("Trace layer/task/restock/verify transitions to chat + /flaglog (diagnose stalls).")
+        .group("Build"));
 
     // ---- state ----
     private final Map<BlockPos, BlockState> schematic = new HashMap<>();
@@ -134,6 +137,10 @@ public final class SchematicBuilderModule extends Module {
     private int pendingSlot = -1;
     private BlockHitResult pendingHit = null;
     private boolean pendingSneak = false;
+    /** Placement awaiting server confirmation: pos + ticks left to see the block appear. */
+    private BlockPos verifyPos = null;
+    private int verifyTicks = 0;
+    private int verifyRetries = 0;
     private boolean faceScanFailureLogged = false;
 
     // pathfinding + scaffold
@@ -207,6 +214,12 @@ public final class SchematicBuilderModule extends Module {
 
         if (!build.get() || !loaded || origin == null) return;
 
+        com.autism.seedcracker.util.DebugProbe.setEnabled(id(), debug.get());
+        com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state",
+            "layer=" + currentLayer + " task=" + layerIndex + "/" + layerTasks.size()
+                + " restock=" + restockState + (verifyPos != null ? " verify=" + verifyPos.toShortString() : "")
+                + (scaffoldTarget != null ? " scaffold" : ""));
+
         // Restock runs even while a container GUI is open (it needs the chest screen). When the
         // restock machine is active it owns the tick; the normal build is paused.
         if (restock.get() && restockState != RestockState.NONE) {
@@ -262,7 +275,7 @@ public final class SchematicBuilderModule extends Module {
             // verify + advance
             int placedInLayer = 0;
             for (BlockPlaceTask t : layerTasks) {
-                if (mc.level.getBlockState(t.worldPos).equals(t.state)) placedInLayer++;
+                if (matches(mc.level.getBlockState(t.worldPos), t.state)) placedInLayer++;
             }
             boolean advance;
             if (buildOrder.get() == BuildOrder.LAYERED) {
@@ -288,9 +301,34 @@ public final class SchematicBuilderModule extends Module {
 
         if (placeCooldown > 0) { placeCooldown--; return; }
 
+        // Server-ack verification: after a place click, wait for the block to actually appear in
+        // the world before counting it. A silent rejection (anti-cheat ate the packet) retries up
+        // to 3 times, then reports to FlagDetector and skips - no more ghost "placed" blocks.
+        if (verifyPos != null) {
+            BlockState now = mc.level.getBlockState(verifyPos);
+            if (!now.isAir() && !now.canBeReplaced()) {
+                placed.add(verifyPos);
+                verifyPos = null;
+                verifyRetries = 0;
+            } else if (--verifyTicks <= 0) {
+                if (++verifyRetries >= 3) {
+                    com.autism.seedcracker.modules.FlagDetectorModule.report(
+                        "place-fail", "SchematicBuilder", "server rejected placement at " + verifyPos + " 3x");
+                    verifyPos = null;
+                    verifyRetries = 0;
+                    layerIndex++; // skip this spot for now; the layer-end verify pass retries it
+                } else {
+                    layerIndex--; // re-run the task (bounded by verifyRetries)
+                    if (layerIndex < 0) layerIndex = 0;
+                    verifyPos = null;
+                }
+            }
+            return;
+        }
+
         BlockPlaceTask task = layerTasks.get(layerIndex);
         BlockState cur = mc.level.getBlockState(task.worldPos);
-        if (cur.equals(task.state)) {
+        if (matches(cur, task.state)) {
             placed.add(task.worldPos);
             layerIndex++;
             return;
@@ -367,9 +405,11 @@ public final class SchematicBuilderModule extends Module {
             com.autism.seedcracker.util.tunnel.SilentRotation.apply(rot[0], rot[1]);
         } else {
             com.autism.seedcracker.util.tunnel.SilentRotation.clear();
-            mc.player.setYRot(rot[0]);
-            mc.player.setXRot(net.minecraft.util.Mth.clamp(rot[1], -90f, 90f));
+            if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, rot[0], rot[1])) return;
         }
+        // Don't click until the eased aim has actually CONVERGED on the hit point - clicking
+        // mid-swing is the "interacted while looking elsewhere" rotation-checker flag.
+        if (!look.isRotationsDone()) return;
         if (mc.gameMode != null) {
             // Sneak when the support is a container (nyx ROTATE_SNEAK) or FaceScan says the click
             // would otherwise be eaten by the block's use action (levers, doors, etc).
@@ -379,13 +419,31 @@ public final class SchematicBuilderModule extends Module {
             mc.player.swing(InteractionHand.MAIN_HAND);
             if (sneakForContainer) mc.options.keyShift.setDown(false);
         }
-        placed.add(task.worldPos);
+        // Don't trust the click: queue server-ack verification (block must appear within ~10t).
+        verifyPos = task.worldPos;
+        verifyTicks = 10;
         layerIndex++;
         pendingPlace = false;
         pendingSlot = -1;
         pendingHit = null;
         pendingSneak = false;
-        placeCooldown = placeDelay.get();
+        // Jittered + TPS-scaled: a constant N-tick place cadence is a printer signature.
+        placeCooldown = com.autism.seedcracker.util.Humanizer.delay(Math.max(1, placeDelay.get()));
+    }
+
+    /**
+     * Same block type counts as placed. Palettes load as default states and the click decides facing/axis/half,
+     * so an exact state compare never matched a stair, log or slab: the layer check kept failing and, with
+     * "Mine out wrong blocks" on, the builder dug out its own correct block and placed it again forever.
+     */
+    private static boolean matches(BlockState cur, BlockState want) {
+        return cur.is(want.getBlock());
+    }
+
+    /** Palette entry -> block; an unknown or malformed name is skipped (air) instead of failing the whole load. */
+    private static Block paletteBlock(CompoundTag entry) {
+        var id = net.minecraft.resources.Identifier.tryParse(entry.getStringOr("Name", "minecraft:air"));
+        return id == null ? Blocks.AIR : BuiltInRegistries.BLOCK.getOptional(id).orElse(Blocks.AIR);
     }
 
     /** Vanilla-ish reach: a bit more for targets above the head (you can reach up further). */
@@ -499,7 +557,7 @@ public final class SchematicBuilderModule extends Module {
         double dz = (target.getZ() + 0.5) - mc.player.getZ();
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         float[] rot = look.update(yaw, 0f);
-        mc.player.setYRot(rot[0]);
+        com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_MOVE, rot[0], mc.player.getXRot());
         mc.options.keyUp.setDown(true);
         if (mc.player.horizontalCollision && mc.player.onGround()) mc.options.keyJump.setDown(true);
         else mc.options.keyJump.setDown(false);
@@ -539,8 +597,7 @@ public final class SchematicBuilderModule extends Module {
             mc.player.getYRot() + (yaw - mc.player.getYRot()) * scale,
             mc.player.getXRot() + (pitch - mc.player.getXRot()) * scale);
         com.autism.seedcracker.util.tunnel.SilentRotation.clear();
-        mc.player.setYRot(rot[0]);
-        mc.player.setXRot(net.minecraft.util.Mth.clamp(rot[1], -90f, 90f));
+        if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, rot[0], rot[1])) return true;
         // Break whatever solid block the crosshair ray actually reports (real face).
         if (mc.hitResult instanceof BlockHitResult bhr
             && mc.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
@@ -594,24 +651,30 @@ public final class SchematicBuilderModule extends Module {
         walkToward(mc, target);
     }
 
-    /** Place a temporary scaffold block under the next step if there's a gap. */
+    /** Place a temporary scaffold block under the next step if there's a gap. Aims with the
+     * eased engine at the REAL hit point and only places once converged (no snap-place). */
     private boolean tryScaffoldStep(Minecraft mc) {
         BlockPos feet = mc.player.blockPosition();
         BlockPos ahead = feet.relative(mc.player.getDirection());
         BlockPos floor = ahead.below();
         if (isSolid(mc, floor)) return false; // already a floor
         if (schematic.containsKey(toRel(floor))) return false; // don't overwrite schematic spots
+        if (!mc.player.onGround()) return true; // airborne: wait, don't scaffold mid-jump (Grim)
         int slot = findScaffoldSlot(mc);
         if (slot < 0) return false;
         // place on the side of an adjacent solid block
         BlockHitResult hit = findPlacementHit(mc, floor);
         if (hit == null) return false;
         com.autism.seedcracker.util.InvSync.select(mc, slot);
-        float[] rot = look.update(
-            (float) Math.toDegrees(Math.atan2(-(hit.getLocation().x - mc.player.getX()), hit.getLocation().z - mc.player.getZ())),
-            40f);
-        mc.player.setYRot(rot[0]);
-        mc.player.setXRot(net.minecraft.util.Mth.clamp(rot[1], -90f, 90f));
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 tgt = hit.getLocation();
+        double dx = tgt.x - eye.x, dy = tgt.y - eye.y, dz = tgt.z - eye.z;
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
+        float[] rot = look.update(yaw, pitch);
+        if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, rot[0], rot[1])) return true;
+        // Keep easing across ticks until converged; return true = "busy scaffolding, don't walk".
+        if (!look.isRotationsDone()) return true;
         if (mc.gameMode != null) {
             mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
             mc.player.swing(InteractionHand.MAIN_HAND);
@@ -708,19 +771,29 @@ public final class SchematicBuilderModule extends Module {
             case OPENING -> {
                 if (mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) {
                     restockState = RestockState.TAKING;
-                    restockDelay = chestDelay.get();
+                    restockDelay = com.autism.seedcracker.util.Humanizer.delay(chestDelay.get());
                     return;
                 }
-                // face + open the chest
-                float[] rot = look.update(
-                    (float) Math.toDegrees(Math.atan2(-(restockChest.getX() + 0.5 - mc.player.getX()), restockChest.getZ() + 0.5 - mc.player.getZ())), 10f);
-                mc.player.setYRot(rot[0]);
-                mc.player.setXRot(net.minecraft.util.Mth.clamp(rot[1], -90f, 90f));
+                // Face the chest with the eased engine at a raycast-visible point; only use once
+                // converged (fabricated centre-hit + instant aim was a rotation-checker flag).
+                Vec3 visible = com.autism.seedcracker.util.tunnel.LegitHitPoint.find(
+                    mc, restockChest, Direction.UP, MAX_REACH);
+                BlockHitResult chestHit = new BlockHitResult(
+                    visible != null ? visible : Vec3.atCenterOf(restockChest),
+                    Direction.UP, restockChest, false);
+                Vec3 eye = mc.player.getEyePosition();
+                Vec3 tgt = chestHit.getLocation();
+                double dx = tgt.x - eye.x, dy = tgt.y - eye.y, dz = tgt.z - eye.z;
+                float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+                float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
+                float[] rot = look.update(yaw, pitch);
+                if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, rot[0], rot[1])) return;
+                if (!look.isRotationsDone()) return; // keep easing next tick
                 if (mc.gameMode != null) {
-                    mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND,
-                        new BlockHitResult(Vec3.atCenterOf(restockChest), Direction.UP, restockChest, false));
+                    mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, chestHit);
+                    mc.player.swing(InteractionHand.MAIN_HAND);
                 }
-                restockDelay = chestDelay.get();
+                restockDelay = com.autism.seedcracker.util.Humanizer.delay(chestDelay.get());
             }
             case TAKING -> {
                 if (!(mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>)) {
@@ -812,7 +885,7 @@ public final class SchematicBuilderModule extends Module {
             if (mc.player.distanceToSqr(Vec3.atCenterOf(worldPos)) > 200.0 * 200.0) continue;
             AABB box = new AABB(worldPos);
             int y = e.getKey().getY();
-            boolean isPlaced = mc.level.getBlockState(worldPos).equals(e.getValue());
+            boolean isPlaced = matches(mc.level.getBlockState(worldPos), e.getValue());
             if (isPlaced) placedBoxes.add(box);
             else if (y == currentLayer) currentBoxes.add(box);
             else if (y < currentLayer) missedBoxes.add(box);
@@ -876,9 +949,7 @@ public final class SchematicBuilderModule extends Module {
         ListTag palette = nbt.getListOrEmpty("palette");
         BlockState[] states = new BlockState[palette.size()];
         for (int i = 0; i < palette.size(); i++) {
-            CompoundTag b = palette.getCompoundOrEmpty(i);
-            Block blk = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.parse(b.getStringOr("Name", "minecraft:air")));
-            states[i] = blk != null ? blk.defaultBlockState() : Blocks.AIR.defaultBlockState();
+            states[i] = paletteBlock(palette.getCompoundOrEmpty(i)).defaultBlockState();
         }
         ListTag blocks = nbt.getListOrEmpty("blocks");
         trackMinMaxReset();
@@ -907,9 +978,7 @@ public final class SchematicBuilderModule extends Module {
             ListTag palette = region.getListOrEmpty("BlockStatePalette");
             BlockState[] states = new BlockState[palette.size()];
             for (int i = 0; i < palette.size(); i++) {
-                CompoundTag b = palette.getCompoundOrEmpty(i);
-                Block blk = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.parse(b.getStringOr("Name", "minecraft:air")));
-                states[i] = blk != null ? blk.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                states[i] = paletteBlock(palette.getCompoundOrEmpty(i)).defaultBlockState();
             }
             long[] data = bsOpt.get();
             int bitsPer = ceilLog2(Math.max(2, palette.size()));

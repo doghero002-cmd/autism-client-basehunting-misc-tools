@@ -120,18 +120,9 @@ public final class FakePaymentsModule extends Module {
         return v;
     }
 
-    /** Parses amounts like 1000, 5k, 1.5m, 2b, 1t. */
+    /** Parses amounts like 1000, 5k, 1.5m, 2b, 1t (shared parser; 1000 fallback keeps old behavior). */
     static long parseAmount(String raw) {
-        if (raw == null) return 1000L;
-        String s = raw.toLowerCase(java.util.Locale.ROOT).trim();
-        try {
-            if (s.endsWith("k")) return (long) (Double.parseDouble(s.substring(0, s.length() - 1)) * 1_000.0);
-            if (s.endsWith("m")) return (long) (Double.parseDouble(s.substring(0, s.length() - 1)) * 1_000_000.0);
-            if (s.endsWith("b")) return (long) (Double.parseDouble(s.substring(0, s.length() - 1)) * 1_000_000_000.0);
-            if (s.endsWith("t")) return (long) (Double.parseDouble(s.substring(0, s.length() - 1)) * 1_000_000_000_000.0);
-            return Long.parseLong(s);
-        } catch (NumberFormatException e) {
-            return 1000L;
-        }
+        long v = com.autism.seedcracker.util.pure.PriceMath.parseAmount(raw);
+        return v < 0 ? 1000L : v;
     }
 }

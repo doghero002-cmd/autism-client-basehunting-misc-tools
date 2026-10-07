@@ -70,6 +70,9 @@ public final class PlayerPanicModule extends Module {
         armed = true;
     }
 
+    /** Ticks the threat list has been continuously empty (re-arm needs 10s of calm). */
+    private int calmTicks = 0;
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
@@ -77,25 +80,39 @@ public final class PlayerPanicModule extends Module {
 
         List<String> threats = findThreats(mc);
         if (threats.isEmpty()) {
-            armed = true; // re-arm once everyone's gone
+            // Re-arm only after sustained calm: a player flickering at the range edge re-armed
+            // instantly and re-fired the full panic (repeated /pay!) every oscillation.
+            if (!armed && ++calmTicks >= 200) {
+                armed = true;
+                calmTicks = 0;
+            }
             return;
         }
+        calmTicks = 0;
         if (!armed) return;
         armed = false;
 
         react(mc, threats);
     }
 
+    private String safeCacheKey = "";
+    private java.util.Set<String> safeCache = java.util.Set.of();
+
     private List<String> findThreats(Minecraft mc) {
-        java.util.Set<String> safe = new java.util.HashSet<>();
-        safe.add(mc.player.getGameProfile().name().toLowerCase(Locale.ROOT));
-        String wl = whitelist.get();
-        if (wl != null) {
+        // Cached safe-set: rebuilt only when inputs change (was per-tick string churn).
+        String wl = whitelist.get() == null ? "" : whitelist.get();
+        String cacheKey = wl + "|" + mc.player.getGameProfile().name();
+        if (!cacheKey.equals(safeCacheKey)) {
+            safeCacheKey = cacheKey;
+            java.util.Set<String> next = new java.util.HashSet<>();
+            next.add(mc.player.getGameProfile().name().toLowerCase(Locale.ROOT));
             for (String w : wl.split(",")) {
                 String t = w.trim().toLowerCase(Locale.ROOT);
-                if (!t.isEmpty()) safe.add(t);
+                if (!t.isEmpty()) next.add(t);
             }
+            safeCache = next;
         }
+        java.util.Set<String> safe = safeCache;
         double r2 = (double) range.get() * range.get();
         List<String> out = new ArrayList<>();
         for (Player p : mc.level.players()) {

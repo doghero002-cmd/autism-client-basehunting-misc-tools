@@ -81,6 +81,8 @@ public final class GrowthFinderModule extends Module {
         .group("General"));
 
     private final Set<ChunkPos> flagged = new HashSet<>();
+    private final com.autism.seedcracker.finder.FinderReport reporter =
+        new com.autism.seedcracker.finder.FinderReport("Growth", 45);
     private final Set<ChunkPos> notified = new HashSet<>();
     private int tickCounter = 0;
 
@@ -114,6 +116,7 @@ public final class GrowthFinderModule extends Module {
 
         scan(mc);
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-growth-finder", flagged, color.get(), tracer.get());
+        reporter.tick(mc, flagged);
     }
 
     private void scan(Minecraft mc) {
@@ -163,10 +166,22 @@ public final class GrowthFinderModule extends Module {
 
         net.minecraft.core.BlockPos.MutableBlockPos m = new net.minecraft.core.BlockPos.MutableBlockPos();
         Set<Long> vineTops = new HashSet<>();
+        var sections = chunk.getSections();
+        int minYWorld = mc.level.getMinY();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = minY; y <= maxY; y++) {
+                    // Skip whole all-air sections: most of a chunk column is empty, and this
+                    // scan was reading every one of ~98k block states per chunk.
+                    int secIdx = (y - minYWorld) >> 4;
+                    if (secIdx >= 0 && secIdx < sections.length) {
+                        var sec = sections[secIdx];
+                        if (sec == null || sec.hasOnlyAir()) {
+                            y |= 15; // jump to the section's last Y; loop's y++ moves to the next section
+                            continue;
+                        }
+                    }
                     m.set(baseX + x, y, baseZ + z);
                     BlockState state = chunk.getBlockState(m);
                     if (state.isAir()) continue;
@@ -226,13 +241,13 @@ public final class GrowthFinderModule extends Module {
 
     private void onNewFlag(ChunkPos pos, Suspicion s) {
         if (!notify.get()) return;
-        int sx = s.source.getX(), sz = s.source.getZ();
-        String msg = "Growth (score " + s.score + (s.maxVine > 0 ? ", max vine " + s.maxVine : "") + ") near X:" + sx + " Z:" + sz;
-        ClientNotify.warning(msg);
-        AutismClientMessaging.sendPrefixed("§2[GrowthFinder] §f" + msg);
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-        }
+        com.autism.seedcracker.finder.FinderNotify.flag("§2[GrowthFinder]",
+            "Growth (score " + s.score + (s.maxVine > 0 ? ", max vine " + s.maxVine : "")
+                + ") near X:" + s.source.getX() + " Z:" + s.source.getZ(), true);
+    }
+
+    @Override
+    public String info() {
+        return flagged.isEmpty() ? "" : flagged.size() + " flagged";
     }
 }

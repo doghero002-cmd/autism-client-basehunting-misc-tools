@@ -300,6 +300,266 @@ public final class TextureCrackEngine {
         }
     }
 
+    // ---- side-face WALL cracking (CoordsFinder technique) ----
+    // On SIDE faces, y-rotations are invisible (every side face of cube/cube_mirrored carries the
+    // same texture + UV), but the "_mirrored" models flip the texture horizontally - so each wall
+    // cell of stone/deepslate/bedrock leaks 1 bit of Mth.getSeed(x,y,z). A wall grid is a vertical
+    // plane: rows = Y descending from the anchor, cols = horizontal as seen on the screenshot.
+    // 32+ known cells recommended (1 bit/cell vs 2 bits for top-face rotations).
+
+    /** Wall cell observation -> bitmask of variant indices with that mirror bit (rotation ignored). */
+    private static int wallAcceptMask(BlockVariantSet vs, boolean mirrored) {
+        int mask = 0;
+        for (int v = 0; v < vs.count(); v++) {
+            if (((vs.transform(v) & BlockVariantSet.T_MIRROR) != 0) == mirrored) mask |= 1 << v;
+        }
+        return mask;
+    }
+
+    /** One wall-pattern cell: horizontal offset + Y-down offset + accepted variants + cost. */
+    private record WCell(int dh, int dyDown, int acceptMask, float weight) {}
+
+    /**
+     * Wall solve: searches every (x, z, anchorY) for a vertical mirror-bit pattern.
+     *
+     * @param mirrorGrid rows x cols, -1 unknown, 0 normal, T_MIRROR mirrored; row 0 = TOP row
+     * @param obsYTop    estimated Y of the TOP row
+     * @param yRange     anchor Y uncertainty (+-)
+     * @param facingLock -1 = try all 4 observer facings, 0-3 = N/E/S/W only
+     */
+    public static void solveWall(int[][] mirrorGrid, float[][] weights, BlockVariantSet variants,
+                                 int obsYTop, int yRange, int centerX, int centerZ, int radius,
+                                 int formulaMode, int facingLock, double tolerance,
+                                 int maxMatches, Consumer<Match> onMatch, Runnable onDone) {
+        if (variants == null || !variants.hasMirrors()) {
+            status = "Block has no mirrored variants - walls carry no signal (use stone/deepslate/bedrock)";
+            if (onDone != null) onDone.run();
+            return;
+        }
+        int rowsTmp = mirrorGrid.length;
+        int colsTmp = 0;
+        for (int[] r : mirrorGrid) colsTmp = Math.max(colsTmp, r.length);
+        final int rows = rowsTmp, cols = colsTmp;
+        if (rows == 0 || cols == 0) {
+            status = "Empty wall grid";
+            if (onDone != null) onDone.run();
+            return;
+        }
+
+        // Build cells for both horizontal directions (observer facing flips column order) and both
+        // mirror interpretations (viewing side ambiguity), heaviest-first for early kill.
+        // dirFlip=false: cols map to +axis; true: reversed. inv: observed flip inverted.
+        List<List<WCell>> cellSets = new ArrayList<>();
+        List<String> cellLabels = new ArrayList<>();
+        for (int flip = 0; flip < 2; flip++) {
+            for (int inv = 0; inv < 2; inv++) {
+                List<WCell> cells = new ArrayList<>();
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < mirrorGrid[r].length; c++) {
+                        int obs = mirrorGrid[r][c];
+                        if (obs < 0) continue;
+                        boolean mirrored = (obs & BlockVariantSet.T_MIRROR) != 0;
+                        if (inv == 1) mirrored = !mirrored;
+                        int dh = flip == 0 ? c : (cols - 1 - c);
+                        float wgt = weights != null && r < weights.length && c < weights[r].length
+                            ? Math.max(0.01f, weights[r][c]) : 1.0f;
+                        cells.add(new WCell(dh, r, wallAcceptMask(variants, mirrored), wgt));
+                    }
+                }
+                if (cells.isEmpty()) continue;
+                cells.sort((a, b) -> Float.compare(b.weight(), a.weight()));
+                cellSets.add(cells);
+                cellLabels.add((flip == 0 ? "fwd" : "rev") + (inv == 1 ? "+inv" : ""));
+            }
+        }
+        if (cellSets.isEmpty()) {
+            status = "No known cells in wall grid";
+            if (onDone != null) onDone.run();
+            return;
+        }
+
+        // Draw -> variant table (same as the floor solve).
+        final int drawRange = variants.totalWeight();
+        final byte[] drawToVariant = new byte[drawRange];
+        {
+            int di = 0;
+            for (int v = 0; v < variants.count(); v++) {
+                for (int w = 0; w < variants.weight(v); w++) drawToVariant[di++] = (byte) v;
+            }
+        }
+
+        searching = true;
+        cancelRequested = false;
+        progress = 0f;
+        status = "Searching walls...";
+
+        boolean tryLegacy = formulaMode != FORMULA_NEXTINT;
+        boolean tryNextInt = formulaMode != FORMULA_LEGACY;
+        // Observer facings: 0=N (wall along X, sees +Z faces), 1=E (along Z), 2=S (along X), 3=W.
+        boolean alongXn = facingLock < 0 || facingLock == 0;
+        boolean alongXs = facingLock < 0 || facingLock == 2;
+        boolean alongZe = facingLock < 0 || facingLock == 1;
+        boolean alongZw = facingLock < 0 || facingLock == 3;
+        // Facing only decides column direction, which cellSets already covers via fwd/rev - so the
+        // real split is wall-along-X vs wall-along-Z.
+        boolean scanAlongX = alongXn || alongXs;
+        boolean scanAlongZ = alongZe || alongZw;
+
+        int minX = centerX - radius, maxX = centerX + radius;
+        int minZ = centerZ - radius, maxZ = centerZ + radius;
+        int yLo = obsYTop - yRange, yHi = obsYTop + yRange;
+        int yWin = (yHi - yLo) + rows;              // hashed Y window per strip
+
+        final int bandW = 256;
+        List<int[]> bands = new ArrayList<>();
+        for (int h0 = (scanAlongX ? minX : minZ); h0 <= (scanAlongX ? maxX : maxZ); h0 += bandW) {
+            bands.add(new int[]{h0, Math.min(h0 + bandW - 1, scanAlongX ? maxX : maxZ)});
+        }
+
+        CopyOnWriteArrayList<Match> results = new CopyOnWriteArrayList<>();
+        AtomicInteger found = new AtomicInteger(0);
+        AtomicLong stripsDone = new AtomicLong(0);
+        AtomicInteger nextStrip = new AtomicInteger(0);
+        int axesCount = (scanAlongX ? 1 : 0) + (scanAlongZ ? 1 : 0);
+        int formulaCount = (tryLegacy ? 1 : 0) + (tryNextInt ? 1 : 0);
+        // One strip = one fixed perpendicular coordinate (z for X-walls, x for Z-walls).
+        long totalStrips = (long) ((maxZ - minZ + 1) + (scanAlongZ && scanAlongX ? (maxX - minX + 1) : 0))
+            * formulaCount * Math.max(1, bands.size());
+        if (!scanAlongX) totalStrips = (long) (maxX - minX + 1) * formulaCount * bands.size();
+
+        int cores = Runtime.getRuntime().availableProcessors();
+        int threads = Math.max(1, cores * Math.max(10, Math.min(100, cpuLoadPercent)) / 100);
+        ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
+            Thread t = new Thread(r, "TextureCrack-Wall");
+            t.setDaemon(true);
+            t.setPriority(Thread.MIN_PRIORITY);
+            return t;
+        });
+        List<Future<?>> futures = new ArrayList<>();
+        final long fTotalStrips = Math.max(1, totalStrips);
+        final List<List<WCell>> fCellSets = cellSets;
+        final List<String> fLabels = cellLabels;
+
+        // Work items: (axis, band) pairs; each item walks all perpendicular strips for its band.
+        List<int[]> work = new ArrayList<>();
+        for (int b = 0; b < bands.size(); b++) {
+            if (scanAlongX) work.add(new int[]{0, b});
+            if (scanAlongZ) work.add(new int[]{1, b});
+        }
+
+        for (int t = 0; t < threads; t++) {
+            futures.add(pool.submit(() -> {
+                int wi;
+                while ((wi = nextStrip.getAndIncrement()) < work.size()
+                        && !cancelRequested && found.get() < maxMatches) {
+                    int[] item = work.get(wi);
+                    boolean axisX = item[0] == 0;
+                    int[] band = bands.get(item[1]);
+                    if (tryNextInt) scanWallBand(axisX, band[0], band[1], axisX ? minZ : minX, axisX ? maxZ : maxX,
+                        yLo, yWin, rows, cols, false, drawRange, drawToVariant, variants,
+                        fCellSets, fLabels, tolerance, results, found, maxMatches, onMatch, stripsDone, fTotalStrips);
+                    if (tryLegacy && !cancelRequested && found.get() < maxMatches)
+                        scanWallBand(axisX, band[0], band[1], axisX ? minZ : minX, axisX ? maxZ : maxX,
+                            yLo, yWin, rows, cols, true, drawRange, drawToVariant, variants,
+                            fCellSets, fLabels, tolerance, results, found, maxMatches, onMatch, stripsDone, fTotalStrips);
+                }
+            }));
+        }
+
+        Thread waiter = new Thread(() -> {
+            for (Future<?> f : futures) {
+                try { f.get(); } catch (Throwable ignored) {}
+            }
+            pool.shutdown();
+            try { pool.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+            searching = false;
+            progress = 1f;
+            status = (cancelRequested ? "Stopped - " : "Done - ") + found.get() + " wall match(es)";
+            if (onDone != null) onDone.run();
+        }, "TextureCrack-WallWaiter");
+        waiter.setDaemon(true);
+        waiter.start();
+    }
+
+    /**
+     * Scans one horizontal band of wall anchors. For each perpendicular strip (fixed z for X-walls,
+     * fixed x for Z-walls) the small Y-window of variant rows is hashed once, then every cell set
+     * slides across the band. Match.y reports the TOP row's Y.
+     */
+    private static void scanWallBand(boolean axisX, int h0, int h1, int p0, int p1,
+                                     int yLo, int yWin, int rows, int cols, boolean legacy,
+                                     int drawRange, byte[] drawToVariant, BlockVariantSet variants,
+                                     List<List<WCell>> cellSets, List<String> labels, double tolerance,
+                                     CopyOnWriteArrayList<Match> results, AtomicInteger found, int maxMatches,
+                                     Consumer<Match> onMatch, AtomicLong stripsDone, long totalStrips) {
+        int bandLen = (h1 - h0 + 1) + cols - 1;     // anchors near h1 still see full pattern width
+        byte[][] plane = new byte[yWin][bandLen];
+        long dutyStartNs = System.nanoTime();
+        int dutyStrips = 0;
+
+        for (int p = p0; p <= p1 && !cancelRequested && found.get() < maxMatches; p++) {
+            if (++dutyStrips >= 8) {
+                int load = Math.max(10, Math.min(100, cpuLoadPercent));
+                if (load < 100) {
+                    long busyMs = (System.nanoTime() - dutyStartNs) / 1_000_000;
+                    long sleepMs = Math.min(250, busyMs * (100 - load) / load);
+                    if (sleepMs > 0) {
+                        try { Thread.sleep(sleepMs); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+                    }
+                }
+                dutyStrips = 0;
+                dutyStartNs = System.nanoTime();
+            }
+            // Hash the strip's Y window.
+            for (int yi = 0; yi < yWin; yi++) {
+                int y = yLo + yi;
+                byte[] row = plane[yi];
+                for (int i = 0; i < bandLen; i++) {
+                    int wx = axisX ? h0 + i : p;
+                    int wz = axisX ? p : h0 + i;
+                    long seed = posSeed(wx, y, wz);
+                    row[i] = drawToVariant[legacy ? idxLegacy(seed, drawRange) : idxNextInt(seed, drawRange)];
+                }
+            }
+            // Anchor Y = top row; it can sit anywhere such that all rows fit in the window.
+            int anchorYiMax = yWin - rows;
+            for (int s = 0; s < cellSets.size(); s++) {
+                List<WCell> cells = cellSets.get(s);
+                for (int ayi = anchorYiMax; ayi >= 0; ayi--) {
+                    int maxAh = bandLen - cols;
+                    for (int ah = 0; ah <= maxAh; ah++) {
+                        double cost = 0;
+                        boolean dead = false;
+                        for (WCell cell : cells) {
+                            byte v = plane[ayi + cell.dyDown()][ah + cell.dh()];
+                            if ((cell.acceptMask() >> v & 1) == 0) {
+                                cost += cell.weight();
+                                if (cost > tolerance) { dead = true; break; }
+                            }
+                        }
+                        if (dead) continue;
+                        int wx = axisX ? h0 + ah : p;
+                        int wz = axisX ? p : h0 + ah;
+                        Match m = new Match(wx, yLo + ayi, wz, axisX ? 0 : 1, s,
+                            (legacy ? "legacy" : "nextInt") + " wall-" + (axisX ? "X" : "Z") + " " + labels.get(s), cost);
+                        if (found.incrementAndGet() <= maxMatches) {
+                            results.add(m);
+                            if (onMatch != null) onMatch.accept(m);
+                        } else {
+                            cancelRequested = true;
+                            return;
+                        }
+                    }
+                }
+            }
+            long done = stripsDone.incrementAndGet();
+            if ((done & 63) == 0) {
+                progress = (float) done / totalStrips;
+                status = String.format("%.0f%% - %d wall match(es)", Math.min(100f, progress * 100), found.get());
+            }
+        }
+    }
+
     /**
      * Pre-transforms the observed grid into world-space patterns, one per orientation/offset
      * combo. Coupled mode pairs each grid orientation with the apparent-rotation offsets it can

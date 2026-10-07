@@ -8,3 +8,12 @@ run/
 
 libs/autism-earlyfix.jar
 
+# Untracked dev-only client jars (see README "Required for builds")
+libs/autism-5.1-26.2.jar
+libs/autism-earlyfix.jar
+
+# GPU cracker sub-project build output (source is tracked)
+bedrock-gpu-cracker/build/
+bedrock-gpu-cracker/bin/
+bedrock-gpu-cracker/.gradle/
+

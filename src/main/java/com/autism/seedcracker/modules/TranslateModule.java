@@ -66,6 +66,7 @@ public final class TranslateModule extends Module {
 
     @Override
     public void onEnable() {
+        instance = this; // re-assign: onDisable nulls it, and the ctor only runs once
         TranslationEngine.setEnabled(true);
     }
 
@@ -119,9 +120,12 @@ public final class TranslateModule extends Module {
         String lang = langCode();
         @SuppressWarnings({"rawtypes", "unchecked"})
         List<Component> raw = (List) lines;
-        int limit = itemName.get() ? raw.size() : Math.max(0, raw.size() - 1); // skip name when off
+        // Snapshot the size BEFORE appending: iterating the live size visits our own appended
+        // translation lines and re-translates them (translation-of-translation cache pollution).
+        int n = raw.size();
+        int limit = itemName.get() ? n : Math.max(0, n - 1); // skip name when off
         int appended = 0;
-        for (int i = 0; i < raw.size() && appended < limit; i++) {
+        for (int i = 0; i < n && appended < limit; i++) {
             if (!itemName.get() && i == 0) continue; // first line is the item name
             Component line = raw.get(i);
             if (line == null) continue;

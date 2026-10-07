@@ -90,6 +90,9 @@ public abstract class ClientPacketListenerMixin {
     @Inject(method = "handleLogin", at = @At(value = "TAIL"))
     public void onGameJoin(ClientboundLoginPacket packet, CallbackInfo ci) {
         newDimension(new HashedSeedData(packet.commonPlayerSpawnInfo().seed()), false);
+        com.autism.seedcracker.util.ActionPacer.resetSession(); // fresh fatigue/backoff per session
+        com.autism.seedcracker.finder.BaseTracker.clear();
+        com.autism.seedcracker.finder.BaseAlerts.reset();
         tryDatabase();
         var preloaded = StructureSave.loadStructures();
         if (!preloaded.isEmpty()) {

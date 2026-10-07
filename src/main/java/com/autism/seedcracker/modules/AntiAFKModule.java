@@ -133,7 +133,7 @@ public final class AntiAFKModule extends Module {
             // machine-detectable idle pattern there is.
             float jitter = 0.7f + random.nextFloat() * 0.6f;
             yaw = net.minecraft.util.Mth.wrapDegrees(yaw + spinSpeed.get() * jitter);
-            mc.player.setYRot(yaw);
+            com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_IDLE, yaw, mc.player.getXRot());
         }
     }
 }

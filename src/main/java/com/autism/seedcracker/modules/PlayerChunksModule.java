@@ -68,6 +68,10 @@ public final class PlayerChunksModule extends Module {
 
     @Override
     public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+        // Intel survives TOGGLES by design, but chunk coords are meaningless across servers.
+        visits.clear();
+        lastPlayer.clear();
+        seenPlayers.clear();
     }
 
     @Override

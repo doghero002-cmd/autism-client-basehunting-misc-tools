@@ -26,9 +26,11 @@ public final class AntiCheatGuesserModule extends Module {
     private final BoolSetting announce = add(new BoolSetting("announce", "Announce guess", true)
         .description("Chat message when the anti-cheat is identified.").group("General"));
 
-    private final java.util.ArrayDeque<Integer> ids = new java.util.ArrayDeque<>();
-    private String guess = "unknown";
-    private boolean announced = false;
+    // onPacketReceive mutates this on the netty thread while onEnable/onGameJoin clear it on
+    // the main thread - plain ArrayDeque can corrupt or NPE under that race.
+    private final java.util.concurrent.ConcurrentLinkedDeque<Integer> ids = new java.util.concurrent.ConcurrentLinkedDeque<>();
+    private volatile String guess = "unknown";
+    private volatile boolean announced = false;
 
     public AntiCheatGuesserModule() {
         super(SeedcrackerAddon.ID + ":ac-guesser", "AntiCheat Guesser",
@@ -86,6 +88,8 @@ public final class AntiCheatGuesserModule extends Module {
         if (!newGuess.equals(guess)) {
             guess = newGuess;
             announced = false;
+            // Feed the guess into the global behavior profile (pacing adapts automatically).
+            com.autism.seedcracker.util.AntiCheatProfile.set(newGuess);
         }
         if (!announced && !"unknown".equals(guess)) {
             announced = true;

@@ -17,7 +17,7 @@ import net.minecraft.network.chat.Component;
  * Relog Loader. Click an entry to copy its coords; per-row buttons delete an entry. Top bar has
  * a search filter and a sort toggle (newest / nearest). Delete Selected removes the clicked entry.
  */
-public final class BaseLogScreen extends Screen {
+public final class BaseLogScreen extends com.autism.seedcracker.gui.AddonScreen {
     private final Screen parent;
 
     private List<BaseLog.Entry> all = new ArrayList<>();
@@ -49,11 +49,11 @@ public final class BaseLogScreen extends Screen {
         int margin = 20;
         this.listX = margin;
         this.listY = 84;
-        this.listW = this.width - margin * 2 - 96; // leave room for the side button column
-        this.rowsVisible = Math.max(1, (this.height - this.listY - 30) / this.rowH);
+        this.listW = screenWidth() - margin * 2 - 96; // leave room for the side button column
+        this.rowsVisible = Math.max(1, (screenHeight() - this.listY - 30) / this.rowH);
 
         int sideX = this.listX + this.listW + 8;
-        int sideW = this.width - sideX - margin;
+        int sideW = screenWidth() - sideX - margin;
 
         this.searchField = new EditBox(this.font, this.listX, 40, 220, 20, Component.literal("Search"));
         this.searchField.setMaxLength(64);
@@ -61,26 +61,26 @@ public final class BaseLogScreen extends Screen {
         this.searchField.setResponder(s -> refilter());
         this.addRenderableWidget(this.searchField);
 
-        this.sortButton = Button.builder(Component.literal(sortLabel()), b -> {
+        this.sortButton = button(Component.literal(sortLabel()), b -> {
             sortNearest = !sortNearest;
             b.setMessage(Component.literal(sortLabel()));
             refilter();
         }).bounds(this.listX + 228, 40, 130, 20).build();
         this.addRenderableWidget(this.sortButton);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> {
+        this.addRenderableWidget(button(Component.literal("Refresh"), b -> {
             this.all = BaseLog.readAll();
             refilter();
         }).bounds(this.listX + 362, 40, 70, 20).build());
 
         // Side action column.
         int by = this.listY;
-        this.addRenderableWidget(Button.builder(Component.literal("Copy Coords"), b -> copySelected())
+        this.addRenderableWidget(button(Component.literal("Copy Coords"), b -> copySelected())
             .bounds(sideX, by, sideW, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Delete Selected"), b -> deleteSelected())
+        this.addRenderableWidget(button(Component.literal("Delete Selected"), b -> deleteSelected())
             .bounds(sideX, by + 26, sideW, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose())
-            .bounds(sideX, this.height - 44, sideW, 20).build());
+        this.addRenderableWidget(button(Component.literal("Close"), b -> onClose())
+            .bounds(sideX, screenHeight() - 44, sideW, 20).build());
 
         refilter();
     }
@@ -144,9 +144,8 @@ public final class BaseLogScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
-        super.extractRenderState(ctx, mouseX, mouseY, delta);
-        ctx.centeredText(this.font, Component.literal("Base Log Browser"), this.width / 2, 12, 0xFFFFFFFF);
+    protected void renderContent(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
+        ctx.centeredText(this.font, Component.literal("Base Log Browser"), screenWidth() / 2, 12, 0xFFFFFFFF);
         ctx.text(this.font, Component.literal(this.view.size() + " base(s)"), this.listX, 24, 0xFFA0A0A0, false);
 
         double[] p = BaseLog.playerPos();
@@ -202,7 +201,7 @@ public final class BaseLogScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    protected boolean onClick(MouseButtonEvent event, boolean doubleClick) {
         if (event != null && event.buttonInfo() != null && event.buttonInfo().button() == 0) {
             double mx = event.x();
             double my = event.y();
@@ -220,17 +219,17 @@ public final class BaseLogScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return false;
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double hAmount, double vAmount) {
+    protected boolean onScroll(double mouseX, double mouseY, double hAmount, double vAmount) {
         if (this.view.size() > this.rowsVisible) {
             this.scroll -= (int) vAmount;
             clampScroll();
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, hAmount, vAmount);
+        return false;
     }
 
     @Override

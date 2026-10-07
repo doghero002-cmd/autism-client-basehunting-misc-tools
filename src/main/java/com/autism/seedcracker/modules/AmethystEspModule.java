@@ -66,6 +66,10 @@ public final class AmethystEspModule extends Module {
 
     /** chunkKey -> set of amethyst block positions in that chunk. */
     private final Map<Long, Set<BlockPos>> flagged = new ConcurrentHashMap<>();
+    /** Anti-xray bypass markers (packet palette leak). SEPARATE from the scan map: scanChunk
+     * put/removes whole chunk entries, and hidden blocks are invisible to it - sharing the map
+     * meant every rescan pass erased the bypass's hidden-geode markers. */
+    private final Map<Long, Set<BlockPos>> bypassFlagged = new ConcurrentHashMap<>();
     private final Set<Long> notified = ConcurrentHashMap.newKeySet();
     private int cursor = 0;
     private long enableTimeMs = 0;
@@ -82,6 +86,7 @@ public final class AmethystEspModule extends Module {
     public void onEnable() {
         BlockEspRenderer.init();
         flagged.clear();
+        bypassFlagged.clear();
         notified.clear();
         cursor = 0;
         enableTimeMs = System.currentTimeMillis();
@@ -93,6 +98,7 @@ public final class AmethystEspModule extends Module {
     @Override
     public void onDisable() {
         flagged.clear();
+        bypassFlagged.clear();
         notified.clear();
         BlockEspRenderer.clear(SeedcrackerAddon.ID + ":amethyst-esp");
     }
@@ -130,21 +136,20 @@ public final class AmethystEspModule extends Module {
         // Prune out-of-range chunks (and their chat-alert keys, so re-entering range re-alerts
         // and the set doesn't grow unbounded over a long session).
         int pr = range + 2;
-        flagged.keySet().removeIf(key -> {
+        java.util.function.Predicate<Long> tooFar = key -> {
             int kx = (int) (key >> 32);
             int kz = (int) (key & 0xffffffffL);
             return Math.abs(kx - centre.x()) > pr || Math.abs(kz - centre.z()) > pr;
-        });
-        notified.removeIf(key -> {
-            int kx = (int) (key >> 32);
-            int kz = (int) (key & 0xffffffffL);
-            return Math.abs(kx - centre.x()) > pr || Math.abs(kz - centre.z()) > pr;
-        });
+        };
+        flagged.keySet().removeIf(tooFar);
+        bypassFlagged.keySet().removeIf(tooFar);
+        notified.removeIf(tooFar);
 
-        // Feed the renderer with the union of all flagged blocks.
+        // Feed the renderer with the union of scan + bypass markers.
         if (blockEsp.get()) {
             Set<BlockPos> all = new HashSet<>();
             for (Set<BlockPos> s : flagged.values()) all.addAll(s);
+            for (Set<BlockPos> s : bypassFlagged.values()) all.addAll(s);
             BlockEspRenderer.feed(SeedcrackerAddon.ID + ":amethyst-esp", all, color.get(), tracer.get(), fill.get());
         }
 
@@ -170,6 +175,7 @@ public final class AmethystEspModule extends Module {
         java.util.List<net.minecraft.world.phys.AABB> boxes = new java.util.ArrayList<>();
         Set<BlockPos> remaining = new HashSet<>();
         for (Set<BlockPos> s : flagged.values()) remaining.addAll(s);
+        for (Set<BlockPos> s : bypassFlagged.values()) remaining.addAll(s);
         while (!remaining.isEmpty()) {
             // Flood-fill one cluster.
             java.util.List<BlockPos> cluster = new java.util.ArrayList<>();
@@ -217,7 +223,7 @@ public final class AmethystEspModule extends Module {
         // marker block at the section centre so the geode box/ESP still shows where to dig.
         ChunkPos pos = new ChunkPos(chunkX, chunkZ);
         long key = ((long) pos.x() << 32) | (pos.z() & 0xffffffffL);
-        Set<BlockPos> found = flagged.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
+        Set<BlockPos> found = bypassFlagged.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
         for (int secY : hidden) {
             found.add(new BlockPos((chunkX << 4) + 8, (secY << 4) + 8, (chunkZ << 4) + 8));
         }

@@ -118,17 +118,25 @@ public final class AutoToolModule extends Module {
         for (int slot = 0; slot < 9; slot++) {
             ItemStack stack = mc.player.getInventory().getItem(slot);
             if (stack.isEmpty()) continue;
+            // Only consider actual weapons; otherwise attacking with a stack of dirt in slot 0
+            // "wins" over bare hands and we swap away from whatever the player was holding.
+            String id = itemId(stack);
+            if (!id.endsWith("_sword") && !id.endsWith("_axe") && !id.endsWith("mace")
+                && !id.endsWith("trident")) continue;
+            if (antiBreak.get() && breakingSoon(stack)) continue;
             double damage = attackScore(stack);
             if (damage > bestDamage) {
                 bestDamage = damage;
                 bestSlot = slot;
             }
         }
-        if (bestSlot != -1 && bestSlot != mc.player.getInventory().getSelectedSlot()) {
-            int sel = mc.player.getInventory().getSelectedSlot();
-            if (prevSlot == -1) prevSlot = sel;
-            com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
-        }
+        if (bestSlot == -1) return;
+        int sel = mc.player.getInventory().getSelectedSlot();
+        if (bestSlot == sel) return;
+        // Don't swap unless the candidate actually beats what's in hand.
+        if (bestDamage <= attackScore(mc.player.getMainHandItem())) return;
+        if (prevSlot == -1) prevSlot = sel;
+        com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
     }
 
     /**

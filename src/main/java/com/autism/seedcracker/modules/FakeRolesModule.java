@@ -59,6 +59,13 @@ public final class FakeRolesModule extends Module {
     }
 
     @Override
+    public void onEnable() {
+        // Restore the mixin hook: onDisable nulls it, so without this the module was
+        // permanently dead after the first disable (same bug class as TranslateModule).
+        instance = this;
+    }
+
+    @Override
     public void onDisable() {
         if (instance == this) instance = null;
     }

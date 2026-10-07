@@ -110,12 +110,16 @@ public final class ChunkKeeperModule extends Module {
                 }
             }
 
-            // Compare against the previous fingerprint AFTER the world applies it: defer one tick.
-            mc.execute(() -> inspect(x, z));
+            // Compare AFTER the world applies the packet: the netty HEAD hook queues before
+            // vanilla's own apply task, so a single execute still sees the PRE-apply chunk -
+            // double-defer puts inspect behind the apply in the main-thread queue.
+            mc.execute(() -> mc.execute(() -> inspect(x, z)));
         } else if (packet instanceof ClientboundForgetLevelChunkPacket forget) {
             if (holdUnloads.get() && mc.level != null) {
                 heldUnloads++;
-                pendingRefresh.add(forget.pos().pack());
+                // Must match the custom key format used by the HOLD path (x high / z low) -
+                // vanilla pack() is z-high, so held chunks were never matched for refresh.
+                pendingRefresh.add((((long) forget.pos().x()) << 32) | (forget.pos().z() & 0xffffffffL));
                 return true; // keep the chunk rendered
             }
             // Chunk unloads keep their fingerprint (that's the point: compare on re-send).

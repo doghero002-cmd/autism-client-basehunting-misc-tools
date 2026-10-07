@@ -78,26 +78,45 @@ public final class ChestStealerModule extends Module {
         if (containerSlots <= 0) return;
         if (requireChest.get() && !hasStorageRows(containerSlots)) return;
 
-        Set<Item> filter = parseItems();
+        Set<Item> filter = cachedFilter();
 
         for (int i = 0; i < containerSlots; i++) {
             Slot slot = menu.slots.get(i);
             if (!slot.hasItem()) continue;
             ItemStack stack = slot.getItem();
             if (!matches(stack, filter)) continue;
+            // Inventory-full failsafe: QUICK_MOVE silently no-ops with a full inventory, which
+            // would loop clicking the same slot forever (a packet-spam flag).
+            if (!hasRoomFor(mc, stack)) {
+                com.autism.seedcracker.compat.ClientNotify.warning("[Chest Stealer] Inventory full.");
+                if (closeWhenDone.get()) mc.player.closeContainer();
+                cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get() * 4);
+                return;
+            }
 
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; } // global budget
             ContainerMutex.notifyContainerAction();
             mc.gameMode.handleContainerInput(menu.containerId, i, 0, ContainerInput.QUICK_MOVE, mc.player);
-            cooldown = delayTicks.get();
+            cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get());
             return; // one click per cycle
         }
 
-        // Nothing lootable left (empty, filtered out, or our inventory is full and QUICK_MOVE
-        // would no-op anyway): optionally close the screen.
+        // Nothing lootable left (empty or filtered out): optionally close the screen.
         if (closeWhenDone.get()) {
             mc.player.closeContainer();
-            cooldown = delayTicks.get();
+            cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get());
         }
+    }
+
+    /** True if the player inventory can accept at least part of this stack. */
+    private static boolean hasRoomFor(Minecraft mc, ItemStack stack) {
+        var inv = mc.player.getInventory();
+        for (int i = 0; i < 36; i++) {
+            ItemStack cur = inv.getItem(i);
+            if (cur.isEmpty()) return true;
+            if (ItemStack.isSameItemSameComponents(cur, stack) && cur.getCount() < cur.getMaxStackSize()) return true;
+        }
+        return false;
     }
 
     /** True when the menu has generic storage rows (chest/barrel/shulker/hopper GUIs). */
@@ -113,18 +132,25 @@ public final class ChestStealerModule extends Module {
         };
     }
 
-    private Set<Item> parseItems() {
+    private Set<Item> cachedFilter() {
+        if (--filterReparseTicks > 0) return cachedFilterSet;
+        filterReparseTicks = 20;
         Set<Item> out = new HashSet<>();
-        for (String id : filterItems.get()) {
-            try {
-                Identifier ident = Identifier.parse(id.trim());
-                Item item = BuiltInRegistries.ITEM.getValue(ident);
-                if (item != null) out.add(item);
-            } catch (Throwable ignored) {
+        java.util.List<String> raw = filterItems.get();
+        if (raw != null) {
+            for (String id : raw) {
+                // tryParse+getOptional: parse() THROWS on bad input and getValue() returns AIR
+                // (never null), so a typo used to whitelist air.
+                Identifier ident = Identifier.tryParse(id.trim());
+                if (ident != null) BuiltInRegistries.ITEM.getOptional(ident).ifPresent(out::add);
             }
         }
+        cachedFilterSet = out;
         return out;
     }
+
+    private Set<Item> cachedFilterSet = new HashSet<>();
+    private int filterReparseTicks = 0;
 
     @Override
     public String info() {

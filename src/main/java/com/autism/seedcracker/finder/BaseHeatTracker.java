@@ -27,10 +27,7 @@ import java.util.regex.Pattern;
 public final class BaseHeatTracker {
 
     private static final int GRID = 9;
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(8))
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build();
+    private static final HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
 
     /** cellIndex (1-based, row-major) -> local find count. */
     private static final Map<Integer, Integer> LOCAL = new ConcurrentHashMap<>();

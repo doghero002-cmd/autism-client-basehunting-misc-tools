@@ -7,7 +7,6 @@ import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.hud.RegionMapHud;
 
 import autismclient.api.module.BoolSetting;
-import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -34,12 +33,6 @@ public final class RegionMapModule extends Module {
 
     private static final Identifier LAYER_ID = Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, "region_map");
 
-    public enum Dimension { OVERWORLD, NETHER }
-
-    private final EnumSetting<Dimension> dimension = add(new EnumSetting<>(
-            "dimension", "Dimension", Dimension.OVERWORLD, Dimension.values())
-        .description("Which dimension's map to show. Nether coords are mapped 1:8 to the Overworld grid.")
-        .group("Grid"));
     private final IntSetting x = add(new IntSetting("x", "X", 6, 0, 4000, 1)
         .description("Horizontal screen position.").group("Render"));
     private final IntSetting y = add(new IntSetting("y", "Y", 40, 0, 4000, 1)
@@ -102,6 +95,7 @@ public final class RegionMapModule extends Module {
 
     private double lastX = Double.NaN;
     private double lastZ = Double.NaN;
+    private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lastDim;
 
     private static final int GRID = 9;
 
@@ -130,7 +124,13 @@ public final class RegionMapModule extends Module {
     }
 
     @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    public void onGameLeft() {
+        // Dots are per-world intel; carrying them into the next server plots garbage.
+        dots.clear();
+        lastX = Double.NaN;
+        lastZ = Double.NaN;
+        lastDim = null;
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     private static boolean layerRegistered = false;
@@ -158,6 +158,13 @@ public final class RegionMapModule extends Module {
 
         // Convert the player's position into Overworld-equivalent coords for the shared map.
         boolean nether = mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER);
+        // A dimension change is a huge raw-coordinate jump but NOT a teleport - reset tracking
+        // so portal travel doesn't log a bogus RTP dot.
+        if (lastDim != mc.level.dimension()) {
+            lastDim = mc.level.dimension();
+            lastX = Double.NaN;
+            lastZ = Double.NaN;
+        }
         double px = mc.player.getX();
         double pz = mc.player.getZ();
         double wx = nether ? px * 8.0 : px;
@@ -271,8 +278,10 @@ public final class RegionMapModule extends Module {
         }
 
         // Dimension label + current cell (top-left, like the reference).
+        // Label reflects the dimension you're actually in (the old setting was decorative).
         if (font != null) {
-            String dim = dimension.get() == Dimension.OVERWORLD ? "Overworld" : "Nether";
+            boolean inNether = mc.level != null && mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER);
+            String dim = inNether ? "Nether" : "Overworld";
             ctx.text(font, dim, ox, oy - 10, 0xFFC8C8D8);
             if (mc.player != null && mc.level != null) {
                 boolean netherNow = mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER);

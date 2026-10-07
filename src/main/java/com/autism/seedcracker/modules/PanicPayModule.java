@@ -38,6 +38,8 @@ public final class PanicPayModule extends Module {
 
     private long enabledAtMs = 0;
     private boolean fired = false;
+    private String safeCacheKey = "";
+    private java.util.Set<String> safeCache = java.util.Set.of();
 
     public PanicPayModule() {
         super(SeedcrackerAddon.ID + ":panic-pay", "Panic Pay",
@@ -70,15 +72,21 @@ public final class PanicPayModule extends Module {
         String target = payTarget.get() == null ? "" : payTarget.get().trim();
         if (target.isEmpty()) return; // not configured - do nothing rather than pay nobody
 
-        java.util.Set<String> safe = new java.util.HashSet<>();
-        safe.add(mc.player.getGameProfile().name().toLowerCase());
-        safe.add(target.toLowerCase());
-        if (whitelist.get() != null) {
-            for (String w : whitelist.get().split(",")) {
+        // Cached safe-set: rebuilt only when the inputs change (was per-tick string churn).
+        String rawWl = whitelist.get() == null ? "" : whitelist.get();
+        String cacheKey = target + "|" + rawWl + "|" + mc.player.getGameProfile().name();
+        if (!cacheKey.equals(safeCacheKey)) {
+            safeCacheKey = cacheKey;
+            java.util.Set<String> next = new java.util.HashSet<>();
+            next.add(mc.player.getGameProfile().name().toLowerCase());
+            next.add(target.toLowerCase());
+            for (String w : rawWl.split(",")) {
                 String t = w.trim().toLowerCase();
-                if (!t.isEmpty()) safe.add(t);
+                if (!t.isEmpty()) next.add(t);
             }
+            safeCache = next;
         }
+        java.util.Set<String> safe = safeCache;
 
         double r2 = (double) radius.get() * radius.get();
         for (Player p : mc.level.players()) {
