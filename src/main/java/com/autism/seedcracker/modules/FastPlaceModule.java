@@ -57,6 +57,11 @@ public final class FastPlaceModule extends Module {
         if (!applies(main, off)) return;
 
         int target = Math.max(0, delay.get().intValue());
+        // Grim's FastPlace check flags sub-2-tick place cadence; when the AC guesser has
+        // identified a strict anti-cheat, enforce that floor regardless of the slider.
+        if (com.autism.seedcracker.util.AntiCheatProfile.delayScale() >= 1.4) {
+            target = Math.max(target, 2);
+        }
         AutismMinecraftAccessor accessor = (AutismMinecraftAccessor) mc;
         if (accessor.autism$getRightClickDelay() != target) {
             accessor.autism$setRightClickDelay(target);

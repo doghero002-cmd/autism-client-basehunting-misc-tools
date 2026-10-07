@@ -81,10 +81,17 @@ public final class AutoMineModule extends Module {
         processMiningAction(mc, true);
 
         if (lockView.get()) {
-            float y = yaw.get().floatValue();
-            float p = pitch.get().floatValue();
-            if (mc.player.getYRot() != y) mc.player.setYRot(y);
-            if (mc.player.getXRot() != p) mc.player.setXRot(p);
+            // Dual-sine idle micro-noise: a head frozen to the exact same float for hours is a
+            // statistical bot tell. ~0.3 deg drift reads as a resting hand on the mouse.
+            long t = System.currentTimeMillis();
+            float ny = (float) (Math.sin(t / 1900.0) * 0.22 + Math.sin(t / 731.0) * 0.08);
+            float np = (float) (Math.sin(t / 2300.0) * 0.15 + Math.sin(t / 613.0) * 0.06);
+            float y = yaw.get().floatValue() + ny;
+            float p = pitch.get().floatValue() + np;
+            // Aim.set keeps the micro-deltas on the mouse GCD grid (sub-step deltas are a Grim flag).
+            if (mc.player.getYRot() != y || mc.player.getXRot() != p) {
+                com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_IDLE, y, p);
+            }
         }
     }
 
@@ -98,7 +105,7 @@ public final class AutoMineModule extends Module {
         if (breaking && target != null && target.getType() == HitResult.Type.BLOCK) {
             BlockHitResult bhr = (BlockHitResult) target;
             BlockPos pos = bhr.getBlockPos();
-            if (safeMine.get() && lavaAdjacent(mc, pos)) {
+            if (safeMine.get() && (lavaAdjacent(mc, pos) || dropsUsIntoDanger(mc, pos))) {
                 if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
                 return;
             }
@@ -156,6 +163,31 @@ public final class AutoMineModule extends Module {
         if (s.isEmpty() || s.getMaxDamage() <= 0) return false;
         int remaining = s.getMaxDamage() - s.getDamageValue();
         return remaining < s.getMaxDamage() * antiBreakPercent.get() / 100;
+    }
+
+    /**
+     * Mining the block we're standing on (looking straight down) with nothing else holding us up: we fall in.
+     * Fine onto solid ground a couple of blocks down; not into lava, the void, or a drop of 4+ (fall damage).
+     */
+    private static boolean dropsUsIntoDanger(Minecraft mc, BlockPos pos) {
+        var box = mc.player.getBoundingBox();
+        if (pos.getY() != (int) Math.floor(box.minY - 0.01)) return false;
+        if (pos.getX() < Math.floor(box.minX) || pos.getX() > Math.floor(box.maxX)
+            || pos.getZ() < Math.floor(box.minZ) || pos.getZ() > Math.floor(box.maxZ)) return false;
+        for (int x = (int) Math.floor(box.minX); x <= (int) Math.floor(box.maxX); x++) {
+            for (int z = (int) Math.floor(box.minZ); z <= (int) Math.floor(box.maxZ); z++) {
+                BlockPos f = new BlockPos(x, pos.getY(), z);
+                if (!f.equals(pos) && !mc.level.getBlockState(f).getCollisionShape(mc.level, f).isEmpty()) return false;
+            }
+        }
+        for (int dy = 1; dy <= 4; dy++) {
+            BlockPos c = pos.below(dy);
+            var s = mc.level.getBlockState(c);
+            if (s.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) return true;
+            if (!s.getFluidState().isEmpty()) return false;
+            if (!s.getCollisionShape(mc.level, c).isEmpty()) return dy > 3 || c.getY() < mc.level.getMinY();
+        }
+        return true;
     }
 
     /** True if any of the 6 blocks adjacent to pos is lava (fluid-state: catches flowing lava too). */

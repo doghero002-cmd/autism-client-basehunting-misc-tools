@@ -48,6 +48,8 @@ public final class TextureCrackCommand extends Command {
     public static int facingLock = -1;
     public static int formulaMode = TextureCrackEngine.FORMULA_NEXTINT;
     public static boolean allOffsets = false;
+    /** Wall-mode grid (side-face mirror bits): row 0 = top row, 0 = normal, 4 = mirrored, -1 = unknown. */
+    public static int[][] wallGrid = null;
     /** Matches from the most recent completed solve (x,z pairs) - read by .crosscheck. */
     public static volatile java.util.List<long[]> lastMatches = java.util.List.of();
     /** Per-match mismatch cost, parallel to lastMatches (0 = exact) - read by .crosscheck. */
@@ -172,6 +174,36 @@ public final class TextureCrackCommand extends Command {
             return SUCCESS;
         }));
 
+        // Side-face WALL cracking: stone/deepslate/bedrock side faces leak 1 mirror bit per block.
+        root.then(LiteralArgumentBuilder.<AutismCommandSource>literal("wall")
+            .executes(ctx -> {
+                msg("Wall mode - crack coords from a WALL of stone/deepslate/bedrock (side faces):");
+                msg("§7.texcrack wall grid m . m m / . m . m §f- m = mirrored, . = unknown, 0/n = normal");
+                msg("§7.texcrack wall solve §f- y/center/radius/tolerance/facing reuse the normal settings");
+                msg("§7Y setting = the TOP row's Y. 32+ cells recommended (1 bit per cell).");
+                return SUCCESS;
+            })
+            .then(LiteralArgumentBuilder.<AutismCommandSource>literal("grid")
+                .then(RequiredArgumentBuilder.<AutismCommandSource, String>argument("rows", StringArgumentType.greedyString())
+                    .executes(ctx -> {
+                        parseWallGrid(StringArgumentType.getString(ctx, "rows"));
+                        return SUCCESS;
+                    })))
+            .then(LiteralArgumentBuilder.<AutismCommandSource>literal("solve").executes(ctx -> {
+                solveWall();
+                return SUCCESS;
+            }))
+            .then(LiteralArgumentBuilder.<AutismCommandSource>literal("read")
+                .executes(ctx -> {
+                    readWall(5);
+                    return SUCCESS;
+                })
+                .then(RequiredArgumentBuilder.<AutismCommandSource, Integer>argument("size", IntegerArgumentType.integer(2, 16))
+                    .executes(ctx -> {
+                        readWall(IntegerArgumentType.getInteger(ctx, "size"));
+                        return SUCCESS;
+                    }))));
+
         root.then(LiteralArgumentBuilder.<AutismCommandSource>literal("cancel").executes(ctx -> {
             TextureCrackEngine.cancel();
             msg("Cancelled.");
@@ -207,6 +239,7 @@ public final class TextureCrackCommand extends Command {
         msg("§7.texcrack block <name> §f- set + inspect the block's variant set (stone/bedrock have mirrors)");
         msg("§7.texcrack y <lvl> [rng] §f| §7center <x> <z> §f| §7radius <blocks> §f| §7tolerance <n> §f| §7facing <dir>");
         msg("§7.texcrack solve §f- search | §7.texcrack read [size] §f- calibration grid under your feet");
+        msg("§7.texcrack wall §f- crack from a WALL's side faces (stone/deepslate/bedrock mirror bits)");
     }
 
     private static void setBlock(String name) {
@@ -319,6 +352,72 @@ public final class TextureCrackCommand extends Command {
         return n;
     }
 
+    /** Wall grid tokens: m/1 = mirrored, 0/n = normal, ./? = unknown. Row 0 = TOP of the wall. */
+    private static void parseWallGrid(String raw) {
+        try {
+            String[] rows = raw.trim().split("/");
+            int[][] g = new int[rows.length][];
+            int known = 0;
+            for (int r = 0; r < rows.length; r++) {
+                String[] toks = rows[r].trim().split("[\\s,]+");
+                g[r] = new int[toks.length];
+                for (int c = 0; c < toks.length; c++) {
+                    String t = toks[c].trim().toLowerCase(Locale.ROOT);
+                    if (t.equals(".") || t.equals("?") || t.equals("x")) {
+                        g[r][c] = -1;
+                    } else if (t.equals("m") || t.equals("1")) {
+                        g[r][c] = com.autism.seedcracker.texturecrack.BlockVariantSet.T_MIRROR;
+                        known++;
+                    } else {
+                        g[r][c] = 0;
+                        known++;
+                    }
+                }
+            }
+            wallGrid = g;
+            msg("Wall grid set: " + g.length + " row(s), " + known + " known cell(s)."
+                + (known < 32 ? " §e32+ recommended (walls leak only 1 bit per cell)." : ""));
+        } catch (Throwable t) {
+            msg("§cBad wall grid. Example: .texcrack wall grid m . m 0 / 0 m . m");
+        }
+    }
+
+    public static void solveWall() {
+        if (wallGrid == null) { msg("§cSet a wall grid first (.texcrack wall grid ...)."); return; }
+        if (TextureCrackEngine.searching) { msg("§cAlready searching (.texcrack cancel to stop)."); return; }
+        com.autism.seedcracker.texturecrack.BlockVariantSet vs;
+        try {
+            vs = com.autism.seedcracker.texturecrack.BlockVariantSet.load(blockName);
+        } catch (Throwable t) {
+            msg("§c" + blockName + ": " + t.getMessage());
+            return;
+        }
+        if (!vs.hasMirrors()) {
+            msg("§c" + blockName + " has no mirrored variants - walls carry no signal. Use stone, deepslate, or bedrock (.texcrack block stone).");
+            return;
+        }
+        msg("Wall search r=" + String.format("%,d", radius) + " around " + centerX + "," + centerZ
+            + " topY=" + obsY + (yRange > 0 ? "+-" + yRange : "")
+            + " block=" + blockName + " tol=" + (int) tolerance + "...");
+        Minecraft mc = Minecraft.getInstance();
+        java.util.List<long[]> collected = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        java.util.List<Double> costs = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        TextureCrackEngine.solveWall(wallGrid, null, vs, obsY, yRange, centerX, centerZ, radius,
+            formulaMode, facingLock, tolerance, 20,
+            m -> {
+                collected.add(new long[]{m.x(), m.z()});
+                costs.add(m.cost());
+                mc.execute(() -> msg("§aWALL MATCH §f" + m.x() + " " + m.y() + " " + m.z()
+                    + " §7(" + (m.cost() <= 0 ? "exact" : String.format("cost %.2f", m.cost()))
+                    + ", " + m.formula() + ")"));
+            },
+            () -> {
+                lastMatches = java.util.List.copyOf(collected);
+                lastCosts = java.util.List.copyOf(costs);
+                mc.execute(() -> msg(TextureCrackEngine.status));
+            });
+    }
+
     public static void solve() {
         if (grid == null) { msg("§cSet a grid first (.texcrack grid ... or .texcrack image ...)."); return; }
         if (TextureCrackEngine.searching) { msg("§cAlready searching (.texcrack cancel to stop)."); return; }
@@ -378,6 +477,48 @@ public final class TextureCrackCommand extends Command {
         msg("§7nextInt: §f" + ni);
         msg("§7legacy:  §f" + lg);
         msg("§7Compare against what you SEE on dirt/netherrack tops to calibrate the formula.");
+    }
+
+    /** Wall calibration: print the computed mirror bits for the wall plane in front of the player. */
+    private static void readWall(int size) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        com.autism.seedcracker.texturecrack.BlockVariantSet vs;
+        try {
+            vs = com.autism.seedcracker.texturecrack.BlockVariantSet.load(blockName);
+        } catch (Throwable t) {
+            msg("§c" + blockName + ": " + t.getMessage());
+            return;
+        }
+        if (!vs.hasMirrors()) {
+            msg("§c" + blockName + " has no mirrored variants (set .texcrack block stone/deepslate/bedrock first).");
+            return;
+        }
+        // Draw -> variant table (same cumulative-weight walk as the solver).
+        int drawRange = vs.totalWeight();
+        byte[] drawToVariant = new byte[drawRange];
+        int di = 0;
+        for (int v = 0; v < vs.count(); v++) {
+            for (int w = 0; w < vs.weight(v); w++) drawToVariant[di++] = (byte) v;
+        }
+        net.minecraft.core.BlockPos base = mc.player.blockPosition();
+        // Plane along X at the player's Z, top row at eye level (rows descend).
+        int topY = base.getY() + 1;
+        StringBuilder out = new StringBuilder();
+        for (int r = 0; r < size; r++) {
+            if (r > 0) out.append(" / ");
+            for (int c = 0; c < size; c++) {
+                long seed = TextureCrackEngine.posSeed(base.getX() + c, topY - r, base.getZ());
+                int variant = drawToVariant[TextureCrackEngine.idxNextInt(seed, drawRange)];
+                boolean mirrored = (vs.transform(variant) & com.autism.seedcracker.texturecrack.BlockVariantSet.T_MIRROR) != 0;
+                out.append(mirrored ? 'm' : '0');
+                if (c < size - 1) out.append(' ');
+            }
+        }
+        msg("Computed wall mirror bits " + size + "x" + size + " from " + base.getX() + "," + topY + "," + base.getZ()
+            + " (cols = +X, rows = Y descending, block " + blockName + "):");
+        msg("§f" + out);
+        msg("§7Compare against the wall faces you SEE (mirrored texture = m) to calibrate reading.");
     }
 
     private static void msg(String s) {

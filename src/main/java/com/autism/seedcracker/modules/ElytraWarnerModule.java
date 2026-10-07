@@ -99,15 +99,22 @@ public final class ElytraWarnerModule extends Module {
         // Swap worn chestplate with the spare via real inventory clicks (pickup chestplate,
         // pickup spare, place) so the server sees the swap (client-only setItem would desync).
         if (mc.gameMode == null) return false;
+        // NEVER click while another container is open: slot 6 of a chest/furnace menu is a
+        // random container slot, not the chestplate - the swap would scramble that container.
+        if (mc.player.containerMenu != mc.player.inventoryMenu || mc.gui.screen() != null) return false;
+        // Books ONE budget slot for the 3-click swap; the durability threshold warns early
+        // enough that a 1-tick retry is safe.
+        if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return false;
         // Inventory container slots: armor chestplate is slot 6 in the player inventory menu;
         // hotbar slots 0-8 map to menu slots 36-44, main inventory 9-35 map to 9-35.
+        int containerId = mc.player.inventoryMenu.containerId;
         int menuChest = 6;
         int menuSpare = bestSlot < 9 ? 36 + bestSlot : bestSlot;
-        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, menuChest, 0,
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(containerId, menuChest, 0,
             net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player); // hold worn elytra
-        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, menuSpare, 0,
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(containerId, menuSpare, 0,
             net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player); // swap into spare slot
-        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, menuChest, 0,
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(containerId, menuChest, 0,
             net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player); // place spare on chest
         return true;
     }

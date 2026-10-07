@@ -62,6 +62,8 @@ public final class LightSourceFinderModule extends Module {
 
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private final Set<ChunkPos> flagged = new HashSet<>();
+    private final com.autism.seedcracker.finder.FinderReport reporter =
+        new com.autism.seedcracker.finder.FinderReport("Light", 45);
     private final Set<ChunkPos> notified = new HashSet<>();
 
     public LightSourceFinderModule() {
@@ -110,6 +112,7 @@ public final class LightSourceFinderModule extends Module {
         flagged.removeIf(p -> tooFar(p, centre, pr));
         notified.removeIf(p -> tooFar(p, centre, pr));
         ChunkFlagRenderer.feed(id(), flagged, color.get(), tracer.get());
+        reporter.tick(mc, flagged);
     }
 
     /** Count player-type light emitters at or below yGate, early-out at {@code enough}. */
@@ -143,7 +146,10 @@ public final class LightSourceFinderModule extends Module {
 
     /** Natural light emitters that generate underground - never evidence of a player. */
     private static boolean isNaturalEmitter(BlockState s) {
-        return !s.getFluidState().isEmpty() // lava (fluid state catches flowing)
+        // Only an actual fluid block counts as lava. The old fluid-state check also matched
+        // WATERLOGGED player-placed emitters (lanterns, candles, glow lichen on frames...),
+        // silently hiding any light source a player dunked underwater.
+        return s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock
             || s.is(Blocks.LAVA) || s.is(Blocks.MAGMA_BLOCK)
             || s.is(Blocks.GLOW_LICHEN) || s.is(Blocks.SEA_PICKLE)
             || s.is(Blocks.AMETHYST_CLUSTER) || s.is(Blocks.LARGE_AMETHYST_BUD)
@@ -166,9 +172,9 @@ public final class LightSourceFinderModule extends Module {
 
     private void onNewFlag(ChunkPos pos) {
         if (!notify.get()) return;
-        String msg = "Lit chunk at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ() + " (player lights below Y" + yLevel.get() + ")";
-        ClientNotify.warning(msg);
-        AutismClientMessaging.sendPrefixed("§e[LightFinder] §f" + msg);
+        com.autism.seedcracker.finder.FinderNotify.flag("§e[LightFinder]",
+            "Lit chunk at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ()
+                + " (player lights below Y" + yLevel.get() + ")", false);
     }
 
     @Override

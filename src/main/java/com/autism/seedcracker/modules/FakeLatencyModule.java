@@ -35,8 +35,10 @@ public final class FakeLatencyModule extends Module {
     private record Held(long releaseAtMs, Packet<?> packet) {}
 
     private final Deque<Held> queue = new ArrayDeque<>();
-    /** Re-entrancy guard: our own flushed packets pass through the hook again. */
-    private boolean flushing = false;
+    /** Re-entrancy guard: our own flushed packets pass through the hook again.
+     * volatile: set on the main thread (tick/flush) but read in onPacketSend on the netty
+     * thread - without it the netty thread can miss the guard and re-queue our own flush. */
+    private volatile boolean flushing = false;
 
     public FakeLatencyModule() {
         super(SeedcrackerAddon.ID + ":fake-latency", "Fake Latency",

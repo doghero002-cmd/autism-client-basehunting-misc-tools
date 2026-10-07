@@ -41,7 +41,11 @@ public final class EntityScannerModule extends Module {
         /** Only tamed/named/leashed animals + villagers - unmistakably player-owned (nyx). */
         OWNED,
         /** Item entities: big drop clusters = mined-out area, death spot, or an active farm. */
-        DROPS
+        DROPS,
+        /** Water BaseESP: farm-tell entities (bees, stands, furnace/hopper carts), farm-output
+         *  item drops (bones, kelp, fungus...), and farm block entities (beehive, piston, smoker,
+         *  crafter, hopper, banner) - the signals block-only finders miss. */
+        BASE_SIGNALS
     }
 
     private final Map<ChunkPos, Double> scores = new ConcurrentHashMap<>();
@@ -50,7 +54,7 @@ public final class EntityScannerModule extends Module {
 
     private final autismclient.api.module.EnumSetting<Mode> mode = add(
         new autismclient.api.module.EnumSetting<>("mode", "Mode", Mode.WEIGHTED, Mode.values())
-        .description("WEIGHTED = all entities scored. STORAGE = container/frame/stand entities. OWNED = tamed/named/leashed (player-owned). DROPS = item clusters.")
+        .description("WEIGHTED = all entities scored. STORAGE = container/frame/stand entities. OWNED = tamed/named/leashed (player-owned). DROPS = item clusters. BASE_SIGNALS = Water BaseESP farm tells: bees/stands/powered carts + farm-output drops + farm block entities (beehive, piston, smoker, crafter, banner).")
         .group("General"));
     private final autismclient.api.module.EnumSetting<com.autism.seedcracker.finder.FinderSensitivity> sensitivity = add(
         new autismclient.api.module.EnumSetting<>("sensitivity", "Sensitivity",
@@ -108,7 +112,9 @@ public final class EntityScannerModule extends Module {
             ChunkPos cpos = chunk.getPos();
             double score = scoreChunk(mc, cpos);
             scores.put(cpos, score);
-            if (score >= sensitivity.get().scale(threshold.get()) && notified.add(cpos) && notifiedThisPass < maxNotify.get()) {
+            // Cap check BEFORE notified.add: adding first marked over-cap chunks as notified
+            // without ever alerting, permanently swallowing those alerts.
+            if (score >= sensitivity.get().scale(threshold.get()) && notifiedThisPass < maxNotify.get() && notified.add(cpos)) {
                 notifiedThisPass++;
                 ClientNotify.warning(
                     "Active chunk X:" + cpos.getMiddleBlockX() + " Z:" + cpos.getMiddleBlockZ() + " (score " + (int) score + ")");
@@ -132,9 +138,49 @@ public final class EntityScannerModule extends Module {
                 case STORAGE -> storageWeight(e);
                 case OWNED -> ownedWeight(e);
                 case DROPS -> e instanceof net.minecraft.world.entity.item.ItemEntity ? 5.0 : 0.0;
+                case BASE_SIGNALS -> baseSignalWeight(e);
             };
         }
+        if (mode.get() == Mode.BASE_SIGNALS) score += baseSignalBlockScore(mc, cpos);
         return Math.min(score, 100.0);
+    }
+
+    /** Water BaseESP entity tells: bees (farm), armor stands (sorters/decor), powered carts. */
+    private double baseSignalWeight(Entity e) {
+        String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
+        if (id.equals("bee")) return 8.0;
+        if (id.equals("armor_stand")) return 10.0;
+        if (id.equals("furnace_minecart") || id.equals("hopper_minecart")) return 15.0;
+        if (e instanceof net.minecraft.world.entity.item.ItemEntity item && isFarmOutputItem(item)) return 6.0;
+        return 0.0;
+    }
+
+    /** Dropped farm-output items floating around = an overflowing farm nearby (Water BaseESP). */
+    private static boolean isFarmOutputItem(net.minecraft.world.entity.item.ItemEntity item) {
+        net.minecraft.world.item.ItemStack s = item.getItem();
+        return s.is(net.minecraft.world.item.Items.BONE) || s.is(net.minecraft.world.item.Items.BONE_MEAL)
+            || s.is(net.minecraft.world.item.Items.BONE_BLOCK)
+            || s.is(net.minecraft.world.item.Items.KELP) || s.is(net.minecraft.world.item.Items.BAMBOO)
+            || s.is(net.minecraft.world.item.Items.CACTUS) || s.is(net.minecraft.world.item.Items.SEA_PICKLE)
+            || s.is(net.minecraft.world.item.Items.CRIMSON_FUNGUS) || s.is(net.minecraft.world.item.Items.WARPED_FUNGUS)
+            || s.is(net.minecraft.world.item.Items.PINK_PETALS);
+    }
+
+    /** Farm block entities in the chunk (beehive, piston, smoker, crafter, hopper, banner). */
+    private double baseSignalBlockScore(Minecraft mc, ChunkPos cpos) {
+        LevelChunk chunk = mc.level.getChunkSource().getChunk(cpos.x(), cpos.z(), false);
+        if (chunk == null) return 0.0;
+        double score = 0.0;
+        for (net.minecraft.world.level.block.entity.BlockEntity be : chunk.getBlockEntities().values()) {
+            if (be instanceof net.minecraft.world.level.block.entity.BeehiveBlockEntity) score += 8.0;
+            else if (be instanceof net.minecraft.world.level.block.entity.HopperBlockEntity) score += 5.0;
+            else if (be instanceof net.minecraft.world.level.block.entity.SmokerBlockEntity) score += 6.0;
+            else if (be instanceof net.minecraft.world.level.block.entity.CrafterBlockEntity) score += 8.0;
+            else if (be instanceof net.minecraft.world.level.block.entity.BannerBlockEntity) score += 4.0;
+            // mid-extension piston BE only exists while actually moving = machinery running NOW
+            else if (be instanceof net.minecraft.world.level.block.piston.PistonMovingBlockEntity) score += 10.0;
+        }
+        return score;
     }
 
     private double weight(Entity e) {

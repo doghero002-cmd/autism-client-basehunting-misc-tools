@@ -24,6 +24,9 @@ public final class AhSellModule extends Module {
         .description("The /ah sell price to list each item at.").group("General"));
     private final IntSetting delay = add(new IntSetting("delay", "Delay (ticks)", 20, 5, 100, 1)
         .description("Ticks between each sell action.").group("General"));
+    private final autismclient.api.module.BoolSetting debug = add(new autismclient.api.module.BoolSetting(
+            "debug", "Debug tracing", false)
+        .description("Trace sell-state transitions to chat + /flaglog.").group("General"));
 
     private int cooldown = 0;
     private State currentState = State.IDLE;
@@ -31,6 +34,7 @@ public final class AhSellModule extends Module {
     private int sellingSlot = -1;   // hotbar slot we ran /ah sell on (verify the GUI consumed it)
     private int confirmRetries = 0;
     private boolean pendingVerify = false; // check the sold slot emptied before listing another
+    private int stuckListings = 0; // consecutive gave-up listings (3 = probable listing limit)
     private static final int MAX_CONFIRM_RETRIES = 3;
 
     private enum State { IDLE, SELECTING, WAITING_FOR_GUI, CLICKING_CONFIRM }
@@ -47,6 +51,7 @@ public final class AhSellModule extends Module {
         guiActionDelay = 0;
         sellingSlot = -1;
         confirmRetries = 0;
+        stuckListings = 0;
     }
 
     @Override
@@ -66,7 +71,7 @@ public final class AhSellModule extends Module {
         guiActionDelay = 0;
         sellingSlot = -1;
         confirmRetries = 0;
-        cooldown = delay.get();
+        cooldown = com.autism.seedcracker.util.Humanizer.delay(delay.get());
     }
 
     /** The lime stained-glass pane confirm slot in the sell GUI (dynamic, not hardcoded). */
@@ -85,6 +90,10 @@ public final class AhSellModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null || mc.getConnection() == null) return;
 
+        com.autism.seedcracker.util.DebugProbe.setEnabled(id(), debug.get());
+        com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state",
+            currentState + " slot=" + sellingSlot + " retries=" + confirmRetries + " stuck=" + stuckListings);
+
         if (cooldown > 0) { cooldown--; return; }
 
         if (currentState == State.SELECTING) {
@@ -93,7 +102,7 @@ public final class AhSellModule extends Module {
             if (guiActionDelay > 0) return;
             mc.getConnection().sendCommand("ah sell " + sellPrice.get().trim().replace(",", ""));
             currentState = State.WAITING_FOR_GUI;
-            guiActionDelay = 10;
+            guiActionDelay = com.autism.seedcracker.util.Humanizer.delay(10);
             return;
         }
 
@@ -101,7 +110,7 @@ public final class AhSellModule extends Module {
             guiActionDelay--;
             if (mc.gui.screen() instanceof AbstractContainerScreen) {
                 currentState = State.CLICKING_CONFIRM;
-                guiActionDelay = 2;
+                guiActionDelay = com.autism.seedcracker.util.Humanizer.delay(2);
             } else if (guiActionDelay <= 0) {
                 resetToIdle();
             }
@@ -114,6 +123,7 @@ public final class AhSellModule extends Module {
             if (mc.gui.screen() instanceof AbstractContainerScreen) {
                 int confirm = findConfirmSlot(mc.player.containerMenu);
                 if (confirm >= 0) {
+                    if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { guiActionDelay = 2; return; }
                     com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,
                         confirm, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
                     confirmRetries++;
@@ -144,8 +154,18 @@ public final class AhSellModule extends Module {
             int s = sellingSlot;
             resetToIdle();
             if (!mc.player.getInventory().getItem(s).isEmpty()) {
-                // gave up on this one after retries: move on so we don't loop on it forever
-                cooldown = delay.get();
+                // gave up on this one after retries: move on so we don't loop on it forever.
+                // Repeated confirm failures usually mean the server listing limit is hit.
+                stuckListings++;
+                if (stuckListings >= 3) {
+                    autismclient.util.AutismClientMessaging.sendPrefixed(
+                        "§e[AH Sell] 3 listings failed in a row - listing limit reached? Disabling.");
+                    setEnabledSilently(false);
+                    return;
+                }
+                cooldown = com.autism.seedcracker.util.Humanizer.delay(delay.get());
+            } else {
+                stuckListings = 0;
             }
             return;
         }
@@ -169,7 +189,7 @@ public final class AhSellModule extends Module {
             sellingSlot = sellableSlot;
             confirmRetries = 0;
             currentState = State.SELECTING; // send the command next tick (carried-item lands first)
-            guiActionDelay = 1;
+            guiActionDelay = com.autism.seedcracker.util.Humanizer.delay(1);
         } else {
             // Nothing left to sell.
             autismclient.util.AutismClientMessaging.sendPrefixed("§a[AH Sell] No more items to sell.");

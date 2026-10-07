@@ -37,6 +37,36 @@ public final class HomeSetterModule extends Module {
         .description("Milliseconds to wait between the delete and set commands.")
         .group("General"));
 
+    // SilentHome (Water port): hide the server's "Home set"/"Home deleted" confirmation lines so
+    // nothing appears in chat while setting a stash home, optionally logging to a webhook instead.
+    private final BoolSetting silent = add(new BoolSetting("silent", "Silent (hide confirmations)", false)
+        .description("Suppress the server's home-command confirmation chat lines for a few seconds around the command (Water SilentHome).")
+        .group("Silent"));
+    private final StringSetting silentPatterns = add(new StringSetting("silent-patterns", "Suppress patterns",
+            "home,sethome,delhome")
+        .description("Comma-separated case-insensitive substrings; system chat containing any of them is hidden during the window.")
+        .group("Silent").visibleWhen(() -> silent.get()));
+    private final StringSetting webhook = add(new StringSetting("webhook", "Webhook", "")
+        .description("Optional Discord webhook: posts the home slot + coordinates after setting (your private log).")
+        .group("Silent").visibleWhen(() -> silent.get()));
+
+    private static final java.time.Duration HTTP_TIMEOUT = java.time.Duration.ofSeconds(8L);
+    private static final java.net.http.HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
+
+    /** Suppression window read by HomeSetterChatMixin (static: the mixin has no module ref). */
+    private static volatile long suppressUntilMs = 0;
+    private static volatile String[] suppressPatterns = new String[0];
+
+    /** True if this system-chat line should be hidden (called from HomeSetterChatMixin). */
+    public static boolean shouldSuppress(net.minecraft.network.chat.Component message) {
+        if (System.currentTimeMillis() > suppressUntilMs || message == null) return false;
+        String text = message.getString().toLowerCase(java.util.Locale.ROOT);
+        for (String p : suppressPatterns) {
+            if (!p.isEmpty() && text.contains(p)) return true;
+        }
+        return false;
+    }
+
     private volatile boolean running = false;
 
     public HomeSetterModule() {
@@ -60,7 +90,14 @@ public final class HomeSetterModule extends Module {
         String setCmd = buildCommand(setCommand.get(), homeSlot);
         String delCmd = buildCommand(deleteCommand.get(), homeSlot);
 
-        AutismClientMessaging.sendPrefixed("§7[Home Setter] Setting home §f" + homeSlot + " §7at your position...");
+        boolean quiet = silent.get();
+        if (quiet) {
+            // Window covers delete + delay + set + server response lag.
+            suppressPatterns = splitPatterns(silentPatterns.get());
+            suppressUntilMs = System.currentTimeMillis() + wait + 5000L;
+        } else {
+            AutismClientMessaging.sendPrefixed("§7[Home Setter] Setting home §f" + homeSlot + " §7at your position...");
+        }
 
         // Run the delete on the client thread, then set after a delay off-thread.
         if (doDelete) {
@@ -73,8 +110,16 @@ public final class HomeSetterModule extends Module {
                 Thread.currentThread().interrupt();
             }
             mc.execute(() -> {
+                // User toggled off during the delay: don't fire the command seconds later.
+                if (!running || mc.getConnection() == null) {
+                    running = false;
+                    return;
+                }
                 sendCommand(mc, setCmd);
-                AutismClientMessaging.sendPrefixed("§a[Home Setter] Home §f" + homeSlot + " §aset.");
+                if (!quiet) {
+                    AutismClientMessaging.sendPrefixed("§a[Home Setter] Home §f" + homeSlot + " §aset.");
+                }
+                postWebhook(mc, homeSlot);
                 running = false;
                 setEnabledSilently(false);
             });
@@ -92,6 +137,35 @@ public final class HomeSetterModule extends Module {
         String cmd = template == null || template.isBlank() ? "sethome %slot%" : template.trim();
         cmd = cmd.replace("%slot%", Integer.toString(slotNumber));
         return cmd.startsWith("/") ? cmd.substring(1) : cmd;
+    }
+
+    private static String[] splitPatterns(String raw) {
+        if (raw == null || raw.isBlank()) return new String[0];
+        String[] parts = raw.toLowerCase(java.util.Locale.ROOT).split(",");
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String p : parts) {
+            String t = p.trim();
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out.toArray(new String[0]);
+    }
+
+    /** Fire-and-forget webhook log of the new home position. */
+    private void postWebhook(Minecraft mc, int homeSlot) {
+        String url = webhook.get();
+        if (url == null || url.isBlank() || mc.player == null) return;
+        String content = "Home " + homeSlot + " set at "
+            + mc.player.getBlockX() + " " + mc.player.getBlockY() + " " + mc.player.getBlockZ();
+        String json = "{\"content\":" + com.autism.seedcracker.util.pure.Json.quote(content) + "}";
+        try {
+            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url.trim()))
+                .timeout(HTTP_TIMEOUT)
+                .header("Content-Type", "application/json")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json))
+                .build();
+            HTTP.sendAsync(req, java.net.http.HttpResponse.BodyHandlers.discarding());
+        } catch (Throwable ignored) {}
     }
 
     private static void sendCommand(Minecraft mc, String command) {

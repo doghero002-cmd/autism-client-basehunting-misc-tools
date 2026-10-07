@@ -314,6 +314,10 @@ public final class FlagDetectorModule extends Module {
         lastSetbackLogMs = now;
         lastSetbackDist = dist;
 
+        // A confirmed rubber-band pauses ALL automation globally (exponential backoff) - one
+        // module getting corrected means the server is already watching.
+        com.autism.seedcracker.util.ActionPacer.onServerPushback("setback");
+
         log(mc, "SETBACK", "rubber-band dist=" + String.format(java.util.Locale.ROOT, "%.2f", dist)
             + " from=" + fmt(from) + " to=" + fmt(target)
             + " automating=" + automationLikelyActive()

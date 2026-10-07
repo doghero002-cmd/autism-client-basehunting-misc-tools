@@ -74,6 +74,11 @@ public final class NetheriteFinderModule extends Module {
     private final Set<BlockPos> revealed = ConcurrentHashMap.newKeySet();
     private long lastNotifyAt = 0;
     private int probeCooldown = 0;
+    private int exposurePruneTicks = 0;
+    /** Block the probe is currently mining (continueDestroyBlock keeps progress; re-calling
+     * startDestroyBlock every pass reset it, so hard blocks never broke). */
+    private BlockPos probeMining = null;
+    private boolean probeAimedLastTick = false;
     /** Last dimension we saw, so a nether<->overworld swap (still connected) clears stale flags. */
     private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lastDimension = null;
 
@@ -196,17 +201,19 @@ public final class NetheriteFinderModule extends Module {
         }
         lastDimension = dim;
 
-        // Prune flags: (a) now well beyond render distance, or (b) the debris is now EXPOSED in the
-        // block view (you mined/uncovered it) - a revealed section must STOP rendering its box. The
-        // "keeps rendering after the debris is found" bug was persistent flags never un-flagging.
+        // Prune flags: (a) now well beyond render distance (cheap, every tick), or (b) the debris
+        // is now EXPOSED in the block view. The exposure scan walks a full 16^3 section, so it runs
+        // only once a second - at 512 flagged sections the per-tick version was ~2M block reads/t.
         if (!flagged.isEmpty()) {
             ChunkPos centre = mc.player.chunkPosition();
             int pr = range.get() + 4;
+            boolean doExposureScan = ++exposurePruneTicks >= 20;
+            if (doExposureScan) exposurePruneTicks = 0;
             synchronized (flagged) {
                 flagged.keySet().removeIf(k -> {
                     int cx = unpackChunkX(k), cz = unpackChunkZ(k);
                     if (Math.max(Math.abs(cx - centre.x()), Math.abs(cz - centre.z())) > pr) return true;
-                    return sectionExposed(mc, cx, cz, unpackSectionY(k));
+                    return doExposureScan && sectionExposed(mc, cx, cz, unpackSectionY(k));
                 });
             }
         }
@@ -259,6 +266,19 @@ public final class NetheriteFinderModule extends Module {
      * ancient debris the client can now actually see. Cheap: only checks blocks near the surface. */
     private static boolean sectionExposed(Minecraft mc, int chunkX, int chunkZ, int secY) {
         if (mc.level == null) return false;
+        // Section-palette fast-skip: if the section's palette has no debris at all, skip the
+        // 4096-block walk entirely (the common case for hidden sections).
+        net.minecraft.world.level.chunk.LevelChunk chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, false);
+        if (chunk != null) {
+            int idx = chunk.getSectionIndexFromSectionY(secY);
+            var sections = chunk.getSections();
+            if (idx < 0 || idx >= sections.length) return false;
+            var sec = sections[idx];
+            if (sec == null || sec.hasOnlyAir()
+                || !sec.maybeHas(st -> st.is(net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS))) {
+                return false;
+            }
+        }
         int minY = secY << 4;
         int baseX = chunkX << 4, baseZ = chunkZ << 4;
         for (int y = minY; y < minY + 16; y++) {
@@ -317,15 +337,37 @@ public final class NetheriteFinderModule extends Module {
         double dist = Math.sqrt(dx * dx + dz * dz);
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         float pitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
-        mc.player.setYRot(yaw);
-        mc.player.setXRot(net.minecraft.util.Mth.clamp(pitch, -90f, 90f));
+        // Ease instead of snapping; keep easing until converged, then dig next tick as before.
+        boolean converged = com.autism.seedcracker.motion.RotationEngine.request(id(),
+            com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, yaw, pitch);
+        if (!converged) {
+            probeAimedLastTick = false;
+            return;
+        }
 
-        // Mine the block we're now looking at (toward the hidden debris).
+        // Aim this tick, dig NEXT tick: mc.hitResult still holds the pre-rotation ray this tick,
+        // so digging immediately mined the block under the old crosshair.
+        if (!probeAimedLastTick) {
+            probeAimedLastTick = true;
+            return;
+        }
+        probeAimedLastTick = false;
+
+        // Mine the block under the (now updated) crosshair. start once, then CONTINUE on the same
+        // block - re-starting every pass reset destroy progress so hard blocks never broke.
         if (mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit
             && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
-            mc.gameMode.startDestroyBlock(hit.getBlockPos(), hit.getDirection());
+            BlockPos hitPos = hit.getBlockPos();
+            if (hitPos.equals(probeMining)) {
+                mc.gameMode.continueDestroyBlock(hitPos, hit.getDirection());
+            } else {
+                mc.gameMode.startDestroyBlock(hitPos, hit.getDirection());
+                probeMining = hitPos.immutable();
+            }
             mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-            probeCooldown = 4; // deliberate pace (not a bot burst)
+            probeCooldown = 1; // continueDestroyBlock must run near-every-tick to hold progress
+        } else {
+            probeMining = null;
         }
     }
 

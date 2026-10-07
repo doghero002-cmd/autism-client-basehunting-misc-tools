@@ -72,6 +72,10 @@ public final class SpectatorDetectorModule extends Module {
         if (!(packet instanceof ClientboundPlayerInfoUpdatePacket info)) return false;
         // Vanish check: latency-only updates for UUIDs we cannot see in the tab list.
         if (!info.actions().contains(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_LATENCY)) return false;
+        // Join bundles carry ADD_PLAYER + UPDATE_LATENCY in ONE packet, and we run before the
+        // client applies it - getPlayerInfo is null for every normal join. Only a latency update
+        // WITHOUT an accompanying add is a vanish signal.
+        if (info.actions().contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) return false;
         Minecraft mc = Minecraft.getInstance();
         if (mc.getConnection() == null || mc.player == null) return false;
 
@@ -128,6 +132,9 @@ public final class SpectatorDetectorModule extends Module {
         Long last = lastAlertMs.get(key);
         if (last != null && now - last < alertCooldown.get() * 1000L) return;
         lastAlertMs.put(key, now);
+        // Drop entries long past their cooldown so the map doesn't grow for the whole session.
+        long maxAge = Math.max(60_000L, alertCooldown.get() * 10_000L);
+        lastAlertMs.values().removeIf(t -> now - t > maxAge);
 
         FlagLog.warn("STAFF", "SpectatorDetector", message);
         if (chat.get()) AutismClientMessaging.sendPrefixed("§c[Staff] §f" + message);

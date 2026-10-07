@@ -50,7 +50,7 @@ public final class BaseTrackerHud implements HudElementProvider {
         Minecraft mc = Minecraft.getInstance();
         if (font == null || mc.player == null) return;
 
-        List<BaseTracker.Entry> bases = BaseTracker.nearest(mc.player.getX(), mc.player.getZ(), MAX_ROWS);
+        List<BaseTracker.Fused> bases = BaseTracker.fusedNearest(mc.player.getX(), mc.player.getZ(), MAX_ROWS);
         int w = width();
         int h = height();
         ctx.fill(x, y, x + w, y + h, BG);
@@ -62,9 +62,11 @@ public final class BaseTrackerHud implements HudElementProvider {
         }
 
         int row = 1;
-        for (BaseTracker.Entry e : bases) {
-            double dist = Math.hypot(e.blockX() - mc.player.getX(), e.blockZ() - mc.player.getZ());
-            String line = String.format("%s §7%d,%d §f%.0fm", e.source(), e.blockX(), e.blockZ(), dist);
+        for (BaseTracker.Fused e : bases) {
+            double dist = Math.sqrt(e.distSq());
+            // Multi-finder clusters show joined sources ("Stash+Growth"); trim to fit the panel.
+            String src = e.sources().length() > 14 ? e.sources().substring(0, 13) + "…" : e.sources();
+            String line = String.format("%s §7%d,%d §f%.0fm", src, e.blockX(), e.blockZ(), dist);
             int ly = y + 2 + LINE * row;
             ctx.text(font, line, x + PAD, ly, TEXT_COLOR);
             // Confidence bar on the right edge.

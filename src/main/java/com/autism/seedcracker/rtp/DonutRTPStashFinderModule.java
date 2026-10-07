@@ -268,8 +268,8 @@ public final class DonutRTPStashFinderModule extends Module {
         AutismClientMessaging.sendPrefixed("§c§l[Warning] §cDonut RTP Stash Finder uses automated RTP/Baritone movement that anti-cheats may flag. Use at your own risk.");
         ClientNotify.warning("RTP Stash Finder: may flag anti-cheat");
         AutismClientMessaging.sendPrefixed("§aDonut RTP Stash Finder enabled. Mode: " + mode.get());
-        if (!BaritoneCompat.isBaritoneAvailable()) {
-            AutismClientMessaging.sendPrefixed("§eBaritone not detected - base-search (dig/mine) disabled; detection still works.");
+        if (!BaritoneCompat.isBaritoneAvailable() && scanMode.get() == ScanMode.BARITONE_MINE) {
+            AutismClientMessaging.sendPrefixed("§eBaritone not detected - using the built-in pathfinder for dig/wander.");
         }
         Minecraft mc = Minecraft.getInstance();
         RtpEnvironmentSnapshot env = buildSnapshot(mc);
@@ -285,6 +285,7 @@ public final class DonutRTPStashFinderModule extends Module {
         stopBaritone();
         Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) waterReleaseKeys(mc);
+        com.autism.seedcracker.motion.RotationEngine.release("rtp-water");
         wandering = false;
         phase = Phase.RTP;
         ACTIVE = false;
@@ -393,10 +394,10 @@ public final class DonutRTPStashFinderModule extends Module {
             waterMineDir = horizontals[WANDER_RNG.nextInt(horizontals.length)];
             waterPlaceAttempts = 0;
             AutismClientMessaging.sendPrefixed("§7Water-mining down to Y=" + waterTargetY.get() + ", then tunneling " + waterMineDir.getName() + "... (raw movement - watch for flags)");
-        } else if (scanMode.get() == ScanMode.BARITONE_MINE && BaritoneCompat.isBaritoneAvailable()) {
+        } else if (scanMode.get() == ScanMode.BARITONE_MINE) {
             applyBaritoneSettings();
             // Dig down to the deepslate level first; tickWander handles the descent until reachedDepth.
-            BaritoneCompat.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
+            goTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
             AutismClientMessaging.sendPrefixed("§7Digging down to Y=" + digDepth.get() + ", then wandering underground (r=" + wanderRadius.get() + ")...");
         } else {
             AutismClientMessaging.sendPrefixed("§7Searching around " + (int) wanderCenterX + ", " + (int) wanderCenterZ + "...");
@@ -435,11 +436,17 @@ public final class DonutRTPStashFinderModule extends Module {
             waterState = WaterMineState.MINE;
             return;
         }
-        mc.player.setXRot(85f);
+        if (!waterLook(mc, mc.player.getYRot(), 85f)) return;
         mc.options.keyAttack.setDown(true);
         mc.options.keyUp.setDown(false);
         mc.options.keyShift.setDown(false);
         mc.options.keyJump.setDown(false);
+    }
+
+    /** Eased look via the shared engine; false while still turning (or another module owns the view). */
+    private static boolean waterLook(Minecraft mc, float yaw, float pitch) {
+        return com.autism.seedcracker.motion.RotationEngine.request("rtp-water",
+            com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, yaw, pitch);
     }
 
     /** Straight-line key-input tunnel at the target Y (Water handleAmethystMine). */
@@ -453,9 +460,8 @@ public final class DonutRTPStashFinderModule extends Module {
         BlockPos above = mc.player.blockPosition().above();
         if (mc.level.getBlockState(above).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
             || mc.level.getBlockState(above.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) {
-            mc.player.setXRot(-80f);
-            mc.options.keyAttack.setDown(true);
             mc.options.keyUp.setDown(false);
+            mc.options.keyAttack.setDown(waterLook(mc, mc.player.getYRot(), -80f));
             return;
         }
 
@@ -463,12 +469,11 @@ public final class DonutRTPStashFinderModule extends Module {
         float targetYaw = switch (waterMineDir) {
             case NORTH -> 180f; case SOUTH -> 0f; case WEST -> 90f; case EAST -> 270f; default -> 0f;
         };
-        if (Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - targetYaw)) > 5f) {
-            mc.player.setYRot(targetYaw);
-            mc.player.setXRot(0f);
+        if (!waterLook(mc, targetYaw, 0f)) {
+            mc.options.keyUp.setDown(false);
+            mc.options.keyAttack.setDown(false);
             return;
         }
-        mc.player.setXRot(0f);
         mc.options.keyAttack.setDown(true);
         mc.options.keyUp.setDown(true);
         mc.options.keyShift.setDown(false);
@@ -490,7 +495,7 @@ public final class DonutRTPStashFinderModule extends Module {
         var obs = mc.player.getInventory().getItem(oSlot);
         if (obs.is(net.minecraft.world.item.Items.OBSIDIAN) && mc.gameMode != null) {
             com.autism.seedcracker.util.InvSync.select(mc, oSlot);
-            mc.player.setXRot(89f);
+            if (!waterLook(mc, mc.player.getYRot(), 89f)) return;
             BlockPos below = mc.player.blockPosition().below();
             BlockState bs = mc.level.getBlockState(below);
             if (bs.isAir() || !bs.getFluidState().isEmpty()) {
@@ -537,21 +542,27 @@ public final class DonutRTPStashFinderModule extends Module {
 
     private void stopBaritone() {
         try {
-            if (BaritoneCompat.isBaritoneAvailable()) BaritoneCompat.stopBaritone(Minecraft.getInstance());
+            com.autism.seedcracker.motion.Motion.stop(Minecraft.getInstance());
         } catch (Throwable ignored) {}
     }
 
-    /** Descend to the dig depth, then roam random points underground so Baritone mines/covers ground. */
+    /** Baritone when installed, else the built-in pathfinder (allowed to mine, like Baritone's allowBreak). */
+    private boolean goTo(Minecraft mc, int x, int y, int z) {
+        return com.autism.seedcracker.motion.Motion.goTo(mc, new BlockPos(x, y, z),
+            com.autism.seedcracker.motion.Motion.Backend.AUTO, allowBreak.get());
+    }
+
+    /** Descend to the dig depth, then roam random points underground so the pathfinder mines/covers ground. */
     private void tickWander(Minecraft mc) {
-        if (!BaritoneCompat.isBaritoneAvailable()) return;
+        com.autism.seedcracker.motion.Motion.tick(mc);
 
         // Phase 1: get underground first (auto-mine down to the dig depth).
         if (!reachedDepth) {
             if ((int) mc.player.getY() <= digDepth.get()) {
                 reachedDepth = true;
                 applyBaritoneSettings(); // re-enable sprint now that we're at depth
-            } else if (!BaritoneCompat.isBaritoneBusy()) {
-                BaritoneCompat.startBaritoneGoTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
+            } else if (!com.autism.seedcracker.motion.Motion.isBusy()) {
+                goTo(mc, (int) wanderCenterX, digDepth.get(), (int) wanderCenterZ);
             }
             return;
         }
@@ -560,7 +571,7 @@ public final class DonutRTPStashFinderModule extends Module {
         double dx = mc.player.getX() - wanderCenterX;
         double dz = mc.player.getZ() - wanderCenterZ;
         double maxR = wanderRadius.get();
-        if (!BaritoneCompat.isBaritoneBusy()) {
+        if (!com.autism.seedcracker.motion.Motion.isBusy()) {
             double tx, tz;
             if (dx * dx + dz * dz > maxR * maxR) {
                 tx = wanderCenterX;
@@ -574,7 +585,7 @@ public final class DonutRTPStashFinderModule extends Module {
             }
             // Stay underground at the dig depth (clamped to the detection Y range).
             int ty = Math.max(minY.get(), Math.min(maxY.get(), digDepth.get()));
-            wandering = BaritoneCompat.startBaritoneGoTo(mc, (int) tx, ty, (int) tz);
+            wandering = goTo(mc, (int) tx, ty, (int) tz);
         }
     }
 

@@ -81,7 +81,8 @@ public final class BoneDropperModule extends Module {
         }
 
         beginDrop(mc, slot, Math.max(1, amount.get()));
-        nextDropMs = now + Math.max(50, delayMs.get());
+        // Jittered: an exact N-ms drop cadence for hours is a statistical bot signature.
+        nextDropMs = now + com.autism.seedcracker.util.Humanizer.delayMs(Math.max(50, delayMs.get()));
     }
 
     private void finishQueue(Minecraft mc) {
@@ -96,9 +97,12 @@ public final class BoneDropperModule extends Module {
     private Item resolveItem() {
         String id = itemName.get().trim().toLowerCase(java.util.Locale.ROOT);
         if (id.isEmpty()) return Items.BONE;
-        Item item = net.minecraft.core.registries.BuiltInRegistries.ITEM
-            .getValue(net.minecraft.resources.Identifier.parse(id.contains(":") ? id : "minecraft:" + id));
-        return item == null ? Items.BONE : item;
+        // tryParse: Identifier.parse THROWS on bad user input (e.g. a space), crashing the tick.
+        // getOptional: getValue returns AIR (not null) for unknown ids, so the null check was dead
+        // and a typo made the module silently try to drop air.
+        var ident = net.minecraft.resources.Identifier.tryParse(id.contains(":") ? id : "minecraft:" + id);
+        if (ident == null) return Items.BONE;
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(ident).orElse(Items.BONE);
     }
 
     private int findItem(Minecraft mc, Item target) {

@@ -58,7 +58,9 @@ public final class ItemFrameEspModule extends Module {
     }
 
     @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    public void onGameLeft() {
+        notified.clear(); // coords are per-world; keeping them suppresses alerts on the next server
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override

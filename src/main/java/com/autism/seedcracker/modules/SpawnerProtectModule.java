@@ -47,10 +47,7 @@ import net.minecraft.world.phys.Vec3;
 public final class SpawnerProtectModule extends Module {
 
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(8L);
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-        .connectTimeout(HTTP_TIMEOUT)
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build();
+    private static final HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
 
     // ---- settings ----
     private final StringSetting whitelist = add(new StringSetting(
@@ -84,7 +81,9 @@ public final class SpawnerProtectModule extends Module {
     private boolean warnedPickaxe;
     private long cooldownUntil;
     private int minedCount;
-    private boolean posting;
+    /** Webhook posts run one after another (in order, never two at once) off the game thread. */
+    private CompletableFuture<Void> postChain = CompletableFuture.completedFuture(null);
+    private int pendingPosts;
 
     public SpawnerProtectModule() {
         super(SeedcrackerAddon.ID + ":z-spawner-protect", "Spawner Protect",
@@ -97,7 +96,6 @@ public final class SpawnerProtectModule extends Module {
         warnedPickaxe = false;
         cooldownUntil = 0L;
         minedCount = 0;
-        posting = false;
         rotInit = false; // re-seed the rotation smoother from the CURRENT view (no snap from stale state)
         resetStorage();
         if (findSilkTouchSlot(Minecraft.getInstance()) == -1) {
@@ -120,7 +118,8 @@ public final class SpawnerProtectModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
-        if (posting) return; // don't mine while a webhook is in flight
+        // Webhooks post in the background: blocking here held every next spawner for up to 8s (the HTTP timeout)
+        // while the enemy walked in.
 
         // Storage phase (shulker -> echest) takes priority once spawners are collected.
         if (tickStorage(mc)) return;
@@ -278,8 +277,7 @@ public final class SpawnerProtectModule extends Module {
         float targetPitch = (float) (-Math.toDegrees(Math.atan2(dy, horiz)));
         smoothYaw = com.autism.seedcracker.util.tunnel.LookRotation.approachAngle(smoothYaw, targetYaw, 16.0f);
         smoothPitch = com.autism.seedcracker.util.tunnel.LookRotation.approach(smoothPitch, targetPitch, 12.0f);
-        mc.player.setYRot(smoothYaw);
-        mc.player.setXRot(net.minecraft.util.Mth.clamp(smoothPitch, -90f, 90f));
+        com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_SAFETY, smoothYaw, smoothPitch);
     }
 
     /** True if the camera is within {@code tolDeg} of facing the block's centre (converged). */
@@ -362,6 +360,8 @@ public final class SpawnerProtectModule extends Module {
         // Sneak must be OFF here: sneak+use on a placed shulker places a block against it
         // instead of opening its GUI, which dead-ends the fill stage.
         if (mc.options != null) mc.options.keyShift.setDown(false);
+        // Breaking is a continuous hold: it has to progress every tick, not once per paced action.
+        if (storageStage == StorageStage.BREAK_SHULKER) return tickBreakShulker(mc);
         storageTicks++;
         int wait = 4; // ticks between actions (legit pacing)
         if (storageTicks < wait) return true;
@@ -377,7 +377,9 @@ public final class SpawnerProtectModule extends Module {
                 mc.gameMode.useItemOn(mc.player, net.minecraft.world.InteractionHand.MAIN_HAND,
                     new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(spot),
                         net.minecraft.core.Direction.UP, spot, false));
-                if (mc.level.getBlockState(spot).getBlock().toString().contains("shulker_box")) {
+                // Registry-key check: Block.toString() is debug formatting with no stability contract.
+                if (net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                        .getKey(mc.level.getBlockState(spot).getBlock()).getPath().endsWith("shulker_box")) {
                     placedShulkerPos = spot;
                     storageStage = StorageStage.OPEN_SHULKER_GUI; // must OPEN it before filling
                 } else {
@@ -407,20 +409,7 @@ public final class SpawnerProtectModule extends Module {
                 if (!moved) {
                     mc.player.closeContainer();
                     storageStage = storeEChest.get() ? StorageStage.BREAK_SHULKER : StorageStage.DONE;
-                }
-            }
-            case BREAK_SHULKER -> {
-                if (placedShulkerPos == null) { resetStorage(); return true; }
-                // Mine the placed shulker to pick it up (it keeps its contents as an item).
-                face(mc, placedShulkerPos);
-                net.minecraft.core.Direction side = facingToward(mc, placedShulkerPos);
-                mc.gameMode.startDestroyBlock(placedShulkerPos, side);
-                mc.gameMode.continueDestroyBlock(placedShulkerPos, side);
-                mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-                if (mc.level.getBlockState(placedShulkerPos).isAir()) {
-                    if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
-                    placedShulkerPos = null;
-                    storageStage = StorageStage.PLACE_EC;
+                    storageTimeout = BREAK_TIMEOUT_TICKS;
                 }
             }
             case PLACE_EC -> {
@@ -465,6 +454,46 @@ public final class SpawnerProtectModule extends Module {
         return true;
     }
 
+    private static final int BREAK_TIMEOUT_TICKS = 20 * 10;
+
+    /**
+     * Mine the placed shulker back up (it keeps its contents). Starts once, then continues every tick: re-calling
+     * startDestroyBlock each pass reset the progress, so without Efficiency V the box never broke and storage hung.
+     */
+    private boolean tickBreakShulker(Minecraft mc) {
+        if (placedShulkerPos == null) { resetStorage(); return true; }
+        if (mc.level.getBlockState(placedShulkerPos).isAir()) {
+            if (mc.gameMode.isDestroying()) mc.gameMode.stopDestroyBlock();
+            placedShulkerPos = null;
+            storageStage = StorageStage.PLACE_EC;
+            storageTicks = 0;
+            return true;
+        }
+        if (--storageTimeout <= 0) {
+            stopMining(mc);
+            notifyLocal("Couldn't break the shulker back up - it's still at " + placedShulkerPos.toShortString());
+            resetStorage();
+            return true;
+        }
+        face(mc, placedShulkerPos);
+        if (!facingTarget(mc, placedShulkerPos, 8.0f)) return true;
+        int pick = bestPickaxeSlot(mc);
+        if (pick >= 0) com.autism.seedcracker.util.InvSync.select(mc, pick);
+        net.minecraft.core.Direction side = facingToward(mc, placedShulkerPos);
+        if (!mc.gameMode.isDestroying()) mc.gameMode.startDestroyBlock(placedShulkerPos, side);
+        else mc.gameMode.continueDestroyBlock(placedShulkerPos, side);
+        mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        return true;
+    }
+
+    /** Any pickaxe in the hotbar (shulkers mine slowly by hand), preferring the one already held. */
+    private int bestPickaxeSlot(Minecraft mc) {
+        int sel = mc.player.getInventory().getSelectedSlot();
+        if (mc.player.getInventory().getItem(sel).is(net.minecraft.tags.ItemTags.PICKAXES)) return sel;
+        for (int i = 0; i < 9; i++) if (mc.player.getInventory().getItem(i).is(net.minecraft.tags.ItemTags.PICKAXES)) return i;
+        return -1;
+    }
+
     private void resetStorage() {
         storageStage = StorageStage.IDLE;
         placedShulkerPos = null;
@@ -487,8 +516,14 @@ public final class SpawnerProtectModule extends Module {
         var handler = mc.player.containerMenu;
         boolean moved = false;
         for (int i = 0; i < handler.slots.size(); i++) {
+            // PLAYER-inventory slots only: matching stacks already inside the shulker would be
+            // quick-moved back OUT, ping-ponging forever and never letting FILL_SHULKER finish.
+            if (handler.slots.get(i).container != mc.player.getInventory()) continue;
             net.minecraft.world.item.ItemStack s = handler.getSlot(i).getItem();
             if (!s.isEmpty() && match.test(s)) {
+                // Budget-gated: a full-inventory one-tick QUICK_MOVE burst (30+ clicks) is a
+                // superhuman APM spike; denied clicks resume on the caller's next pass.
+                if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return moved;
                 com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(handler.containerId, i, 0,
                     net.minecraft.world.inventory.ContainerInput.QUICK_MOVE, mc.player);
                 moved = true;
@@ -498,7 +533,8 @@ public final class SpawnerProtectModule extends Module {
     }
 
     private boolean isSpawnerItem(net.minecraft.world.item.ItemStack s) {
-        return s.getItem().toString().toLowerCase(java.util.Locale.ROOT).contains("spawner");
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem())
+            .getPath().contains("spawner");
     }
 
     private boolean isShulkerBox(net.minecraft.world.item.ItemStack s) {
@@ -536,8 +572,10 @@ public final class SpawnerProtectModule extends Module {
             + "}]"
             + "}";
 
-        posting = true;
-        CompletableFuture.runAsync(() -> {
+        // A raid can mine a dozen spawners in seconds: cap the backlog so Discord's rate limit isn't hammered.
+        if (pendingPosts >= 5) return;
+        pendingPosts++;
+        postChain = postChain.thenRunAsync(() -> {
             try {
                 HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                     .timeout(HTTP_TIMEOUT)
@@ -550,7 +588,7 @@ public final class SpawnerProtectModule extends Module {
             } catch (Exception ignored) {
                 // Webhook delivery is best-effort; never crash the module over it.
             }
-        }).whenComplete((v, err) -> posting = false);
+        }).whenComplete((v, err) -> Minecraft.getInstance().execute(() -> pendingPosts--));
     }
 
     private boolean isValidWebhook(String url) {

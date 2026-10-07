@@ -71,11 +71,17 @@ public final class AutoStoreModule extends Module {
         if (menu == null || menu instanceof InventoryMenu) return; // no container open
         if (mc.gui.screen() == null) return; // menu desync guard: only act while the screen is up
 
-        int containerSlots = menu.slots.size() - 36; // last 36 slots are always the player inv
+        // Count container slots by slot-container IDENTITY (same fix ChestStealer has) - custom
+        // menus break the "last 36 = player inv" assumption.
+        int containerSlots = 0;
+        for (int i = 0; i < menu.slots.size(); i++) {
+            if (menu.slots.get(i).container == mc.player.getInventory()) break;
+            containerSlots++;
+        }
         if (containerSlots <= 0) return;
         if (requireChest.get() && !hasStorageRows(menu, containerSlots)) return;
 
-        Set<Item> filter = parseItems();
+        Set<Item> filter = cachedFilter();
 
         // Player inventory slots inside this menu: [containerSlots, containerSlots+27) = main inv,
         // [containerSlots+27, containerSlots+36) = hotbar.
@@ -89,12 +95,29 @@ public final class AutoStoreModule extends Module {
             if (!slot.hasItem()) continue;
             ItemStack stack = slot.getItem();
             if (!matches(stack, filter)) continue;
+            // Container-full failsafe: QUICK_MOVE no-ops into a full container -> infinite clicks.
+            if (!containerHasRoomFor(menu, containerSlots, stack)) {
+                com.autism.seedcracker.compat.ClientNotify.warning("[Auto Store] Container full.");
+                cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get() * 8);
+                return;
+            }
 
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; } // global budget
             ContainerMutex.notifyContainerAction();
             mc.gameMode.handleContainerInput(menu.containerId, i, 0, ContainerInput.QUICK_MOVE, mc.player);
-            cooldown = delayTicks.get();
+            cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get());
             return; // one click per cycle
         }
+    }
+
+    /** True if the open container can accept at least part of this stack. */
+    private static boolean containerHasRoomFor(AbstractContainerMenu menu, int containerSlots, ItemStack stack) {
+        for (int i = 0; i < containerSlots; i++) {
+            ItemStack cur = menu.slots.get(i).getItem();
+            if (cur.isEmpty()) return true;
+            if (ItemStack.isSameItemSameComponents(cur, stack) && cur.getCount() < cur.getMaxStackSize()) return true;
+        }
+        return false;
     }
 
     /** True when the menu has generic storage rows (chest/barrel/shulker/hopper GUIs). */
@@ -112,14 +135,21 @@ public final class AutoStoreModule extends Module {
         };
     }
 
-    private Set<Item> parseItems() {
+    private Set<Item> cachedFilter() {
+        if (--filterReparseTicks > 0) return cachedFilterSet;
+        filterReparseTicks = 20;
         Set<Item> out = new HashSet<>();
         java.util.List<String> raw = filterItems.get();
-        if (raw == null) return out;
-        for (String id : raw) {
-            Identifier ident = Identifier.tryParse(id.trim());
-            if (ident != null) BuiltInRegistries.ITEM.getOptional(ident).ifPresent(out::add);
+        if (raw != null) {
+            for (String id : raw) {
+                Identifier ident = Identifier.tryParse(id.trim());
+                if (ident != null) BuiltInRegistries.ITEM.getOptional(ident).ifPresent(out::add);
+            }
         }
+        cachedFilterSet = out;
         return out;
     }
+
+    private Set<Item> cachedFilterSet = new HashSet<>();
+    private int filterReparseTicks = 0;
 }

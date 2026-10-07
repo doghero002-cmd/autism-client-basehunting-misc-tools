@@ -91,6 +91,7 @@ public final class MacePvpModule extends Module {
 
     private final LegitMovement look = new LegitMovement();
     private int launchTicks = -1;   // ticks since the wind-charge launch (-1 = not slamming)
+    private boolean pulseFired = false; // PULSE mode: one launch per activation
     private int cooldownWait = 0;
     // Anubis swap-back state.
     private int returnSlot = -1;    // slot we were holding before the auto-swap (-1 = none)
@@ -105,6 +106,7 @@ public final class MacePvpModule extends Module {
     public void onEnable() {
         look.reset();
         launchTicks = -1;
+        pulseFired = false;
         cooldownWait = 0;
     }
 
@@ -165,14 +167,12 @@ public final class MacePvpModule extends Module {
             float[] goal = yawPitchTo(mc, target);
             if (aimStyle.get() == AimStyle.LEGIT) {
                 float[] now = look.update(goal[0], goal[1]);
-                mc.player.setYRot(now[0]);
-                mc.player.setXRot(now[1]);
+                if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_COMBAT, now[0], now[1])) return;
                 float off = Math.abs(net.minecraft.util.Mth.wrapDegrees(goal[0] - now[0]))
                     + Math.abs(goal[1] - now[1]);
                 if (off > 6.0f) return; // still easing on-target; swing next tick
-            } else {
-                mc.player.setYRot(goal[0]);
-                mc.player.setXRot(goal[1]);
+            } else if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_COMBAT, goal[0], goal[1])) {
+                return;
             }
         }
 
@@ -187,8 +187,10 @@ public final class MacePvpModule extends Module {
     private boolean wantsLaunch(Minecraft mc, LivingEntity target) {
         if (findItem(mc, "minecraft:wind_charge") < 0) return false;
         if (slamMode.get() == SlamMode.PULSE) {
-            // Pulse: launch only when the player is on the ground near a target (a clean opener).
-            return mc.player.onGround() && target != null && mc.player.distanceTo(target) <= targetRange.get() + 1;
+            // Pulse: ONE launch per activation (pulseFired clears on re-enable) - without the
+            // flag, the 100-tick safety reset re-armed a launch every ~5s.
+            return !pulseFired && mc.player.onGround() && target != null
+                && mc.player.distanceTo(target) <= targetRange.get() + 1;
         }
         // HOLD: launch whenever the module is active and we're grounded near a target.
         return mc.player.onGround() && target != null;
@@ -197,11 +199,15 @@ public final class MacePvpModule extends Module {
     private void doLaunch(Minecraft mc) {
         int wind = findItem(mc, "minecraft:wind_charge");
         if (wind < 0) return;
+        // Ease the pitch down through the human engine; only throw once actually aimed down
+        // (an instant 90-degree snap + restore-less pitch was a GCD/rotation-checker flag).
+        float[] now = look.update(mc.player.getYRot(), 90f);
+        if (!com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_COMBAT, now[0], now[1])) return;
+        if (now[1] < 80f) return; // keep easing next tick
         com.autism.seedcracker.util.InvSync.select(mc, wind);
-        // Aim straight down so the charge detonates at our feet = max self-launch.
-        mc.player.setXRot(90f);
         mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
         launchTicks = 0;
+        pulseFired = true;
     }
 
     // ---- elytra ----
@@ -263,7 +269,8 @@ public final class MacePvpModule extends Module {
             var ench = stack.getEnchantments();
             for (var e : ench.entrySet()) {
                 var keyOpt = e.getKey().unwrapKey();
-                if (keyOpt.isPresent() && keyOpt.get().toString().equals(enchantId)) return e.getIntValue();
+                // ResourceKey.toString() is "ResourceKey[... / ...]" - compare the identifier.
+                if (keyOpt.isPresent() && keyOpt.get().identifier().toString().equals(enchantId)) return e.getIntValue();
             }
         } catch (Throwable ignored) {}
         return 0;

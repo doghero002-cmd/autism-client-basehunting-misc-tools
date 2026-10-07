@@ -11,7 +11,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
-import net.minecraft.network.protocol.game.ServerboundChatPacket;
 import net.minecraft.sounds.SoundEvents;
 
 /**
@@ -39,11 +38,10 @@ public final class FakePayModule extends Module {
 
     @Override
     public boolean onPacketSend(Packet<?> packet) {
-        if (packet instanceof ServerboundChatPacket chat) {
-            return handle(chat.message()) ? true : false;
-        }
+        // Commands only: plain chat packets never carry commands, and intercepting them meant
+        // typing the literal words "pay bob 100" in chat silently ate your chat message.
         if (packet instanceof ServerboundChatCommandPacket cmd) {
-            return handle(cmd.command()) ? true : false;
+            return handle(cmd.command());
         }
         return false;
     }
@@ -89,16 +87,6 @@ public final class FakePayModule extends Module {
 
     /** Parses a DonutSMP amount that may use k/m/b shorthand or commas ("166.3k", "1.8m", "30"). */
     private static long parseAmount(String raw) {
-        String s = raw.replace(",", "").trim().toLowerCase(java.util.Locale.ROOT);
-        double mult = 1.0;
-        if (s.endsWith("b")) { mult = 1_000_000_000.0; s = s.substring(0, s.length() - 1); }
-        else if (s.endsWith("m")) { mult = 1_000_000.0; s = s.substring(0, s.length() - 1); }
-        else if (s.endsWith("k")) { mult = 1_000.0; s = s.substring(0, s.length() - 1); }
-        try {
-            double v = Double.parseDouble(s) * mult;
-            return (long) v;
-        } catch (NumberFormatException e) {
-            return -1;
-        }
+        return com.autism.seedcracker.util.pure.PriceMath.parseAmount(raw);
     }
 }

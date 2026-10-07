@@ -123,6 +123,9 @@ public final class TunnelBaseWaterModule extends Module {
     private final BoolSetting buying = add(new BoolSetting("buying", "Enable buying", true)
         .description("Allow the module to /shop-restock XP / pearls / obsidian / carrots / totems. OFF = never opens the shop (you supply everything).")
         .group("Buying"));
+    private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
+        .description("Trace state/phase/buy transitions to chat + /flaglog, and every tick into motion-trace.log (problems + their lead-up in motion-errors.log).")
+        .group("General"));
 
     // ---- state ----
     private enum State { NONE, MINING, GOABOVEHAZARD, YRECOVERY, BUYOBI, PEARL, BUYPEARL, AUTOMEND, BUYXP, AUTOEAT, BUYCARROT, BUYTOTEM }
@@ -187,6 +190,7 @@ public final class TunnelBaseWaterModule extends Module {
         isBackup = false; mendingGraceTicks = 0; pearlReset = true; shouldCloseInventory = false;
         preferredSide = 0; detourStartPos = null; hazardCommitTicks = 0; noFoodCooldown = 0;
         diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0; scanTicks = 0;
+        lastSafePos = null; escapeTarget = null;
         resetMiningTick = 0; resetUseTick = 0; wasScreenOpen = false; jumped = false;
         look.reset();
         stuck.reset();
@@ -262,8 +266,7 @@ public final class TunnelBaseWaterModule extends Module {
         float pitchStep = Math.max(1.5f, Math.min(cap, pitchRemain * 0.35f));
         currentSmoothedYaw = LookRotationCompat.approachAngle(currentSmoothedYaw, pendingYaw, yawStep);
         currentSmoothedPitch = LookRotationCompat.approach(currentSmoothedPitch, pendingPitch, pitchStep);
-        mc.player.setYRot(currentSmoothedYaw);
-        mc.player.setXRot(net.minecraft.util.Mth.clamp(currentSmoothedPitch, -90f, 90f));
+        com.autism.seedcracker.motion.RotationEngine.write(id(), com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, currentSmoothedYaw, currentSmoothedPitch);
         float yawDiff = Math.abs(net.minecraft.util.Mth.wrapDegrees(pendingYaw - mc.player.getYRot()));
         float pitchDiff = Math.abs(pendingPitch - mc.player.getXRot());
         if (yawDiff < 0.5f && pitchDiff < 0.5f) {
@@ -294,6 +297,11 @@ public final class TunnelBaseWaterModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.options == null) return;
+
+        com.autism.seedcracker.util.DebugProbe.setEnabled(id(), debug.get());
+        com.autism.seedcracker.motion.MotionDebug.requestFromBot(debug.get());
+        com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state",
+            state + "/" + phase + (buyStage != BuyStage.NONE ? " buy=" + buyStage : ""));
 
         if (jumped) { jumped = false; mc.options.keyJump.setDown(false); }
         tickRotation(mc);
@@ -332,24 +340,38 @@ public final class TunnelBaseWaterModule extends Module {
         // whole state machine - swim up + back AWAY horizontally, then flip detour side and re-route.
         // The old version pressed sneak(keyDown)+jump together, which cancelled out and left you
         // hanging in the lava, and never moved you OUT of the block.
-        if (mc.player.isInLava()) lavaEscapeTicks = 14;
+        if (mc.player.isInLava()) {
+            if (lavaEscapeTicks == 0) {
+                escapeTarget = findLavaEscape(mc);
+                com.autism.seedcracker.motion.MotionDebug.event("LAVA", "tunnel bot in lava at " + mc.player.blockPosition().toShortString()
+                    + " state=" + state + " escaping to " + (escapeTarget == null ? "?" : escapeTarget.toShortString()));
+                // Leave tower/recovery: their scripted camera and key holds would keep us standing in it.
+                resetTower();
+                yRecoveryBasePos = null;
+                if (state == State.GOABOVEHAZARD || state == State.YRECOVERY) state = State.MINING;
+            }
+            lavaEscapeTicks = 14;
+        }
         if (lavaEscapeTicks > 0) {
             lavaEscapeTicks--;
             updateMining(mc, false);
             updateUsage(mc, false);
-            mc.options.keyDown.setDown(false);   // never sneak in lava - sneaking sinks you
+            mc.options.keyShift.setDown(false);  // never sneak in lava - sneaking sinks you
             mc.options.keyJump.setDown(true);    // swim up out of the flow
-            // Back AWAY from the lava along the tunnel (reverse of the heading), not forward into it.
-            // In follow mode movement goes where the camera points, so briefly steer the view back.
-            Direction away = currentDirection == null ? null : currentDirection.getOpposite();
-            if (followCamera.get() && away != null) {
-                float[] back = dirValues(away);
-                mc.player.setYRot(back[0]); // direct set, not a slow rotateTo - this is a reflex
-            }
-            mc.options.keyUp.setDown(true);      // hold forward (which now points away from the lava)
-            if (lavaEscapeTicks == 0 && !mc.player.isInLava()) {
-                mc.options.keyJump.setDown(false);
+            // Walk toward the nearest safe floor (strafe keys relative to wherever we're facing), so it works
+            // in follow AND manual mode and never holds forward INTO the lava like the old reflex could.
+            BlockPos goal = escapeTarget != null ? escapeTarget : lastSafePos;
+            if (goal != null) {
+                var keys = com.autism.seedcracker.util.tunnel.MovementInput.keysToward(goal.getX() + 0.5, goal.getZ() + 0.5);
+                com.autism.seedcracker.util.tunnel.MovementInput.setKeys(keys, false);
+            } else {
                 mc.options.keyUp.setDown(false);
+                mc.options.keyDown.setDown(true);
+            }
+            if (lavaEscapeTicks == 0 && !mc.player.isInLava()) {
+                com.autism.seedcracker.motion.MotionDebug.event("LAVA", "escaped to " + mc.player.blockPosition().toShortString());
+                stopMovement(mc);
+                escapeTarget = null;
                 hazardCommitTicks = 0;
                 preferredSide = -preferredSide;
                 if (state == State.MINING || state == State.GOABOVEHAZARD) avoidHazard(mc, true);
@@ -357,6 +379,12 @@ public final class TunnelBaseWaterModule extends Module {
             return;
         }
         mc.options.keyDown.setDown(false);
+        // Remember where we last stood on dry, solid, hazard-free ground: the fallback escape target.
+        if (mc.player.onGround() && !mc.player.isInLava() && !mc.player.isInWater()) {
+            BlockPos here = mc.player.blockPosition();
+            if (!isFluid(mc.level.getBlockState(here)) && !isFluid(mc.level.getBlockState(here.below()))
+                && !isContactHazard(mc.level.getBlockState(here.below()).getBlock())) lastSafePos = here;
+        }
 
         // Grim SpeedA predictor: pause movement while a speed flag is imminent (buffer drains).
         if (FlagDetectorModule.speedFlagImminent()) {
@@ -404,10 +432,30 @@ public final class TunnelBaseWaterModule extends Module {
         }
         wasScreenOpen = mc.gui.screen() != null;
         // Stuck detector: log the exact state if we stop making progress.
-        stuck.setAction("state=" + state + " dir=" + currentDirection
+        String action = "state=" + state + " dir=" + currentDirection
             + (isRotating ? " rotating" : "") + (isBackup ? " backup->" + backupDirection : "")
-            + " phase=" + phase + " buy=" + buyStage);
+            + (diagonalDetour ? " diag->" + diagSide : "") + " phase=" + phase + " buy=" + buyStage;
+        stuck.setAction(action);
         stuck.tick(mc);
+        traceTick(mc, action);
+    }
+
+    private String lastTracedState = "";
+
+    /** Per-tick line into motion-trace.log (and the error-log lead-up) while GoTo debug mode is on. */
+    private void traceTick(Minecraft mc, String action) {
+        if (!com.autism.seedcracker.motion.MotionDebug.enabled()) return;
+        String st = state + "/" + phase;
+        if (!st.equals(lastTracedState)) {
+            com.autism.seedcracker.motion.MotionDebug.event("TUNNEL", "state " + lastTracedState + " -> " + st + " at "
+                + mc.player.blockPosition().toShortString());
+            lastTracedState = st;
+        }
+        int keys = (mc.options.keyUp.isDown() ? 1 : 0) | (mc.options.keyDown.isDown() ? 2 : 0) | (mc.options.keyLeft.isDown() ? 4 : 0)
+            | (mc.options.keyRight.isDown() ? 8 : 0) | (mc.options.keyJump.isDown() ? 16 : 0) | (mc.options.keyAttack.isDown() ? 32 : 0)
+            | (mc.options.keyUse.isDown() ? 64 : 0);
+        com.autism.seedcracker.motion.MotionDebug.traceBot("tunnel", mc.player.position(), mc.player.getYRot(), mc.player.getXRot(),
+            action + " stuck=" + stuckTicks, mc.player.onGround(), keys);
     }
 
     // ---- base detection (Water thresholds) ----
@@ -458,13 +506,11 @@ public final class TunnelBaseWaterModule extends Module {
 
     private void playFoundSound(Minecraft mc) {
         if (mc.player == null) return;
-        try {
-            net.minecraft.resources.Identifier id = net.minecraft.resources.Identifier.parse(findSound.get().trim());
-            net.minecraft.sounds.SoundEvent evt = net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getValue(id);
-            if (evt != null) mc.player.playSound(evt, 1.0f, 1.0f);
-        } catch (Throwable t) {
-            mc.player.playSound(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.0f, 1.0f);
-        }
+        net.minecraft.resources.Identifier id =
+            net.minecraft.resources.Identifier.tryParse(findSound.get().trim());
+        net.minecraft.sounds.SoundEvent evt = id == null ? null
+            : net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.getOptional(id).orElse(null);
+        mc.player.playSound(evt != null ? evt : net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.0f, 1.0f);
     }
 
     // ---- MINING ----
@@ -475,8 +521,16 @@ public final class TunnelBaseWaterModule extends Module {
         //  - USING ITEM (eating): an attack latch would cancel the eat, so it never finishes.
         //  - LAVA AHEAD: don't chew into a lava pocket (the reflex below handles being IN it).
         boolean falling = !mc.player.onGround() && mc.player.getDeltaMovement().y < -0.08;
-        if (falling || mc.player.isUsingItem() || lavaAhead(mc)) {
+        boolean lava = lavaAhead(mc);
+        if (falling || mc.player.isUsingItem() || lava) {
             updateMining(mc, false);
+            if (lava) {
+                // The old guard stopped mining but left forward held: momentum (or the next tick) walked us in.
+                stopMovement(mc);
+                if (mc.player.isSprinting()) mc.player.setSprinting(false);
+                // avoidHazard keeps its commit unless the committed lane is hot at point-blank (lava right here is).
+                avoidHazard(mc, true);
+            }
             return;
         }
         // Turn while walking: don't freeze movement just because a rotation is in flight (that
@@ -534,6 +588,11 @@ public final class TunnelBaseWaterModule extends Module {
         BlockPos cur = mc.player.blockPosition();
         if (cur.equals(lastCoords)) {
             stuckTicks++;
+            if (stuckTicks == 20 || stuckTicks == 40 || stuckTicks == 60 || stuckTicks >= 90) {
+                com.autism.seedcracker.motion.MotionDebug.event("UNSTICK", "tunnel stuck " + stuckTicks + " ticks at " + cur.toShortString()
+                    + " dir=" + currentDirection + " -> " + (stuckTicks == 20 ? "hop" : stuckTicks == 40 ? "re-aim"
+                    : stuckTicks == 60 ? "reroute" : followCamera.get() ? "keep steering" : "tower out"));
+            }
             if (stuckTicks == 20) {
                 mc.options.keyJump.setDown(true); jumped = true; // hop a lip / unstick feet
             } else if (stuckTicks == 40) {
@@ -611,6 +670,7 @@ public final class TunnelBaseWaterModule extends Module {
             // Back AWAY from the column (reverse of the heading). In follow mode steer the view back
             // so forward-key actually retreats; manual mode walks backward via the reverse heading.
             Direction away = currentDirection == null ? null : currentDirection.getOpposite();
+            // Raw set (audited): panic retreat from falling gravel - a human flicks here too.
             if (followCamera.get() && away != null) mc.player.setYRot(dirValues(away)[0]);
             mc.options.keyUp.setDown(true);
             if (gravelRetreatTicks == 0) mc.options.keyUp.setDown(false);
@@ -695,6 +755,31 @@ public final class TunnelBaseWaterModule extends Module {
     private int preferredSide = 0;     // sticky detour side: -1 left, +1 right (0 = pick fresh)
     private BlockPos detourStartPos = null; // where the current detour began
     private int lavaEscapeTicks = 0;   // survival reflex: back out of lava we're standing in
+    private BlockPos lastSafePos = null;   // last dry, solid, hazard-free spot we stood on
+    private BlockPos escapeTarget = null;  // where the current lava escape is heading
+
+    /** Nearest standable, lava-free cell within 3 blocks (feet + head clear of fluid, solid floor), else the last safe spot. */
+    private BlockPos findLavaEscape(Minecraft mc) {
+        BlockPos me = mc.player.blockPosition();
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dy = 1; dy >= -1; dy--) for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) {
+            if (dx == 0 && dz == 0) continue;
+            BlockPos feet = me.offset(dx, dy, dz);
+            var fs = mc.level.getBlockState(feet);
+            var hs = mc.level.getBlockState(feet.above());
+            var under = mc.level.getBlockState(feet.below());
+            if (isFluid(fs) || isFluid(hs) || isFluid(under)) continue;
+            if (!fs.getCollisionShape(mc.level, feet).isEmpty() || !hs.getCollisionShape(mc.level, feet.above()).isEmpty()) continue;
+            if (under.getCollisionShape(mc.level, feet.below()).isEmpty() || isContactHazard(under.getBlock())) continue;
+            double d = dx * dx + dz * dz + dy * dy * 0.5;
+            if (d < bestD) {
+                bestD = d;
+                best = feet;
+            }
+        }
+        return best != null ? best : lastSafePos;
+    }
     private int scanTicks = 0;         // base-scan throttle
     private boolean diagonalDetour = false; // 45° detour: one turn out, one turn back (no 90° staircase)
     private Direction diagSide = null;      // side the diagonal leans toward
@@ -809,6 +894,8 @@ public final class TunnelBaseWaterModule extends Module {
         }
         com.autism.seedcracker.modules.FlagDetectorModule.report("HAZARD_BOXED", "TunnelBaseWater",
             "fully boxed by lava at " + mc.player.blockPosition());
+        com.autism.seedcracker.motion.MotionDebug.event("FAIL", "tunnel boxed in by hazards on every side at "
+            + mc.player.blockPosition().toShortString() + " heading " + heading);
         stopMovement(mc);
     }
 
@@ -937,6 +1024,8 @@ public final class TunnelBaseWaterModule extends Module {
         if (++towerStallTicks < 200) return false;
         // Not gaining height (out of blocks? unbreakable ceiling pocket?): stop towering, flip the
         // detour side, and let the hazard router find another lane instead of cycling forever.
+        com.autism.seedcracker.motion.MotionDebug.event("TOWER", "no height gained for 10s at " + mc.player.blockPosition().toShortString()
+            + " (state " + state + ", phase " + phase + ", best y " + towerBestY + "): giving up tower, rerouting");
         resetTower();
         updateMining(mc, false); updateUsage(mc, false); mc.options.keyJump.setDown(false);
         com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc));
@@ -995,21 +1084,30 @@ public final class TunnelBaseWaterModule extends Module {
                 // one-shot rotateTo left isRotating true across the jump, so handleGoAbove's
                 // isRotating early-return suppressed every subsequent towerPhase tick = the
                 // "only places 1 block" stall. Re-assert the aim each tick (cheap, no rotateTo).
-                mc.player.setXRot(90f);
+                mc.player.setXRot(90f); // raw set (audited): re-assert = zero delta after entry ease, no GCD signal
                 towerRotationDone = true;
                 com.autism.seedcracker.util.InvSync.select(mc, obiSlot.get() - 1);
-                // Legit towering: only place when on the ground (never use-spam while airborne, the
-                // classic scaffold flag), with a jittered per-place cooldown. Jump between places.
-                if (placeCooldown > 0) { placeCooldown--; mc.options.keyUse.setDown(false); }
-                else if (mc.player.onGround()) {
-                    mc.options.keyJump.setDown(true);
-                    updateUsage(mc, true);
-                    placeCooldown = 2 + (int) (Math.random() * 2); // 2-3 ticks between places
+                // Jump, then place under our feet once they've CLEARED the block below: placing while still
+                // standing in that cell fails (the block can't go inside our own hitbox), which is why the old
+                // on-ground-only placing stalled the tower after one block.
+                BlockPos under = mc.player.blockPosition().below();
+                boolean cellFree = mc.level.getBlockState(under).canBeReplaced();
+                boolean feetClear = mc.player.getY() >= under.getY() + 1.0 + 0.15;
+                if (placeCooldown > 0) placeCooldown--;
+                if (mc.player.onGround()) {
+                    updateUsage(mc, false);
+                    mc.options.keyJump.setDown(isAir(mc, mc.player.blockPosition().above(2)));
                 } else {
                     mc.options.keyJump.setDown(false);
-                    updateUsage(mc, false);
+                    boolean place = cellFree && feetClear && placeCooldown == 0;
+                    updateUsage(mc, place);
+                    if (place) placeCooldown = 2 + (int) (Math.random() * 2);
                 }
-                if (System.currentTimeMillis() - phaseStartTime >= PHASE_TIME_MS) {
+                // Headroom ran out (a block above stopped the jump) or no height gained for a while: dig again.
+                boolean blockedAbove = !isAir(mc, mc.player.blockPosition().above(2)) && mc.player.onGround();
+                if (blockedAbove || System.currentTimeMillis() - phaseStartTime >= PHASE_TIME_MS) {
+                    if (blockedAbove) com.autism.seedcracker.motion.MotionDebug.event("TOWER", "headroom blocked at "
+                        + mc.player.blockPosition().toShortString() + ", digging up");
                     mc.options.keyJump.setDown(false); updateUsage(mc, false); switchPhase(mc, Phase.DIG);
                 }
             }

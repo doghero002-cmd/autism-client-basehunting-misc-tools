@@ -7,6 +7,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
+import com.autism.seedcracker.util.pure.Json;
+
 /**
  * Routes a chat-game question to an OpenAI-compatible chat-completions API and returns the
  * model's short answer. Works with any endpoint that accepts {model, messages:[{role,content}]}
@@ -15,18 +17,18 @@ import java.util.concurrent.CompletableFuture;
 public final class AiRouter {
     private AiRouter() {}
 
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(8)).build();
+    private static final HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
 
     /** Ask the AI for a concise answer to the question. Async; resolves to the answer or null. */
     public static CompletableFuture<String> ask(String endpoint, String apiKey, String model, String question) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String prompt = "Answer this chat-game question with ONLY the final answer, no explanation. "
-                    + "If it's a math problem, give just the number. Question: " + question;
+                String prompt = "This is a Minecraft server chat game. Reply with ONLY the exact answer to type in chat, "
+                    + "nothing else. Math: just the number. Unscramble: the unscrambled word (Minecraft words are likely). "
+                    + "Trivia: the shortest correct answer. Game message: " + question;
                 String body = "{"
-                    + "\"model\":" + json(model) + ","
-                    + "\"messages\":[{\"role\":\"user\",\"content\":" + json(prompt) + "}],"
+                    + "\"model\":" + Json.quote(model) + ","
+                    + "\"messages\":[{\"role\":\"user\",\"content\":" + Json.quote(prompt) + "}],"
                     + "\"max_tokens\":32,\"temperature\":0"
                     + "}";
                 HttpRequest.Builder b = HttpRequest.newBuilder()
@@ -69,7 +71,18 @@ public final class AiRouter {
         return out.isEmpty() ? null : out;
     }
 
-    private static String json(String s) {
-        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    /**
+     * Trim a model reply to something sendable: first line, filler ("The answer is") and wrapping
+     * quotes/periods removed. Keeps words (unscramble/trivia answers), not just numbers. Null if empty.
+     */
+    public static String sanitize(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        int nl = s.indexOf('\n');
+        if (nl >= 0) s = s.substring(0, nl).trim();
+        s = s.replaceAll("(?i)^(the )?(final )?(answer|word|result)( is)?\\s*[:=]?\\s*", "")
+            .replaceAll("^[\"'`*]+|[\"'`*.!]+$", "").trim();
+        if (s.isEmpty() || s.length() > 64) return null;
+        return s;
     }
 }

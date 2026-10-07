@@ -1,8 +1,25 @@
 package com.autism.seedcracker.modules;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.chatgames.AiRouter;
-import com.autism.seedcracker.chatgames.MathSolver;
+import com.autism.seedcracker.chatgames.ChatGameSolver;
+import com.autism.seedcracker.chatgames.ChatLine;
+import com.autism.seedcracker.util.DebugProbe;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.EnumSetting;
@@ -11,254 +28,281 @@ import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 
-import java.util.Locale;
-
 /**
- * Auto Chat Games.
+ * Auto Chat Games: answers server chat games.
  *
- * Watches chat for a configurable keyword/message (e.g. the server's chat-game prompt). When a
- * message contains the keyword AND a math expression, it solves the math and replies in chat.
- *
- * Two answer modes:
- *  - LOCAL: solves the math itself with a built-in arithmetic evaluator (no internet needed).
- *  - AI: routes the question to an OpenAI-compatible chat API you configure (endpoint + model +
- *    optional key) and replies with the model's answer. Falls back to LOCAL if the AI fails.
- *
- * Replies are sent as normal chat (or a configurable command prefix). Rate-limited and deduped so
- * it can't spam. Only solves when a keyword matches (or any message if keyword is blank).
+ * LOCAL (no internet) solves math, word problems, UNSCRAMBLE, retype ("first to type X"),
+ * REVERSE and FILL-IN games. Words come from every item/block/mob name in the game plus your own
+ * chatgames-words.txt, and trivia answers are learned from the server's "the answer was X" reveals,
+ * so it gets better the longer it runs. AI mode asks an OpenAI-compatible API only when the local
+ * solver can't answer.
  */
 public final class ChatGamesModule extends Module {
 
-    public enum AnswerMode { LOCAL, RISKY, AI }
+    public enum AnswerMode { LOCAL, AI }
 
-    private final StringSetting keyword = add(new StringSetting(
-            "keyword", "Trigger keyword", "solve")
-        .description("Only react to chat messages containing this text (blank = react to math in any message).")
+    private final StringSetting keyword = add(new StringSetting("keyword", "Trigger keyword", "")
+        .description("Only react to lines containing this (e.g. your server's '[ChatGames]' tag). Blank = any game-looking line.")
         .group("General"));
-    private final EnumSetting<AnswerMode> mode = add(new EnumSetting<>(
-            "mode", "Answer mode", AnswerMode.LOCAL, AnswerMode.values())
-        .description("LOCAL = solve raw math in-client. RISKY = also solve word problems + auto answer command (can misread). AI = route to an AI API.")
+    private final EnumSetting<AnswerMode> mode = add(new EnumSetting<>("mode", "Answer mode", AnswerMode.LOCAL, AnswerMode.values())
+        .description("LOCAL = offline solver (math, unscramble, type, reverse, fill-in, learned trivia). "
+            + "AI = same, but unknown questions go to your AI endpoint.")
         .group("General"));
-    private final BoolSetting autoReply = add(new BoolSetting(
-            "auto-reply", "Auto reply in chat", true)
-        .description("Send the answer in chat. Off = just show it to you locally.")
+    private final BoolSetting games = add(new BoolSetting("word-games", "Word games", true)
+        .description("Unscramble / reverse / fill-in / retype. Off = math only.").group("General"));
+    private final BoolSetting wordProblems = add(new BoolSetting("word-problems", "Word problems", true)
+        .description("Read 'what is five plus three' style math. Can misread odd phrasing.").group("General"));
+    private final BoolSetting learnTrivia = add(new BoolSetting("learn", "Learn from reveals", true)
+        .description("Remember answers the server announces ('the word was diamond') and answer that question instantly next time.")
         .group("General"));
-    private final StringSetting replyPrefix = add(new StringSetting(
-            "reply-prefix", "Reply prefix", "")
-        .description("Optional prefix before the answer (e.g. a command like '/answer '). Blank = plain chat. RISKY can auto-detect this from the prompt.")
-        .group("General"));
-    private final BoolSetting autoDetectCommand = add(new BoolSetting(
-            "auto-detect-command", "Auto-detect answer command", true)
-        .description("RISKY: read the prompt for a '/answer'/'/quiz' style command and reply using it.")
-        .group("General"));
-    private final IntSetting cooldownMs = add(new IntSetting(
-            "cooldown-ms", "Cooldown (ms)", 1500, 0, 30000, 100)
-        .description("Minimum time between answers (anti-spam).")
-        .group("General"));
+    private final BoolSetting autoReply = add(new BoolSetting("auto-reply", "Auto reply in chat", true)
+        .description("Send the answer. Off = only show it to you (safe practice mode).").group("Reply"));
+    private final StringSetting replyPrefix = add(new StringSetting("reply-prefix", "Reply prefix", "")
+        .description("Text before the answer (e.g. '/answer '). Blank = plain chat or the command the prompt mentions.")
+        .group("Reply"));
+    private final BoolSetting autoDetectCommand = add(new BoolSetting("auto-detect-command", "Use prompt's command", true)
+        .description("If the prompt says to use /answer, /quiz etc., reply with that command.").group("Reply"));
+    private final IntSetting typeSpeed = add(new IntSetting("type-speed", "Typing speed (chars/s)", 9, 3, 30, 1)
+        .description("Simulated read + type time. Instant answers are the #1 chat-game bot tell.").group("Reply"));
+    private final IntSetting maxDelay = add(new IntSetting("max-delay", "Max delay (s)", 6, 1, 20, 1)
+        .description("Never wait longer than this, or someone else wins.").group("Reply"));
+    private final IntSetting skipChance = add(new IntSetting("skip-chance", "Skip chance (%)", 0, 0, 80, 5)
+        .description("Randomly sit out some rounds so you don't win every single one.").group("Reply"));
+    private final IntSetting cooldownMs = add(new IntSetting("cooldown-ms", "Cooldown (ms)", 3000, 0, 60000, 250)
+        .description("Minimum time between answers.").group("Reply"));
+    private final StringSetting aiEndpoint = add(new StringSetting("ai-endpoint", "AI endpoint", "https://api.openai.com/v1/chat/completions")
+        .description("OpenAI-compatible chat-completions URL (OpenAI, OpenRouter, Ollama...).")
+        .group("AI").visibleWhen(() -> mode.get() == AnswerMode.AI));
+    private final StringSetting aiModel = add(new StringSetting("ai-model", "AI model", "gpt-4o-mini")
+        .group("AI").visibleWhen(() -> mode.get() == AnswerMode.AI));
+    private final StringSetting aiKey = add(new StringSetting("ai-key", "AI API key", "")
+        .description("Blank for local endpoints like Ollama.").group("AI").visibleWhen(() -> mode.get() == AnswerMode.AI));
+    private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false).group("General"));
 
-    // AI config.
-    private final StringSetting aiEndpoint = add(new StringSetting(
-            "ai-endpoint", "AI endpoint", "https://api.openai.com/v1/chat/completions")
-        .description("OpenAI-compatible chat-completions URL (OpenAI, OpenRouter, Ollama, etc).")
-        .group("AI"));
-    private final StringSetting aiModel = add(new StringSetting(
-            "ai-model", "AI model", "gpt-4o-mini")
-        .description("Model name to request.")
-        .group("AI"));
-    private final StringSetting aiKey = add(new StringSetting(
-            "ai-key", "AI API key", "")
-        .description("API key (leave blank for local endpoints like Ollama).")
-        .group("AI"));
-
-    private long lastAnswerMs = 0;
-    private String lastQuestion = "";
-    private String lastDetectedCommand = "";
-    private volatile boolean aiInFlight = false;
+    private ChatGameSolver solver;
+    private long lastAnswerMs;
+    private String lastPrompt = "";
+    private String detectedCommand = "";
+    private String pendingQuestion;
+    private long pendingQuestionAt;
+    private int roundToken;
+    private volatile boolean aiInFlight;
 
     public ChatGamesModule() {
         super(SeedcrackerAddon.ID + ":chat-games", "Auto Chat Games",
-            "Answers chat-game math questions (local solver, or routed to an AI API).");
+            "Answers chat games offline: math, unscramble, type, reverse, fill-in, learned trivia (AI optional).");
+    }
+
+    @Override
+    public void onEnable() {
+        solver = buildSolver();
+        AutismClientMessaging.sendPrefixed("§a[ChatGames] §7Ready: " + solver.dictionarySize() + " words, "
+            + solver.triviaSnapshot().size() + " learned answers.");
+    }
+
+    @Override
+    public void onDisable() {
+        saveTrivia();
+        roundToken++;
     }
 
     @Override
     public boolean onPacketReceive(Packet<?> packet) {
-        if (!(packet instanceof ClientboundSystemChatPacket chat)) return false;
+        if (!(packet instanceof ClientboundSystemChatPacket chat) || chat.overlay() || chat.content() == null) return false;
         Component content = chat.content();
-        if (content == null) return false;
-        handleMessage(content.getString());
-        return false; // never block the message
+        String line = content.getString();
+        Minecraft.getInstance().execute(() -> handle(line, hoverText(content)));
+        return false;
     }
 
-    private void handleMessage(String raw) {
-        if (raw == null) return;
-        // RISKY: remember any '/answer'/'/quiz' style command the prompt told us to use.
-        if (autoDetectCommand.get()) {
-            String cmd = detectCommand(raw);
-            if (cmd != null) lastDetectedCommand = cmd;
-        }
-        String kw = keyword.get().trim().toLowerCase(Locale.ROOT);
-        if (!kw.isEmpty() && !raw.toLowerCase(Locale.ROOT).contains(kw)) return;
-
-        String expr = extractMath(raw);
-        // RISKY mode also handles word problems when there's no raw expression.
-        if (expr == null && mode.get() == AnswerMode.RISKY) {
-            Double wordResult = MathSolver.solveWordProblem(raw);
-            if (wordResult != null) {
-                long nowW = System.currentTimeMillis();
-                if (nowW - lastAnswerMs >= cooldownMs.get()) {
-                    lastAnswerMs = nowW;
-                    lastQuestion = raw;
-                    deliver(raw, MathSolver.format(wordResult));
-                }
-            }
-            return;
-        }
-        if (expr == null) return;
-
-        // Dedupe identical question + cooldown.
-        long now = System.currentTimeMillis();
-        if (expr.equals(lastQuestion) && now - lastAnswerMs < 10000) return;
-        if (now - lastAnswerMs < cooldownMs.get()) return;
-        lastQuestion = expr;
-        lastAnswerMs = now;
-
-        if (mode.get() == AnswerMode.AI) {
-            answerWithAi(raw, expr);
-        } else {
-            answerLocal(expr);
-        }
-    }
-
-    private void answerLocal(String expr) {
-        Double result = MathSolver.solve(expr);
-        if (result == null) return;
-        String answer = MathSolver.format(result);
-        deliver(expr, answer);
-    }
-
-    private void answerWithAi(String fullMessage, String expr) {
-        if (aiInFlight) return;
-        aiInFlight = true;
-        String question = fullMessage.trim();
-        AiRouter.ask(aiEndpoint.get(), aiKey.get(), aiModel.get(), question)
-            .thenAccept(answer -> {
-                aiInFlight = false;
-                Minecraft.getInstance().execute(() -> {
-                    String clean = sanitizeAnswer(answer);
-                    if (clean != null) {
-                        deliver(expr, clean);
-                    } else {
-                        // Fallback to local solver if the AI gave nothing usable.
-                        answerLocal(expr);
-                    }
-                });
-            })
-            .exceptionally(e -> {
-                aiInFlight = false;
-                Minecraft.getInstance().execute(() -> answerLocal(expr));
-                return null;
-            });
-    }
-
-    private void deliver(String expr, String answer) {
+    private void handle(String line, String hover) {
+        if (solver == null || line == null || line.isBlank()) return;
+        DebugProbe.setEnabled(id(), debug.get());
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        if (autoReply.get()) {
-            if (mc.getConnection() == null) return;
-            String prefix = replyPrefix.get().trim();
-            // RISKY: prefer the command the prompt told us to use.
-            if (autoDetectCommand.get() && !lastDetectedCommand.isEmpty()) {
-                prefix = lastDetectedCommand;
+
+        // Round-end lines first: learn the answer, and cancel any reply we haven't sent yet.
+        String revealed = ChatLine.revealedAnswer(line);
+        if (revealed != null || ChatLine.isRoundOver(line)) {
+            if (revealed != null && learnTrivia.get() && pendingQuestion != null
+                && System.currentTimeMillis() - pendingQuestionAt < 5 * 60_000L) {
+                solver.learn(pendingQuestion, revealed);
+                solver.addWord(revealed);
+                DebugProbe.trace(id(), "learned", pendingQuestion + " -> " + revealed);
+                saveTrivia();
             }
-            String out = (prefix + answer).trim();
-            if (out.isEmpty()) return;
+            pendingQuestion = null;
+            roundToken++;
+            return;
+        }
+
+        if (ChatLine.isPlayerChat(line, onlineNames(mc))) return;
+        String kw = keyword.get().trim().toLowerCase(Locale.ROOT);
+        String lower = line.toLowerCase(Locale.ROOT);
+        if (!kw.isEmpty() && !lower.contains(kw)) return;
+
+        if (autoDetectCommand.get()) {
+            String cmd = detectCommand(line);
+            if (cmd != null) detectedCommand = cmd;
+        }
+
+        // Some servers hide the actual word in the hover text of the prompt.
+        String prompt = hover != null && !hover.isBlank() && !lower.contains(hover.toLowerCase(Locale.ROOT))
+            ? line + " : " + hover : line;
+        ChatGameSolver.Answer answer = solver.solve(prompt, wordProblems.get());
+        if (answer != null && !games.get() && answer.kind() != ChatGameSolver.Kind.MATH
+            && answer.kind() != ChatGameSolver.Kind.TRIVIA) {
+            answer = null;
+        }
+        if (answer == null && !looksLikeGame(lower)) return;
+
+        pendingQuestion = line;
+        pendingQuestionAt = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
+        if (line.equals(lastPrompt) && now - lastAnswerMs < 15_000) return;
+        if (now - lastAnswerMs < cooldownMs.get()) return;
+
+        if (answer != null) {
+            DebugProbe.trace(id(), "solved", answer.kind() + ": " + answer.text());
+            lastPrompt = line;
+            lastAnswerMs = now;
+            deliver(line, answer.text(), answer.kind().name().toLowerCase(Locale.ROOT));
+        } else if (mode.get() == AnswerMode.AI) {
+            lastPrompt = line;
+            lastAnswerMs = now;
+            askAi(line);
+        } else {
+            DebugProbe.trace(id(), "unsolved", line);
+        }
+    }
+
+    private void askAi(String question) {
+        if (aiInFlight) return;
+        aiInFlight = true;
+        int token = roundToken;
+        AiRouter.ask(aiEndpoint.get(), aiKey.get(), aiModel.get(), question).whenComplete((raw, err) -> {
+            aiInFlight = false;
+            String clean = err == null ? AiRouter.sanitize(raw) : null;
+            if (clean == null) return;
+            Minecraft.getInstance().execute(() -> {
+                if (token == roundToken) deliver(question, clean, "ai");
+            });
+        });
+    }
+
+    private void deliver(String question, String answer, String how) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        if (!autoReply.get()) {
+            AutismClientMessaging.sendPrefixed("§a[ChatGames] §7(" + how + ") §f" + answer);
+            return;
+        }
+        if (ThreadLocalRandom.current().nextInt(100) < skipChance.get()) {
+            DebugProbe.trace(id(), "skipped", question);
+            return;
+        }
+        String prefix = replyPrefix.get().trim();
+        if (prefix.isEmpty() && autoDetectCommand.get()) prefix = detectedCommand;
+        String out = (prefix.isEmpty() ? answer : prefix + " " + answer).trim();
+        // Reading the prompt (~250ms/word) + typing the answer at the configured speed.
+        int words = question.split("\\s+").length;
+        long delay = 400 + words * 120L + out.length() * 1000L / Math.max(3, typeSpeed.get())
+            + ThreadLocalRandom.current().nextLong(500);
+        delay = Math.min(delay, maxDelay.get() * 1000L);
+        int token = roundToken;
+        CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS).execute(() -> mc.execute(() -> {
+            // Someone else already won (or the round ended) while we were "typing".
+            if (!isEnabled() || token != roundToken || mc.getConnection() == null) return;
             if (out.startsWith("/")) mc.getConnection().sendCommand(out.substring(1));
             else mc.getConnection().sendChat(out);
-        } else {
-            AutismClientMessaging.sendPrefixed("§a[ChatGames] §f" + expr + " = §e" + answer);
-        }
+        }));
     }
 
-    /** Detect a '/answer', '/quiz', '/math', '/solve' etc. command in the prompt. */
+    private static boolean looksLikeGame(String lower) {
+        return lower.contains("unscramble") || lower.contains("first to") || lower.contains("trivia")
+            || lower.contains("question") || lower.contains("guess") || lower.contains("quiz") || lower.contains("chat game");
+    }
+
     private static String detectCommand(String text) {
         java.util.regex.Matcher m = java.util.regex.Pattern
-            .compile("/(answer|quiz|math|solve|response|reply|guess)\\b", java.util.regex.Pattern.CASE_INSENSITIVE)
+            .compile("(/(?:answer|quiz|math|solve|response|reply|guess|cg|chatgame))\\b", java.util.regex.Pattern.CASE_INSENSITIVE)
             .matcher(text);
-        if (m.find()) {
-            return "/" + m.group(1).toLowerCase(java.util.Locale.ROOT) + " ";
-        }
-        return null;
+        return m.find() ? m.group(1).toLowerCase(Locale.ROOT) : null;
     }
 
-    /**
-     * Strip AI verbosity down to a clean Minecraft-chat answer. If there's a number anywhere in
-     * the response, return just that number (so "The answer is 42." -> "42"). Otherwise return the
-     * first short token (for non-numeric game answers). Returns null if nothing usable.
-     */
-    private static String sanitizeAnswer(String raw) {
-        if (raw == null) return null;
-        String s = raw.trim();
-        if (s.isEmpty()) return null;
-        // Take only the first line (AI often adds a second sentence).
-        int nl = s.indexOf('\n');
-        if (nl >= 0) s = s.substring(0, nl).trim();
-        // Prefer a standalone number (int or decimal, optional sign) anywhere in the text.
-        java.util.regex.Matcher num = java.util.regex.Pattern
-            .compile("-?\\d+(?:[.,]\\d+)?")
-            .matcher(s);
-        String best = null;
-        while (num.find()) {
-            best = num.group(); // last number tends to be the final answer
+    private static List<String> onlineNames(Minecraft mc) {
+        List<String> out = new ArrayList<>();
+        if (mc.getConnection() == null) return out;
+        for (PlayerInfo pi : mc.getConnection().getOnlinePlayers()) {
+            if (pi.getProfile() != null && pi.getProfile().name() != null) out.add(pi.getProfile().name());
         }
-        if (best != null) {
-            return best.replace(",", "");
-        }
-        // No number: return the first short word/answer (drop filler like "The answer is").
-        String cleaned = s.replaceAll("(?i)^(the answer is|answer:|it's|it is|that is|result:?|approximately|about|=)\\s*", "").trim();
-        // Keep it short (Minecraft chat games expect a single token).
-        String[] parts = cleaned.split("\\s+");
-        if (parts.length > 0 && parts[0].length() <= 24 && !parts[0].isEmpty()) {
-            return parts[0].replaceAll("[^\\w.-]", "");
-        }
-        return null;
+        return out;
     }
 
-    /**
-     * Extract the math expression from a chat line: the longest run of digits, operators,
-     * parentheses, dots and spaces that contains at least one digit and one operator.
-     */
-    private static String extractMath(String text) {
-        StringBuilder best = new StringBuilder();
-        StringBuilder cur = new StringBuilder();
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            boolean ok = Character.isDigit(c) || c == '.' || c == '+' || c == '-' || c == '*'
-                || c == '/' || c == '%' || c == '^' || c == '(' || c == ')' || c == ' '
-                || c == '×' || c == '÷' || c == 'x' || c == 'X';
-            if (ok) {
-                cur.append(c);
-            } else {
-                if (isExpression(cur)) best = new StringBuilder(cur);
-                cur.setLength(0);
+    /** Text from any hover tooltip in the message (some servers hide the word there). */
+    private static String hoverText(Component c) {
+        StringBuilder sb = new StringBuilder();
+        collectHover(c, sb, 0);
+        return sb.toString().trim();
+    }
+
+    private static void collectHover(Component c, StringBuilder sb, int depth) {
+        if (c == null || depth > 6) return;
+        HoverEvent h = c.getStyle().getHoverEvent();
+        if (h instanceof HoverEvent.ShowText st && st.value() != null) sb.append(' ').append(st.value().getString());
+        for (Component s : c.getSiblings()) collectHover(s, sb, depth + 1);
+    }
+
+    // ---- word list + trivia persistence ----
+
+    private Path dir() {
+        return autismclient.AutismClientAddon.FOLDER.toPath();
+    }
+
+    private ChatGameSolver buildSolver() {
+        Set<String> words = new LinkedHashSet<>();
+        for (var item : BuiltInRegistries.ITEM) words.add(new net.minecraft.world.item.ItemStack(item).getHoverName().getString());
+        for (var block : BuiltInRegistries.BLOCK) words.add(block.getName().getString());
+        for (var type : BuiltInRegistries.ENTITY_TYPE) words.add(type.getDescription().getString());
+        for (var key : BuiltInRegistries.ITEM.keySet()) words.add(key.getPath().replace('_', ' '));
+        Path custom = dir().resolve("chatgames-words.txt");
+        try {
+            if (!Files.exists(custom)) {
+                Files.createDirectories(custom.getParent());
+                Files.writeString(custom, "# One word or phrase per line. Used for unscramble / fill-in games.\n", StandardCharsets.UTF_8);
             }
-        }
-        if (isExpression(cur)) best = new StringBuilder(cur);
-        if (best.length() == 0) return null;
-        return best.toString().trim();
+            for (String l : Files.readAllLines(custom, StandardCharsets.UTF_8)) if (!l.startsWith("#")) words.add(l);
+        } catch (Exception ignored) {}
+        ChatGameSolver s = new ChatGameSolver(words);
+        try {
+            Path f = dir().resolve("chatgames-learned.json");
+            if (Files.exists(f)) {
+                Map<String, String> learned = new Gson().fromJson(Files.readString(f, StandardCharsets.UTF_8),
+                    new TypeToken<Map<String, String>>() {}.getType());
+                if (learned != null) learned.forEach((q, a) -> { s.learn(q, a); s.addWord(a); });
+            }
+        } catch (Exception ignored) {}
+        return s;
     }
 
-    private static boolean isExpression(StringBuilder sb) {
-        String s = sb.toString();
-        boolean digit = false, op = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (Character.isDigit(c)) digit = true;
-            if (c == '+' || c == '*' || c == '/' || c == '%' || c == '^' || c == '×' || c == '÷') op = true;
-        }
-        return digit && op;
+    private void saveTrivia() {
+        if (solver == null) return;
+        try {
+            Path f = dir().resolve("chatgames-learned.json");
+            Files.createDirectories(f.getParent());
+            Files.writeString(f, new Gson().toJson(solver.triviaSnapshot()), StandardCharsets.UTF_8);
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public String info() {
+        return solver == null ? "" : solver.triviaSnapshot().size() + " learned";
     }
 }

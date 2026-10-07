@@ -37,7 +37,10 @@ public final class FakePlayerModule extends Module {
     @Override
     public void onEnable() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
+        if (mc.level == null || mc.player == null) {
+            setEnabledSilently(false); // no world = no decoy; stay consistent instead of "on but empty"
+            return;
+        }
 
         String name = playerName.get();
         if (name == null || name.isBlank()) name = "FakePlayer";

@@ -40,8 +40,14 @@ public final class AutoSmeltModule extends Module {
             "Runs open furnaces for you: pull output, refuel, feed input.");
     }
 
+    // Stepped move state: 0 = idle, 1 = place into dst, 2 = return leftovers to src.
+    private int moveStep = 0;
+    private int moveSrc = -1, moveDst = -1;
+
     @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    public void onGameLeft() {
+        moveStep = 0; moveSrc = -1; moveDst = -1; cooldown = 0;
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
@@ -51,10 +57,29 @@ public final class AutoSmeltModule extends Module {
         if (cooldown > 0) { cooldown--; return; }
 
         AbstractContainerMenu raw = mc.player.containerMenu;
-        if (!(raw instanceof AbstractFurnaceMenu menu) || mc.gui.screen() == null) return;
+        if (!(raw instanceof AbstractFurnaceMenu menu) || mc.gui.screen() == null) {
+            moveStep = 0; // menu closed mid-move
+            return;
+        }
+        // Finish an in-flight move first: one click per delay tick, like a human - the old
+        // moveTo fired all 3 clicks in the same tick despite the delay setting.
+        // Each click books the shared APM budget; denied = retry next tick, state unchanged.
+        if (moveStep == 1) {
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
+            click(mc, menu, moveDst, ContainerInput.PICKUP);
+            moveStep = mc.player.containerMenu.getCarried().isEmpty() ? 0 : 2;
+            return;
+        }
+        if (moveStep == 2) {
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
+            click(mc, menu, moveSrc, ContainerInput.PICKUP);
+            moveStep = 0;
+            return;
+        }
 
         // 1. Output ready -> pull it.
         if (pullOutput.get() && menu.slots.get(2).hasItem()) {
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
             click(mc, menu, 2, ContainerInput.QUICK_MOVE);
             return;
         }
@@ -64,6 +89,7 @@ public final class AutoSmeltModule extends Module {
             int fuelSlot = findPlayerSlot(menu, stack -> stack.is(Items.COAL)
                 || stack.is(Items.CHARCOAL) || stack.is(Items.COAL_BLOCK));
             if (fuelSlot >= 0) {
+                if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
                 moveTo(mc, menu, fuelSlot, 1);
                 return;
             }
@@ -73,6 +99,7 @@ public final class AutoSmeltModule extends Module {
         if (feedInput.get() && !menu.slots.get(0).hasItem()) {
             int inSlot = findPlayerSlot(menu, this::isSmeltable);
             if (inSlot >= 0) {
+                if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
                 moveTo(mc, menu, inSlot, 0);
             }
         }
@@ -97,19 +124,17 @@ public final class AutoSmeltModule extends Module {
         return -1;
     }
 
-    /** Pickup src -> drop into dst -> return leftovers (3 clicks max, one per tick chain). */
+    /** Pickup src now; the place + leftover-return clicks run on later ticks via moveStep. */
     private void moveTo(Minecraft mc, AbstractContainerMenu menu, int src, int dst) {
+        moveSrc = src;
+        moveDst = dst;
+        moveStep = 1;
         click(mc, menu, src, ContainerInput.PICKUP);
-        click(mc, menu, dst, ContainerInput.PICKUP);
-        // Any remainder goes back where it came from.
-        if (!mc.player.containerMenu.getCarried().isEmpty()) {
-            click(mc, menu, src, ContainerInput.PICKUP);
-        }
     }
 
     private void click(Minecraft mc, AbstractContainerMenu menu, int slot, ContainerInput type) {
         ContainerMutex.notifyContainerAction();
         mc.gameMode.handleContainerInput(menu.containerId, slot, 0, type, mc.player);
-        cooldown = delayTicks.get();
+        cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get());
     }
 }

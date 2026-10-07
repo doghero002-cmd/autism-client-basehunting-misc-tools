@@ -30,10 +30,7 @@ public final class TranslationEngine {
     private static final Duration TIMEOUT = Duration.ofSeconds(8L);
     private static final int CACHE_CAP = 1000;
 
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-        .connectTimeout(TIMEOUT)
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build();
+    private static final HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
 
     private static final ExecutorService POOL = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "Translate");

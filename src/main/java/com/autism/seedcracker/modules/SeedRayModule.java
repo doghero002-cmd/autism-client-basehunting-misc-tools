@@ -209,7 +209,9 @@ public final class SeedRayModule extends Module {
     }
 
     private static long key(ChunkPos pos) {
-        return (long) pos.x() + ((long) pos.z() << 32);
+        // Mask x: with plain addition a negative x sign-extends into z's bits, so e.g.
+        // (-1, 5) and (-1+2^32... ) chunk pairs collide and dedupe wrong chunks.
+        return (pos.x() & 0xFFFFFFFFL) | ((long) pos.z() << 32);
     }
 
     /** Ore predicate without the registry string round-trip (the old getKey().contains("_ore")). */

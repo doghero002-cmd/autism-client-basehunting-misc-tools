@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'gpucrack'
+version = '1.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.jocl:jocl:2.0.5'
+}
+
+application {
+    mainClass = 'gpucrack.Main'
+}
+
+// Self-contained fat jar without the shadow plugin (one fewer build dependency).
+jar {
+    manifest {
+        attributes 'Main-Class': 'gpucrack.Main'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}

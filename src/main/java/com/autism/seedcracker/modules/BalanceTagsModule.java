@@ -52,8 +52,7 @@ public final class BalanceTagsModule extends Module {
     private final ColorSetting accent = add(new ColorSetting("hud-accent", "HUD accent", 0xFF54D66A).group("HUD"));
     private final BoolSetting showHp = add(new BoolSetting("show-hp", "Show HP", true).group("HUD"));
 
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(8)).build();
+    private static final HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
 
     /** name -> balance; null-entry semantics via FAILED set. */
     private final Map<String, Long> balances = new ConcurrentHashMap<>();
@@ -72,6 +71,7 @@ public final class BalanceTagsModule extends Module {
         // Keep the balance cache across toggles (it's session intel); reset alerts + failures.
         failed.clear();
         alerted.clear();
+        cachedKey = null; // re-resolve in case the user edited the key while disabled
     }
 
     @Override
@@ -142,16 +142,27 @@ public final class BalanceTagsModule extends Module {
             AutismClientMessaging.sendPrefixed("§6[BalanceTags] §f" + name + " is worth §a" + formatMoney(bal) + "§f!"));
     }
 
+    /** Resolved key cache - resolveApiKey() used to hit the disk every tick (20 reads/s). */
+    private volatile String cachedKey;
+    private long keyResolvedMs;
+
     private String resolveApiKey() {
+        long now = System.currentTimeMillis();
+        String cached = cachedKey;
+        if (cached != null && now - keyResolvedMs < 30_000) return cached;
         String own = text("api-key").trim();
-        if (!own.isEmpty()) return own;
-        // Fall back to the key the AH modules save to disk.
-        try {
-            java.nio.file.Path f = autismclient.AutismClientAddon.FOLDER.toPath()
-                .resolve("donut-ah").resolve("api-key.txt");
-            if (java.nio.file.Files.exists(f)) return java.nio.file.Files.readString(f).trim();
-        } catch (Throwable ignored) {}
-        return "";
+        String resolved = own;
+        if (resolved.isEmpty()) {
+            // Fall back to the key the AH modules save to disk.
+            try {
+                java.nio.file.Path f = autismclient.AutismClientAddon.FOLDER.toPath()
+                    .resolve("donut-ah").resolve("api-key.txt");
+                if (java.nio.file.Files.exists(f)) resolved = java.nio.file.Files.readString(f).trim();
+            } catch (Throwable ignored) {}
+        }
+        cachedKey = resolved;
+        keyResolvedMs = now;
+        return resolved;
     }
 
     static String formatMoney(long money) {

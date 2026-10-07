@@ -72,7 +72,9 @@ public final class PrimeChunkFinderModule extends Module {
     }
 
     @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    public void onGameLeft() {
+        scanned.clear(); // unbounded growth across worlds otherwise
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override

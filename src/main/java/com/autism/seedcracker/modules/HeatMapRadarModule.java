@@ -82,11 +82,14 @@ public final class HeatMapRadarModule extends Module {
             if (persist.get()) load();
         }
 
-        // Record the current chunk.
+        // Record the current chunk. Also mark dirty when a revisit meaningfully advances the
+        // timestamp (not just new chunks) - otherwise refreshed visits never hit disk and get
+        // pruned by max-age using the stale saved time. 60s hysteresis avoids dirtying per tick.
         ChunkPos cp = mc.player.chunkPosition();
         long packed = pack(cp.x(), cp.z());
-        Long prev = visited.put(packed, System.currentTimeMillis());
-        if (prev == null) dirty = true;
+        long nowMs = System.currentTimeMillis();
+        Long prev = visited.put(packed, nowMs);
+        if (prev == null || nowMs - prev > 60_000L) dirty = true;
 
         // Prune stale entries once a second.
         if (++saveTicks % 20 == 0) {

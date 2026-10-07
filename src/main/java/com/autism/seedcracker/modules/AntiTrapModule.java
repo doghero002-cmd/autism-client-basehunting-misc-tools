@@ -58,7 +58,10 @@ public final class AntiTrapModule extends Module {
         if (cooldownTicks > 0) { cooldownTicks--; return; }
 
         List<Entity> targets = new ArrayList<>();
-        double rSq = (double) range.get() * range.get();
+        // Clamp to vanilla survival reach: slider goes to 10, but attacking past ~4.5 blocks
+        // is an instant reach flag on any anticheat (and the server rejects the hit anyway).
+        double reach = Math.min(range.get(), 4.5);
+        double rSq = reach * reach;
         for (Entity e : mc.level.entitiesForRendering()) {
             if (e == null || !e.isAlive()) continue;
             if (!isTarget(e)) continue;

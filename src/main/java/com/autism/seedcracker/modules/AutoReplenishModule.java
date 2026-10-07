@@ -70,13 +70,25 @@ public final class AutoReplenishModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
         // Never fight an open container screen (chest stealer / shop flows own the clicks there).
-        if (mc.gui.screen() != null && moveStep == 0) return;
+        if (mc.gui.screen() != null) {
+            // A screen opened mid-sequence: the server is now tracking the container menu, so
+            // our inventoryMenu clicks would desync (or dump the cursor stack into the chest).
+            // Abort cleanly and retry once the screen closes.
+            if (moveStep > 0 || mc.player.containerMenu != mc.player.inventoryMenu) {
+                moveStep = 0;
+                moveFromSlot = -1;
+                moveToSlot = -1;
+            }
+            return;
+        }
         if (cooldown > 0) { cooldown--; return; }
 
         AbstractContainerMenu menu = mc.player.inventoryMenu;
 
         // Mid-move: finish the 3-click sequence regardless of held-stack state.
+        // Each click books the shared APM budget; denied = retry next tick, state unchanged.
         if (moveStep > 0) {
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
             switch (moveStep) {
                 case 1 -> { clickSlot(mc, menu, moveFromSlot); moveStep = 2; }
                 case 2 -> { clickSlot(mc, menu, moveToSlot); moveStep = 3; }
@@ -88,7 +100,7 @@ public final class AutoReplenishModule extends Module {
                     moveToSlot = -1;
                 }
             }
-            cooldown = clickDelay.get();
+            cooldown = com.autism.seedcracker.util.Humanizer.delay(clickDelay.get());
             return;
         }
 
@@ -106,7 +118,7 @@ public final class AutoReplenishModule extends Module {
                 ItemStack s = mc.player.getInventory().getItem(i);
                 if (!s.isEmpty() && ItemStack.isSameItemSameComponents(s, held) && s.getCount() > held.getCount()) {
                     InvSync.select(mc, i);
-                    cooldown = 5;
+                    cooldown = com.autism.seedcracker.util.Humanizer.delay(5);
                     return;
                 }
             }
@@ -120,7 +132,7 @@ public final class AutoReplenishModule extends Module {
             moveFromSlot = inv;
             moveToSlot = 36 + selected;
             moveStep = 1;
-            cooldown = clickDelay.get();
+            cooldown = com.autism.seedcracker.util.Humanizer.delay(clickDelay.get());
             return;
         }
     }

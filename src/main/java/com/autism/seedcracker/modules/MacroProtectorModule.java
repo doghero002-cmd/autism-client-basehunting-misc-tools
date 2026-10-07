@@ -49,11 +49,12 @@ public final class MacroProtectorModule extends Module {
     /** Modules that must be shut down on a control check (automation that would expose a macro). */
     private static final java.util.Set<String> AUTOMATION_IDS = java.util.Set.of(
         "TunnelBaseFinderModule", "TunnelBaseWaterModule", "SchematicBuilderModule",
-        "AutoMineModule", "AutoEatModule", "AutoToolModule", "AutoFireworkModule",
-        "KeyPearlModule", "BoneDropperModule", "NetherTunnelFinderModule",
-        "DonutRTPStashFinderModule", "RelogLoaderModule", "AutoTPAModule", "ShopBuyerModule",
+        "AutoMineModule", "AutoEatModule", "AutoToolModule",
+        "BoneDropperModule", "NetherTunnelFinderModule", "ShopBuyerModule",
         "AHSniperModule", "AHFlipperModule", "AhSellModule", "TPASpammerModule",
-        "AntiAFKModule", "SpawnerProtectModule", "QuickMacroModule");
+        "AntiAFKModule", "SpawnerProtectModule",
+        "ChestStealerModule", "AutoStoreModule", "AutoReplenishModule", "AutoSmeltModule",
+        "HomeMetaModule");
 
     private long lastTripMs = 0;
 
@@ -68,12 +69,14 @@ public final class MacroProtectorModule extends Module {
 
     @Override
     public boolean onPacketReceive(Packet<?> packet) {
+        // This hook runs on the NETTY thread; trip() disables arbitrary modules whose onDisable
+        // touches renderers/keybinds - hop to the main thread first.
         if (packet instanceof ClientboundPlayerRotationPacket) {
-            if (onRotation.get()) trip("forced rotation");
+            if (onRotation.get()) Minecraft.getInstance().execute(() -> trip("forced rotation"));
         } else if (packet instanceof ClientboundSetHeldSlotPacket) {
-            if (onSlot.get()) trip("forced hotbar slot");
+            if (onSlot.get()) Minecraft.getInstance().execute(() -> trip("forced hotbar slot"));
         } else if (packet instanceof ClientboundPlayerPositionPacket) {
-            if (onTeleport.get()) trip("server teleport");
+            if (onTeleport.get()) Minecraft.getInstance().execute(() -> trip("server teleport"));
         }
         return false;
     }

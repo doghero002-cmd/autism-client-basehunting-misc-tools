@@ -39,16 +39,25 @@ public final class SprintModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         mc.player.setSprinting(wasSprinting);
-        if (holdKey.get()) {
-            mc.options.keySprint.setDown(false);
-        }
+        // Always release: toggling hold-key off mid-run left the key stuck down.
+        mc.options.keySprint.setDown(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        mc.player.setSprinting(true);
+        // Only force sprint when vanilla would allow it: re-setting while vanilla unsets (hungry,
+        // using item, sneaking, stationary) flip-flops START/STOP_SPRINTING packets every tick.
+        boolean movingForward = mc.player.input != null && mc.player.input.keyPresses.forward();
+        boolean canSprint = movingForward
+            && !mc.player.isSprinting()
+            && !mc.player.isUsingItem()
+            && !mc.player.isShiftKeyDown()
+            && mc.player.getFoodData().getFoodLevel() > 6;
+        if (canSprint) {
+            mc.player.setSprinting(true);
+        }
         if (holdKey.get()) {
             mc.options.keySprint.setDown(true);
         }

@@ -64,7 +64,8 @@ public final class HomeMetaModule extends Module {
         }
         long now = System.currentTimeMillis();
         if (now < nextAtMs) return;
-        long delayMs = (long) (delay.get() * 1000.0);
+        // Jittered: exact fixed gaps between sethome/rtp/home read as a scripted chain in logs.
+        long delayMs = com.autism.seedcracker.util.Humanizer.delayMs((long) (delay.get() * 1000.0));
 
         switch (step) {
             case SETHOME -> {

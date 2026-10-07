@@ -57,6 +57,9 @@ public final class CoordinateProtectorModule extends Module {
         String text = null;
         if (packet instanceof net.minecraft.network.protocol.game.ServerboundChatPacket chat) {
             text = chat.message();
+        } else if (packet instanceof net.minecraft.network.protocol.game.ServerboundChatCommandPacket cmd) {
+            // /msg, /r, /party etc. leak coords through the COMMAND packet, not plain chat.
+            text = cmd.command();
         }
         if (text == null) return false;
 

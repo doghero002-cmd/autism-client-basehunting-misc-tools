@@ -56,6 +56,9 @@ public final class HoleEspModule extends Module {
 
     /** chunkKey -> set of holes (box + depth + is1x1). */
     private final Map<Long, Set<Hole>> chunkHoles = new ConcurrentHashMap<>();
+    /** chunkKey -> last scan time; rescan after RESCAN_MS so new/filled holes refresh. */
+    private final Map<Long, Long> scannedAt = new ConcurrentHashMap<>();
+    private static final long RESCAN_MS = 10_000;
     private int tickCounter = 0;
 
     private record Hole(AABB box, int depth, boolean is1x1) {}
@@ -112,6 +115,9 @@ public final class HoleEspModule extends Module {
 
         // Budget: 2 chunks per pass. The old loop scanned EVERY missing chunk in one tick, so
         // entering new terrain (or enabling) froze a frame on millions of block reads.
+        // Rescan on a timer: contains-only never refreshed, so newly dug holes stayed invisible
+        // and filled holes stayed highlighted until you left and came back.
+        long now = System.currentTimeMillis();
         int budget = 2;
         outer:
         for (int dx = -r; dx <= r; dx++) {
@@ -119,11 +125,17 @@ public final class HoleEspModule extends Module {
                 int cx = pcx + dx, cz = pcz + dz;
                 if (!mc.level.hasChunk(cx, cz)) continue;
                 long key = ((long) cx << 32) | (cz & 0xffffffffL);
-                if (chunkHoles.containsKey(key)) continue;
+                Long last = scannedAt.get(key);
+                if (last != null && now - last < RESCAN_MS) continue;
+                scannedAt.put(key, now);
                 chunkHoles.put(key, scanChunk(mc, cx, cz));
                 if (--budget <= 0) break outer;
             }
         }
+        scannedAt.keySet().removeIf(key -> {
+            int kx = (int) (key >> 32), kz = (int) (long) key;
+            return Math.abs(kx - pcx) > r + 1 || Math.abs(kz - pcz) > r + 1;
+        });
     }
 
     private Set<Hole> scanChunk(Minecraft mc, int cx, int cz) {

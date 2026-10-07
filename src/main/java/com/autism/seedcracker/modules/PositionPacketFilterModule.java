@@ -40,9 +40,23 @@ public final class PositionPacketFilterModule extends Module {
 
     @Override
     public boolean onPacketReceive(Packet<?> packet) {
-        if (!(packet instanceof ClientboundEntityPositionSyncPacket sync)) return false;
+        // All three entity-position carriers: sync, initial spawn, and teleport - filtering only
+        // sync left NaN spawn/teleport coords through, defeating the anti-crash purpose.
+        Vec3 pos;
+        int entityId;
+        if (packet instanceof ClientboundEntityPositionSyncPacket sync) {
+            pos = sync.values().position();
+            entityId = sync.id();
+        } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundAddEntityPacket add) {
+            pos = new Vec3(add.getX(), add.getY(), add.getZ());
+            entityId = add.getId();
+        } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket tp) {
+            pos = tp.change().position();
+            entityId = tp.id();
+        } else {
+            return false;
+        }
 
-        Vec3 pos = sync.values().position();
         boolean bad = false;
         if (filterNaN.get()
             && (!Double.isFinite(pos.x) || !Double.isFinite(pos.y) || !Double.isFinite(pos.z))) {
@@ -57,7 +71,7 @@ public final class PositionPacketFilterModule extends Module {
         dropped++;
         if (logDrops.get() && dropped % 20 == 1) { // sample the log: these can spam
             FlagLog.warn("POSFILTER", "PositionFilter",
-                "dropped entity pos id=" + sync.id() + " pos=" + pos + " (total " + dropped + ")");
+                "dropped entity pos id=" + entityId + " pos=" + pos + " (total " + dropped + ")");
         }
         return true; // cancel
     }

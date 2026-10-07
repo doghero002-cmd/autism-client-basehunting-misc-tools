@@ -72,15 +72,17 @@ public final class AHSniperModule extends Module {
         .description("Delay before clicking to buy a matched listing.")
         .group("General"));
     private final IntSetting apiRefreshMs = add(new IntSetting(
-            "api-refresh-ms", "API refresh (ms)", 250, 10, 5000, 10)
-        .description("How often to poll the DonutSMP API in API mode.")
+            "api-refresh-ms", "API refresh (ms)", 500, 150, 5000, 10)
+        .description("Base API poll interval (jittered +-30% so the cadence isn't a metronome; sub-150ms hammers the API and gets keys rate-limited).")
         .group("API"));
     private final BoolSetting notify = add(new BoolSetting(
             "notify", "Notifications", true)
         .description("Chat notifications for finds / errors.")
         .group("General"));
+    private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
+        .description("Trace snipe/verify phases to chat + /flaglog.").group("General"));
 
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final HttpClient http = com.autism.seedcracker.util.Http.CLIENT;
 
     private int delayCounter;
     private boolean isProcessing;
@@ -89,6 +91,12 @@ public final class AHSniperModule extends Module {
     private int auctionPageCounter = -1;
     private String currentSeller = "";
     private long lastApiCall;
+    private long nextApiGap = 500; // jittered per-poll
+    private boolean warnedUnparseable; // once per enable, not per scan
+    /** Pending purchase verification: target-item count before the buy click. */
+    private int preBuyCount = -1;
+    private int verifyTicks = 0;
+    private double pendingPrice = -1;
 
     public AHSniperModule() {
         super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper",
@@ -114,6 +122,10 @@ public final class AHSniperModule extends Module {
         auctionPageCounter = -1;
         currentSeller = "";
         lastApiCall = 0;
+        warnedUnparseable = false;
+        preBuyCount = -1;
+        verifyTicks = 0;
+        pendingPrice = -1;
     }
 
     @Override
@@ -130,12 +142,45 @@ public final class AHSniperModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
+        com.autism.seedcracker.util.DebugProbe.setEnabled(id(), debug.get());
+        com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state",
+            (preBuyCount >= 0 ? "VERIFY(" + verifyTicks + "t)" : isAuctionSniping ? "SNIPING " + currentSeller
+                : mode.get() == Mode.API ? "API_POLL" : "MANUAL")
+                + (isProcessing ? " processing" : ""));
+        // Purchase verification: the buy click is only "bought" once the item count actually
+        // rose in our inventory. A vanished listing (someone sniped it first) reports honestly.
+        if (preBuyCount >= 0) {
+            int now = countOf(mc, resolveItem());
+            if (now > preBuyCount) {
+                if (notify.get()) send("§a[AH Sniper] Purchase CONFIRMED (+" + (now - preBuyCount) + ")"
+                    + (pendingPrice >= 0 ? " for " + formatPrice(pendingPrice) : "") + ".");
+                preBuyCount = -1;
+                pendingPrice = -1;
+            } else if (--verifyTicks <= 0) {
+                if (notify.get()) send("§e[AH Sniper] Purchase NOT confirmed - listing likely sniped or GUI stale.");
+                preBuyCount = -1;
+                pendingPrice = -1;
+            } else {
+                return; // keep waiting before doing anything else
+            }
+        }
         if (delayCounter > 0) {
             delayCounter--;
             return;
         }
         if (mode.get() == Mode.API) handleApiMode(mc);
         else handleManualMode(mc);
+    }
+
+    /** Total of the target item across the player inventory. */
+    private static int countOf(Minecraft mc, Item item) {
+        if (item == null) return 0;
+        int n = 0;
+        for (int i = 0; i < 36; i++) {
+            ItemStack s = mc.player.getInventory().getItem(i);
+            if (!s.isEmpty() && s.is(item)) n += s.getCount();
+        }
+        return n;
     }
 
     // ---- MANUAL mode (drive the open /ah GUI) ----
@@ -159,7 +204,8 @@ public final class AHSniperModule extends Module {
         if (!isAuctionSniping) {
             if (apiQueryInProgress) return;
             long now = System.currentTimeMillis();
-            if (now - lastApiCall < apiRefreshMs.get()) return;
+            if (now - lastApiCall < nextApiGap) return;
+            nextApiGap = com.autism.seedcracker.util.Humanizer.delayMs(apiRefreshMs.get());
             lastApiCall = now;
             String key = apiKey.get().trim();
             if (key.isEmpty()) {
@@ -210,18 +256,28 @@ public final class AHSniperModule extends Module {
             if (!isValidAuctionItem(stack)) continue;
 
             double listingPrice = readListingPrice(stack);
-            if (listingPrice >= 0 && listingPrice > maxPrice) continue;
+            if (listingPrice > maxPrice) continue;
+            // Fail closed: an unparseable price means we CANNOT verify it's under budget - buying
+            // blind is how you pay 10x market for a renamed item.
+            if (listingPrice < 0) {
+                if (notify.get() && !warnedUnparseable) {
+                    warnedUnparseable = true;
+                    send("§e[AH Sniper] Skipping " + itemName(stack) + " - price not readable from the lore.");
+                }
+                continue;
+            }
 
             if (isProcessing) {
+                preBuyCount = countOf(mc, target); // snapshot BEFORE the click for verification
+                pendingPrice = listingPrice;
+                verifyTicks = 40; // 2s for the server to deliver the item
                 click(mc, menu, i);
                 isProcessing = false;
-                delayCounter = Math.max(1, refreshDelay.get());
-                if (notify.get()) send("§a[AH Sniper] Bought " + itemName(stack) +
-                    (listingPrice >= 0 ? " for " + formatPrice(listingPrice) : "") + ".");
+                delayCounter = com.autism.seedcracker.util.Humanizer.delay(Math.max(1, refreshDelay.get()));
                 return;
             }
             isProcessing = true;
-            delayCounter = Math.max(1, buyDelay.get());
+            delayCounter = com.autism.seedcracker.util.Humanizer.delay(Math.max(1, buyDelay.get()));
             return;
         }
 
@@ -301,41 +357,18 @@ public final class AHSniperModule extends Module {
         return !stack.isEmpty();
     }
 
-    /** Best-effort listing price read from the item's hover name / lore. -1 if unknown. */
+    /** Listing price from price-looking lore lines only (shared anchored parser) - the old
+     *  "lowest number anywhere" matched enchant levels and stack counts. -1 if unknown. */
     private double readListingPrice(ItemStack stack) {
-        try {
-            String name = stack.getHoverName().getString();
-            java.util.List<net.minecraft.network.chat.Component> tooltip = stack.getTooltipLines(
-                net.minecraft.world.item.Item.TooltipContext.EMPTY, Minecraft.getInstance().player,
-                net.minecraft.world.item.TooltipFlag.Default.NORMAL);
-            StringBuilder sb = new StringBuilder(name);
-            for (net.minecraft.network.chat.Component c : tooltip) sb.append(' ').append(c.getString());
-            java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("\\$?([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*([kKmM])?")
-                .matcher(sb.toString());
-            double best = -1;
-            while (m.find()) {
-                double v = Double.parseDouble(m.group(1).replace(",", ""));
-                String suffix = m.group(2);
-                if (suffix != null) {
-                    if (suffix.equalsIgnoreCase("k")) v *= 1_000;
-                    else if (suffix.equalsIgnoreCase("m")) v *= 1_000_000;
-                }
-                if (best < 0 || v < best) best = v;
-            }
-            return best;
-        } catch (Exception e) {
-            return -1;
-        }
+        return com.autism.seedcracker.market.ListingPriceParser.parse(stack);
     }
 
     private Item resolveItem() {
-        try {
-            Identifier id = Identifier.parse(itemId.get().trim());
-            return BuiltInRegistries.ITEM.getValue(id);
-        } catch (Exception e) {
-            return null;
-        }
+        // tryParse+getOptional: getValue() returns AIR for unknown ids, so a typo'd item id
+        // silently sniped for AIR matches (never buys, no error).
+        Identifier id = Identifier.tryParse(itemId.get().trim());
+        if (id == null) return null;
+        return BuiltInRegistries.ITEM.getOptional(id).orElse(null);
     }
 
     private String prettyItemName() {
@@ -363,20 +396,10 @@ public final class AHSniperModule extends Module {
         else mc.getConnection().sendCommand(command);
     }
 
-    /** Parse "1k"/"2.5m"/plain numbers into a price, or -1 on error. */
+    /** Parse "1k"/"2.5m"/"1b"/plain numbers into a price, or -1 on error (shared parser). */
     static double parsePrice(String raw) {
         if (raw == null) return -1;
-        String s = raw.trim().toLowerCase(Locale.ROOT).replace(",", "").replace("$", "");
-        if (s.isEmpty()) return -1;
-        double mult = 1;
-        if (s.endsWith("k")) { mult = 1_000; s = s.substring(0, s.length() - 1); }
-        else if (s.endsWith("m")) { mult = 1_000_000; s = s.substring(0, s.length() - 1); }
-        try {
-            double v = Double.parseDouble(s) * mult;
-            return v < 0 ? -1 : v;
-        } catch (NumberFormatException e) {
-            return -1;
-        }
+        return com.autism.seedcracker.util.pure.PriceMath.parseAmount(raw.replace("$", ""));
     }
 
     private static String formatPrice(double v) {
