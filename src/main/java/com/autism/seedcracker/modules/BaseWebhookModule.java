@@ -54,6 +54,12 @@ public final class BaseWebhookModule extends Module {
             "Posts a Discord webhook the first time any finder confirms a new base location.");
     }
 
+    /** Grouped into the Finders hub (it's a simple on/off tool); hidden from the main menu. */
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }

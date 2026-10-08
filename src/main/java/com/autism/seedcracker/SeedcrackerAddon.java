@@ -156,6 +156,11 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new com.autism.seedcracker.modules.PortalFinderModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.SignFinderModule(), "Finders");
 
+        // The Finders hub bundles the simple set-and-forget finders (Sign/Portal/PlayerChunks/
+        // Structure/BaseWebhook/FinderOverlay) into one menu entry. It must be registered AFTER the
+        // finders it drives, since its constructor looks them up in ModuleLookup.
+        regTab(new com.autism.seedcracker.modules.FindersModule(), "Finders");
+
         // Zelith entity / fake modules (ported), each under its own tab.
         regTab(new EntityScannerModule(), "Entity");
         regTab(new com.autism.seedcracker.modules.VisualRangeModule(), "Entity");

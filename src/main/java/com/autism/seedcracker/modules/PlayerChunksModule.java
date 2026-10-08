@@ -55,6 +55,12 @@ public final class PlayerChunksModule extends Module {
             "Caches every other player's chunk positions - loiter clusters reveal their base.");
     }
 
+    /** Grouped into the Finders hub (it's a simple on/off tool); hidden from the main menu. */
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onEnable() {
         // Keep the cache across toggles ON PURPOSE (it's intel); only sampling resets.

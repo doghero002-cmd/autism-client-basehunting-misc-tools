@@ -59,7 +59,7 @@ This addon bundles base-finding, stash scouting, seed-cracking, and utility tool
 | Section | Included tools |
 | --- | --- |
 | **Core** | Seedcracker, Bedrock Finder, Texture Cracker, Donut RTP Stash Finder, Relog Loader |
-| **Finders** | Netherite Finder, Stash Finder, Chunk Finder, Spawner Finder, SusChunk Finder (DOGS/GEODE/BETA/… modes), SeedRay, Finder Overlay, Player Chunks, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Base Webhook, Chunk Keeper, Base Log Browser, Tunnel Base Finder (CRAWL/STANDING/AMETHYST mining styles), Nether Tunnel Finder, Structure Detector |
+| **Finders** | **Finders hub** (one entry bundling the simple set-and-forget finders: Sign, Portal, Player Chunks, Structure Detector, Base Webhook, Finder Overlay), Netherite Finder, Stash Finder, Chunk Finder, Spawner Finder, SusChunk Finder (DOGS/GEODE/BETA/… modes), SeedRay, Seed Map, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Chunk Keeper, Base Log Browser, Tunnel Base Finder (CRAWL/STANDING/AMETHYST mining styles), Nether Tunnel Finder |
 | **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, Spawner Protect |
 | **Render** | AutoRender, PaperRig, Scoreboard Hider, Storage Recorder |
 | **Fake** | Fake Identity (fake /pay, fake incoming payments, fake rank — one module), Fake Player |

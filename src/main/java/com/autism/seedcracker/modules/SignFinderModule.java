@@ -46,6 +46,12 @@ public final class SignFinderModule extends Module {
             "Highlights signs and reads their text (signs never generate in the wild - all player-placed).");
     }
 
+    /** Grouped into the Finders hub (it's a simple on/off tool); hidden from the main menu. */
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onDisable() {
         BlockEspRenderer.clear(id());
