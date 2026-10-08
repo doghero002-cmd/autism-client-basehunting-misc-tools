@@ -32,6 +32,12 @@ public final class FinderOverlayModule extends Module {
             "Condenses flooded finder-flag areas to the most-overlapped hotspot chunks.");
     }
 
+    /** Grouped into the Finders hub (it's a simple on/off tool); hidden from the main menu. */
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onEnable() {
         ChunkFlagRenderer.configureSmartOverlap(true, overlapModules.get(), floodChunks.get());

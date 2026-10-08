@@ -49,6 +49,12 @@ public final class PortalFinderModule extends Module {
             "Flags chunks with lit nether portals (player infrastructure away from spawn).");
     }
 
+    /** Grouped into the Finders hub (it's a simple on/off tool); hidden from the main menu. */
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onEnable() {
         flagged.clear();

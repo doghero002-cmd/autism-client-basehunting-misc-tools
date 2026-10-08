@@ -78,6 +78,12 @@ public final class StructureDetectorModule extends Module {
             "Locates natural structures via /locate so they aren't mistaken for player bases.");
     }
 
+    /** Grouped into the Finders hub (it's a simple on/off tool); hidden from the main menu. */
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onEnable() {
         cooldown = autoScan.get() ? 0 : -1;
