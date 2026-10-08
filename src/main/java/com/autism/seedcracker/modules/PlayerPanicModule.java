@@ -41,7 +41,7 @@ public final class PlayerPanicModule extends Module {
         .group("Reaction"));
     private final StringSetting modulesToToggle = add(new StringSetting(
             "modules-to-toggle", "Modules to disable",
-            "tunnel-base-water,netherite-finder,tunnel-base-finder,schematic-builder,mace-pvp")
+            "netherite-finder,tunnel-base-finder,schematic-builder,mace-pvp")
         .description("Comma-separated module name suffixes (the part after the last ':') to disable on threat.")
         .group("Reaction"));
     private final BoolSetting doPanicPay = add(new BoolSetting("panic-pay", "Panic pay", false)

@@ -14,7 +14,6 @@ import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
 import com.autism.seedcracker.compat.ClientNotify;
-import com.autism.seedcracker.compat.ModuleLookup;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
@@ -227,6 +226,30 @@ public final class SusChunkFinderModule extends Module {
         .description("Also count powered observers (noisier: flowing water/crop growth can fire them naturally).")
         .group("Farm").visibleWhen(() -> mode.get() == Mode.FARM));
 
+    // BETA mode: fuses the strongest detector from every other mode and only flags when several
+    // independent signals agree (merged in from the former "Sus Chunk Finder (Beta)" module).
+    private final IntSetting betaThreshold = add(new IntSetting("beta-threshold", "Score to flag", 45, 10, 100, 5)
+        .description("0-100 fused score needed. Storage 45, running redstone 35, deepslate/vines/kelp 25, room/built 20, glow/skulls 15.")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+    private final IntSetting betaMinSignals = add(new IntSetting("beta-min-signals", "Agreeing signals", 2, 1, 5, 1)
+        .description("Independent signals that must agree. 2 = recommended; 1 behaves like the old single-mode finders (noisy).")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+    private final IntSetting betaRescanSeconds = add(new IntSetting("beta-rescan", "Rescan (s)", 20, 2, 300, 1)
+        .description("How often a chunk is re-scored (redstone and flats change, storage rarely does).")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+    private final BoolSetting betaSpread = add(new BoolSetting("beta-spread", "Neighbour heat", true)
+        .description("Chunks next to a flagged chunk get up to +15% (bases sprawl across borders). Never flags a chunk with no evidence.")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+    private final IntSetting betaMaxY = add(new IntSetting("beta-max-y", "Underground below Y", 45, -40, 120, 5)
+        .description("Vines/kelp/rooms only count below this (surface jungles and oceans are natural).")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+    private final BoolSetting betaGlow = add(new BoolSetting("beta-glow", "Amethyst glow", true)
+        .description("Amethyst growth in the chunk (geodes = caves = traffic). Weak on its own by design.")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+    private final BoolSetting betaRedstone = add(new BoolSetting("beta-redstone", "Running redstone", true)
+        .description("Powered repeaters/comparators: a clock is cycling right now.")
+        .group("Beta").visibleWhen(() -> mode.get() == Mode.BETA));
+
     private final Set<ChunkPos> flagged = ConcurrentHashMap.newKeySet();
     private final com.autism.seedcracker.finder.FinderReport reporter =
         new com.autism.seedcracker.finder.FinderReport("Sus", 55);
@@ -237,29 +260,20 @@ public final class SusChunkFinderModule extends Module {
      * got one (looked like the module "stopped registering" until toggled). Advances each call. */
     private int scanOffset = 0;
 
+    // BETA mode state (round-robin fused scanner).
+    private final Map<ChunkPos, com.autism.seedcracker.util.pure.SusScore.Result> betaResults = new java.util.HashMap<>();
+    private final Map<ChunkPos, Long> betaScannedAt = new java.util.HashMap<>();
+    private java.util.List<LevelChunk> betaQueue = java.util.List.of();
+    private int betaQueueIndex;
+    private int betaPruneTicks;
+
     public SusChunkFinderModule() {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder",
             "Flags suspicious chunks. Pick a Mode: GEODE/DOGS (recommended), BETA (fuses every detector, fewest false flags), or the raw single-signal modes.");
     }
 
-    /** The hidden Beta engine module, driven by this module's BETA mode (menu shows one entry). */
-    private Module betaEngine() {
-        return ModuleLookup.get(SeedcrackerAddon.ID + ":sus-chunk-beta");
-    }
-
-    /** Keep the hidden Beta engine running only while this module is on AND in BETA mode. */
-    private void syncBetaEngine() {
-        Module beta = betaEngine();
-        if (beta == null) return;
-        boolean want = isEnabled() && mode.get() == Mode.BETA;
-        if (want != beta.isEnabled()) {
-            try { beta.setEnabled(want); } catch (Throwable ignored) {}
-        }
-    }
-
     @Override
     public void onEnable() {
-        syncBetaEngine();
         flagged.clear();
         notified.clear();
         lastScan.clear();
@@ -271,6 +285,7 @@ public final class SusChunkFinderModule extends Module {
         geodeScanned.clear();
         scanCursorAge.reset();
         scanCursorTunnel.reset();
+        resetBeta();
         if (persistFlags.get()) loadFlags();
     }
 
@@ -289,9 +304,9 @@ public final class SusChunkFinderModule extends Module {
             geodeScanned.clear();
             scanCursorAge.reset();
             scanCursorTunnel.reset();
+            resetBeta();
             ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
         }
-        if ("mode".equals(settingId)) syncBetaEngine();
     }
 
     @Override
@@ -307,7 +322,7 @@ public final class SusChunkFinderModule extends Module {
         geodeVeto.clear();
         geodeScanned.clear();
         ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
-        syncBetaEngine();
+        resetBeta();
     }
 
     // ---- disk persistence (nyx ChunkActivityScanner behaviour) ----
@@ -354,6 +369,7 @@ public final class SusChunkFinderModule extends Module {
         activityFlaggedAt.clear();
         flagged.clear();
         notified.clear();
+        resetBeta();
     }
 
     @Override
@@ -361,15 +377,8 @@ public final class SusChunkFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
-        // BETA mode is a facade: the hidden Beta engine does its own scanning + rendering, so this
-        // module stays out of the way (just make sure the engine is running).
-        if (mode.get() == Mode.BETA) {
-            syncBetaEngine();
-            return;
-        }
-
         switch (mode.get()) {
-            case BETA -> { /* handled above */ }
+            case BETA -> tickBeta(mc);
             case DOGS -> tickDogs(mc);
             case WATER -> tickWater(mc);
             case XENON -> tickXenon(mc);
@@ -383,6 +392,115 @@ public final class SusChunkFinderModule extends Module {
         }
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-sus-chunk-finder", flagged, color.get(), tracer.get());
         reporter.tick(mc, flagged);
+    }
+
+    // ---- BETA mode (fused multi-signal scanner, merged from the old Sus Chunk Finder (Beta)) ----
+
+    private void tickBeta(Minecraft mc) {
+        long now = System.currentTimeMillis();
+        if (betaQueueIndex >= betaQueue.size()) {
+            betaQueue = com.autism.seedcracker.finder.ChunkScanHelper.loadedChunksAround(mc, scanRadius.get());
+            betaQueueIndex = 0;
+        }
+        long rescanMs = betaRescanSeconds.get() * 1000L;
+        int budget = chunksPerTick.get();
+        while (budget > 0 && betaQueueIndex < betaQueue.size()) {
+            LevelChunk chunk = betaQueue.get(betaQueueIndex++);
+            ChunkPos pos = chunk.getPos();
+            Long last = betaScannedAt.get(pos);
+            if (last != null && now - last < rescanMs) continue;
+            betaScannedAt.put(pos, now);
+            budget--;
+            evaluateBeta(chunk);
+        }
+        if (++betaPruneTicks >= 40) {
+            betaPruneTicks = 0;
+            ChunkPos c = mc.player.chunkPosition();
+            int r = scanRadius.get() + 2;
+            java.util.function.Predicate<ChunkPos> far = p -> Math.abs(p.x() - c.x()) > r || Math.abs(p.z() - c.z()) > r;
+            flagged.removeIf(far);
+            notified.removeIf(far);
+            betaResults.keySet().removeIf(far);
+            betaScannedAt.keySet().removeIf(far);
+        }
+    }
+
+    private void evaluateBeta(LevelChunk chunk) {
+        ChunkPos pos = chunk.getPos();
+        int yCut = betaMaxY.get();
+        java.util.Map<com.autism.seedcracker.util.pure.SusScore.Signal, Double> s =
+            new java.util.EnumMap<>(com.autism.seedcracker.util.pure.SusScore.Signal.class);
+
+        int storage = 0;
+        for (net.minecraft.world.level.block.entity.BlockEntity be : chunk.getBlockEntities().values()) {
+            if (be.getBlockPos().getY() <= 50 && isBetaPlayerStorage(be.getBlockState().getBlock())) storage++;
+        }
+        s.put(com.autism.seedcracker.util.pure.SusScore.Signal.STORAGE, com.autism.seedcracker.util.pure.SusScore.ramp(storage, 1));
+        s.put(com.autism.seedcracker.util.pure.SusScore.Signal.ROTATED_DEEPSLATE, com.autism.seedcracker.util.pure.SusScore.ramp(
+            com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, SusChunkFinderModule::isRotatedDeepslate, 6), 3));
+        s.put(com.autism.seedcracker.util.pure.SusScore.Signal.DEEP_VINES, vineRunHit(chunk, 8, yCut, chunk.getMinY()) ? 1.0 : 0);
+        s.put(com.autism.seedcracker.util.pure.SusScore.Signal.DEEP_KELP, kelpBelowY(chunk, Math.min(yCut, 24)) ? 1.0 : 0);
+        s.put(com.autism.seedcracker.util.pure.SusScore.Signal.FLAT_ROOM, flatRoomHit(chunk, 30) ? 1.0 : 0);
+        s.put(com.autism.seedcracker.util.pure.SusScore.Signal.SKULL_CANDLE, com.autism.seedcracker.util.pure.SusScore.ramp(
+            com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, SusChunkFinderModule::isSkullOrCandle, 6), 3));
+        if (betaRedstone.get()) {
+            s.put(com.autism.seedcracker.util.pure.SusScore.Signal.POWERED_REDSTONE, com.autism.seedcracker.util.pure.SusScore.ramp(
+                com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, SusChunkFinderModule::isBetaPoweredClock, 6), 3));
+        }
+        if (betaGlow.get()) {
+            s.put(com.autism.seedcracker.util.pure.SusScore.Signal.GLOW, com.autism.seedcracker.util.pure.SusScore.ramp(
+                com.autism.seedcracker.finder.ChunkScanHelper.countBlocksInChunk(chunk, SusChunkFinderModule::isAmethystGrowth, 24), 12));
+        }
+        // BaseConfidence walks every block; only pay for it when something else already fired.
+        if (s.values().stream().anyMatch(v -> v > 0)) {
+            com.autism.seedcracker.finder.BaseConfidence.Result bc = com.autism.seedcracker.finder.BaseConfidence.score(chunk);
+            s.put(com.autism.seedcracker.util.pure.SusScore.Signal.BUILT, bc.score() >= 60 ? 1.0 : bc.score() >= 35 ? 0.5 : 0);
+        }
+
+        com.autism.seedcracker.util.pure.SusScore.Result r = com.autism.seedcracker.util.pure.SusScore.score(
+            s, betaSpread.get() ? betaNeighbourHeat(pos) : 0, betaThreshold.get(), betaMinSignals.get());
+        betaResults.put(pos, r);
+        if (r.flagged()) {
+            flagged.add(pos);
+            if (notified.add(pos) && notify.get()) {
+                com.autism.seedcracker.finder.FinderNotify.flag("§d[SusBeta]", "Sus chunk X:" + pos.getMinBlockX()
+                    + " Z:" + pos.getMinBlockZ() + " (" + r.score() + ": " + r.why() + ")", true);
+            }
+        } else {
+            flagged.remove(pos);
+        }
+    }
+
+    private int betaNeighbourHeat(ChunkPos pos) {
+        int best = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                com.autism.seedcracker.util.pure.SusScore.Result r = betaResults.get(new ChunkPos(pos.x() + dx, pos.z() + dz));
+                if (r != null && r.flagged()) best = Math.max(best, r.score());
+            }
+        }
+        return best;
+    }
+
+    /** Storage that natural structures never generate (plain chests/spawners are excluded on purpose). */
+    private static boolean isBetaPlayerStorage(Block b) {
+        return b == Blocks.BARREL || b == Blocks.HOPPER || b == Blocks.ENDER_CHEST || b == Blocks.FURNACE
+            || b == Blocks.BLAST_FURNACE || b == Blocks.SMOKER || b == Blocks.ENCHANTING_TABLE || b == Blocks.BEACON
+            || b instanceof net.minecraft.world.level.block.ShulkerBoxBlock;
+    }
+
+    private static boolean isBetaPoweredClock(BlockState s) {
+        return (s.is(Blocks.REPEATER) || s.is(Blocks.COMPARATOR))
+            && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED)
+            && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED);
+    }
+
+    private void resetBeta() {
+        betaResults.clear();
+        betaScannedAt.clear();
+        betaQueue = java.util.List.of();
+        betaQueueIndex = 0;
     }
 
     // ---- NEW_CHUNKS / OLD_CHUNKS mode (Boze NewChunks port) ----
