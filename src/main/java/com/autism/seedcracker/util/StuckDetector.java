@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * module via {@link #setAction}), so the exact looping behaviour can be diagnosed and fixed.
  *
  * Usage (one instance per module):
- *   private final StuckDetector stuck = new StuckDetector("TunnelBaseWaterModule");
+ *   private final StuckDetector stuck = new StuckDetector("TunnelBaseFinderModule");
  *   // in tick(): stuck.setAction("MINING dir=" + currentDirection); stuck.tick(mc);
  *   // the detector auto-logs when the module stops making progress.
  *

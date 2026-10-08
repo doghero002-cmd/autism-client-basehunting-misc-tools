@@ -57,7 +57,6 @@ import com.autism.seedcracker.modules.SprintModule;
 import com.autism.seedcracker.modules.StashFinderModule;
 import com.autism.seedcracker.modules.StructureDetectorModule;
 import com.autism.seedcracker.modules.SusChunkFinderModule;
-import com.autism.seedcracker.modules.TunnelBaseWaterModule;
 import com.autism.seedcracker.modules.SwingSpeedModule;
 import com.autism.seedcracker.modules.TPASpammerModule;
 import com.autism.seedcracker.modules.TabDetectorModule;
@@ -138,7 +137,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new ChunkFinderModule(), "Finders");
         regTab(new SpawnerFinderModule(), "Finders");
         regTab(new SusChunkFinderModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.SusChunkBetaModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.SeedRayModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.SeedMapModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.FinderOverlayModule(), "Finders");
@@ -153,7 +151,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new com.autism.seedcracker.modules.ChunkKeeperModule(), "Finders");
         regTab(new BaseLogBrowserModule(), "Finders");
         regTab(new TunnelBaseFinderModule(), "Finders");
-        regTab(new TunnelBaseWaterModule(), "Finders");
         regTab(new NetherTunnelFinderModule(), "Finders");
         regTab(new StructureDetectorModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.PortalFinderModule(), "Finders");

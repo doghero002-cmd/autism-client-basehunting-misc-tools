@@ -340,7 +340,7 @@ public final class FlagDetectorModule extends Module {
 
     /** Modules that drive automated movement/interaction (used for setback correlation). */
     private static final java.util.Set<String> MOVEMENT_MODULES = java.util.Set.of(
-        "TunnelBaseFinderModule", "TunnelBaseWaterModule", "SchematicBuilderModule",
+        "TunnelBaseFinderModule", "SchematicBuilderModule",
         "AutoMineModule", "SpawnerProtectModule", "AutoToolModule", "AutoEatModule",
         "AutoFireworkModule", "KeyPearlModule", "BoneDropperModule", "NetherTunnelFinderModule",
         "DonutRTPStashFinderModule", "RelogLoaderModule", "AutoTPAModule", "ShopBuyerModule",
