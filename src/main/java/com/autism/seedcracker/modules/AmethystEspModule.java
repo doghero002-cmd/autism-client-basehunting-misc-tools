@@ -40,29 +40,35 @@ public final class AmethystEspModule extends Module {
             "sim-distance", "Sim distance (chunks)", 8, 1, 32, 1)
         .description("Chunk bubble scanned for amethyst geodes.")
         .group("General"));
-    private final IntSetting rescanMs = add(new IntSetting(
-            "rescan-ms", "Rescan delay (ms)", 0, 0, 10000, 100)
-        .description("Delay after enabling before scanning starts (lets chunks load). 0 = scan immediately.")
-        .group("General"));
     private final IntSetting minCluster = add(new IntSetting(
             "min-cluster", "Min cluster size", 3, 1, 20, 1)
         .description("Amethyst blocks needed in a chunk to flag it as a geode.")
         .group("General"));
-    private final BoolSetting blockEsp = add(new BoolSetting("block-esp", "Block ESP", true)
-        .description("Highlight each amethyst block.").group("Render"));
-    private final BoolSetting geodeBox = add(new BoolSetting("geode-box", "Geode box", false)
-        .description("Draw a single bounding box around the whole detected geode.").group("Render"));
-    private final BoolSetting tracer = add(new BoolSetting("tracer", "Show tracers", true)
-        .description("Draw a tracer line to the nearest amethyst block.").group("Render"));
-    private final BoolSetting fill = add(new BoolSetting("fill", "Fill boxes", false)
-        .description("Translucent fill on the amethyst blocks.").group("Render"));
     private final BoolSetting chatAlert = add(new BoolSetting("chat-alert", "Chat alert", true)
         .description("Chat message when a new geode is found.").group("General"));
-    private final BoolSetting bypass = add(new BoolSetting("bypass", "Amethyst bypass (anti-xray)", true)
-        .description("DEFAULT: Anubis AmethystBypass - reveal geodes the server HIDES by scanning chunk-section palettes for amethyst the server declared but stripped (palette leak). Works even when no amethyst is visible in your block view.")
-        .group("Bypass"));
+    private final BoolSetting blockEsp = add(new BoolSetting("block-esp", "Block ESP", true)
+        .description("Highlight each amethyst block.").group("Render"));
+    private final BoolSetting tracer = add(new BoolSetting("tracer", "Show tracers", true)
+        .description("Draw a tracer line to the nearest amethyst block.").group("Render"));
     private final ColorSetting color = add(new ColorSetting("color", "ESP colour", 0xFFB464FF)
         .description("Colour of the amethyst markers.").group("Render"));
+
+    // Advanced: off by default so the panel stays short; flip on to reveal the niche options.
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal extra render/scan options below.").group("General"));
+    private final IntSetting rescanMs = add(new IntSetting(
+            "rescan-ms", "Rescan delay (ms)", 0, 0, 10000, 100)
+        .description("Delay after enabling before scanning starts (lets chunks load). 0 = scan immediately.")
+        .group("Advanced").visibleWhen(showAdvanced::get));
+    private final BoolSetting geodeBox = add(new BoolSetting("geode-box", "Geode box", false)
+        .description("Draw a single bounding box around the whole detected geode.")
+        .group("Advanced").visibleWhen(showAdvanced::get));
+    private final BoolSetting fill = add(new BoolSetting("fill", "Fill boxes", false)
+        .description("Translucent fill on the amethyst blocks.")
+        .group("Advanced").visibleWhen(showAdvanced::get));
+    private final BoolSetting bypass = add(new BoolSetting("bypass", "Amethyst bypass (anti-xray)", true)
+        .description("DEFAULT: Anubis AmethystBypass - reveal geodes the server HIDES by scanning chunk-section palettes for amethyst the server declared but stripped (palette leak). Works even when no amethyst is visible in your block view.")
+        .group("Advanced").visibleWhen(showAdvanced::get));
 
     /** chunkKey -> set of amethyst block positions in that chunk. */
     private final Map<Long, Set<BlockPos>> flagged = new ConcurrentHashMap<>();

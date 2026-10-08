@@ -46,21 +46,23 @@ public final class StorageRecorderModule extends Module {
     private final ColorSetting ghostColor = add(new ColorSetting("ghost-color", "Ghost color", 0x8095A5FF)
         .description("Box color for remembered storage in unloaded/re-hidden chunks.")
         .group("Render"));
-    private final IntSetting maxRender = add(new IntSetting("max-render", "Max rendered boxes", 2048, 64, 8192, 64)
-        .description("Nearest-first cap on rendered boxes (keeps FPS stable on huge records).")
-        .group("Render"));
-    private final BoolSetting syncEsp = add(new BoolSetting("sync-esp", "Match Storage ESP", true)
-        .description("Auto-use the client Storage ESP module's selected block types AND per-type colours for recording + rendering. Off (or Storage ESP missing) = builtin chest/barrel/shulker/hopper list with the colours above.")
-        .group("Record"));
     private final BoolSetting spawners = add(new BoolSetting("spawners", "Record spawners", true)
         .description("Record monster spawners too.")
         .group("Record"));
     private final BoolSetting persist = add(new BoolSetting("persist", "Persist to disk", true)
         .description("Save the record per server+dimension so it survives relogs.")
         .group("Record"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal colours, render cap, Storage-ESP sync and scan rate.").group("Record"));
+    private final IntSetting maxRender = add(new IntSetting("max-render", "Max rendered boxes", 2048, 64, 8192, 64)
+        .description("Nearest-first cap on rendered boxes (keeps FPS stable on huge records).")
+        .group("Render").visibleWhen(showAdvanced::get));
+    private final BoolSetting syncEsp = add(new BoolSetting("sync-esp", "Match Storage ESP", true)
+        .description("Auto-use the client Storage ESP module's selected block types AND per-type colours for recording + rendering. Off (or Storage ESP missing) = builtin chest/barrel/shulker/hopper list with the colours above.")
+        .group("Record").visibleWhen(showAdvanced::get));
     private final IntSetting scanChunks = add(new IntSetting("chunks-per-tick", "Chunks per tick", 16, 1, 64, 1)
         .description("Loaded chunks swept per tick for storage block entities.")
-        .group("Record"));
+        .group("Record").visibleWhen(showAdvanced::get));
     private final ActionSetting clear = add(new ActionSetting("clear", "Clear record", this::clearRecord)
         .buttonLabel("Clear").description("Forget everything recorded for this server+dimension.")
         .group("Record"));

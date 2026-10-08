@@ -39,26 +39,28 @@ public final class RegionMapModule extends Module {
         .description("Vertical screen position.").group("Render"));
     private final IntSetting size = add(new IntSetting("size", "Size", 180, 80, 600, 4)
         .description("Canvas size (square, in pixels).").group("Render"));
-    private final IntSetting cellBlocks = add(new IntSetting("cell-blocks", "Blocks per region", 50000, 500, 100000, 500)
-        .description("World blocks covered by one region cell (9 cells span the map).")
-        .group("Grid"));
     private final BoolSetting showDots = add(new BoolSetting("show-dots", "RTP dots", true)
         .description("Plot your teleport landings as colour-coded dots.").group("RTP Log"));
-    private final BoolSetting showHover = add(new BoolSetting("show-hover", "Hover coords", true)
-        .description("Show world coordinates under the cursor.").group("Render"));
-    private final BoolSetting showAxes = add(new BoolSetting("show-axes", "Axis labels", true)
-        .description("Show +X/+Z/-X/-Z labels around the canvas.").group("Render"));
-    private final BoolSetting showLegend = add(new BoolSetting("show-legend", "Legend", true)
-        .description("Show the cluster colour legend.").group("Render"));
-    private final IntSetting teleportThreshold = add(new IntSetting("teleport-threshold", "Teleport threshold", 1000, 100, 100000, 100)
-        .description("Minimum horizontal distance (blocks) that counts as a teleport to log.")
-        .group("RTP Log"));
-    private final IntSetting maxDots = add(new IntSetting("max-dots", "Max dots", 2000, 100, 10000, 100)
-        .description("Maximum number of RTP dots kept (oldest are dropped).")
-        .group("RTP Log"));
     private final BoolSetting showHeat = add(new BoolSetting("show-heat", "Base heatmap", true)
         .description("Colour-code regions by how many bases you've found there (green -> red).")
         .group("Heatmap"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal grid size, overlay labels and RTP-log tuning.").group("Render"));
+    private final IntSetting cellBlocks = add(new IntSetting("cell-blocks", "Blocks per region", 50000, 500, 100000, 500)
+        .description("World blocks covered by one region cell (9 cells span the map).")
+        .group("Grid").visibleWhen(showAdvanced::get));
+    private final BoolSetting showHover = add(new BoolSetting("show-hover", "Hover coords", true)
+        .description("Show world coordinates under the cursor.").group("Render").visibleWhen(showAdvanced::get));
+    private final BoolSetting showAxes = add(new BoolSetting("show-axes", "Axis labels", true)
+        .description("Show +X/+Z/-X/-Z labels around the canvas.").group("Render").visibleWhen(showAdvanced::get));
+    private final BoolSetting showLegend = add(new BoolSetting("show-legend", "Legend", true)
+        .description("Show the cluster colour legend.").group("Render").visibleWhen(showAdvanced::get));
+    private final IntSetting teleportThreshold = add(new IntSetting("teleport-threshold", "Teleport threshold", 1000, 100, 100000, 100)
+        .description("Minimum horizontal distance (blocks) that counts as a teleport to log.")
+        .group("RTP Log").visibleWhen(showAdvanced::get));
+    private final IntSetting maxDots = add(new IntSetting("max-dots", "Max dots", 2000, 100, 10000, 100)
+        .description("Maximum number of RTP dots kept (oldest are dropped).")
+        .group("RTP Log").visibleWhen(showAdvanced::get));
     private final BoolSetting autoHeatmap = add(new BoolSetting("auto-heatmap", "Auto-update heatmap", true)
         .description("ON = finds update the heatmap automatically. OFF = finds queue up and only update when you confirm (via /heatconfirm).")
         .group("Heatmap"));

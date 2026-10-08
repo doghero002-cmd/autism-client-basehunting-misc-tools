@@ -80,6 +80,13 @@ public final class SusChunkBetaModule extends Module {
             "Fuses every sus-chunk detector; flags only when 2+ independent signals agree. Fewer false flags.");
     }
 
+    // Hidden from the menu: this engine is driven by Sus Chunk Finder's BETA mode, so users meet
+    // it there as one entry instead of a confusing second "(Beta)" module.
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onEnable() {
         ChunkFlagRenderer.init();

@@ -61,13 +61,15 @@ public final class ChatBotModule extends Module {
         .description("Whisper replies to the sender (/msg) instead of public chat. Coords are ALWAYS private.").group("Reply"));
     private final IntSetting globalCooldown = add(new IntSetting("cooldown", "Cooldown (s)", 4, 0, 120, 1)
         .description("Minimum time between any two replies (owners skip this).").group("Reply"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal per-player cooldown, rate cap, typing delay and debug log.").group("Reply"));
     private final IntSetting perSender = add(new IntSetting("per-sender", "Per-player cooldown (s)", 20, 0, 600, 5)
-        .group("Reply"));
+        .group("Reply").visibleWhen(showAdvanced::get));
     private final IntSetting maxPerMinute = add(new IntSetting("max-per-minute", "Max replies / minute", 6, 1, 30, 1)
-        .description("Hard cap for everyone, so a spam loop can never flood chat or get you muted.").group("Reply"));
-    private final BoolSetting humanDelay = add(new BoolSetting("human-delay", "Human typing delay", true).group("Reply"));
+        .description("Hard cap for everyone, so a spam loop can never flood chat or get you muted.").group("Reply").visibleWhen(showAdvanced::get));
+    private final BoolSetting humanDelay = add(new BoolSetting("human-delay", "Human typing delay", true).group("Reply").visibleWhen(showAdvanced::get));
     private final BoolSetting log = add(new BoolSetting("log", "Show decisions", false)
-        .description("Print why each keyword hit was answered or ignored (only you see it).").group("Reply"));
+        .description("Print why each keyword hit was answered or ignored (only you see it).").group("Reply").visibleWhen(showAdvanced::get));
 
     private ChatBotPolicy policy;
     private int rulesHash;

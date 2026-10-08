@@ -42,23 +42,25 @@ public final class HoleTunnelStairsEspModule extends Module {
         .description("Which shapes to detect.").group("General"));
     private final IntSetting scanRadius = add(new IntSetting("scan-radius", "Scan radius (chunks)", 3, 1, 8, 1)
         .description("Chunk bubble around you scanned.").group("General"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal per-shape length/depth thresholds, colours and scan tuning.").group("General"));
     private final IntSetting minHoleDepth = add(new IntSetting("min-hole-depth", "Min hole depth", 4, 1, 20, 1)
-        .description("Minimum 1x1/3x1 shaft depth.").group("Holes"));
+        .description("Minimum 1x1/3x1 shaft depth.").group("Holes").visibleWhen(showAdvanced::get));
     private final IntSetting minTunnelLength = add(new IntSetting("min-tunnel-length", "Min tunnel length", 3, 1, 20, 1)
-        .description("Minimum straight tunnel run length.").group("Tunnels"));
+        .description("Minimum straight tunnel run length.").group("Tunnels").visibleWhen(showAdvanced::get));
     private final IntSetting minStairLength = add(new IntSetting("min-stair-length", "Min staircase length", 3, 1, 20, 1)
-        .description("Minimum staircase run length.").group("Staircases"));
+        .description("Minimum staircase run length.").group("Staircases").visibleWhen(showAdvanced::get));
     private final IntSetting maxTunnelHeight = add(new IntSetting("max-tunnel-height", "Max tunnel height", 3, 2, 10, 1)
-        .description("Max interior height of a tunnel/staircase section.").group("Tunnels"));
+        .description("Max interior height of a tunnel/staircase section.").group("Tunnels").visibleWhen(showAdvanced::get));
     private final IntSetting searchDepth = add(new IntSetting("search-depth", "Search depth below you", 24, 4, 96, 4)
-        .description("How far below your Y to scan. Holes/tunnels near the surface matter for base-hunting; scanning bedrock level was wasted work.").group("Performance"));
+        .description("How far below your Y to scan. Holes/tunnels near the surface matter for base-hunting; scanning bedrock level was wasted work.").group("Performance").visibleWhen(showAdvanced::get));
     private final BoolSetting airOnly = add(new BoolSetting("air-only", "Only air blocks", false)
-        .description("Only count fully-air blocks as passable (stricter).").group("General"));
-    private final ColorSetting holeColor = add(new ColorSetting("hole-color", "Hole colour", 0xFFFF4040).group("Render"));
-    private final ColorSetting tunnelColor = add(new ColorSetting("tunnel-color", "Tunnel colour", 0xFF4060FF).group("Render"));
-    private final ColorSetting stairColor = add(new ColorSetting("stair-color", "Staircase colour", 0xFFFF40FF).group("Render"));
+        .description("Only count fully-air blocks as passable (stricter).").group("General").visibleWhen(showAdvanced::get));
+    private final ColorSetting holeColor = add(new ColorSetting("hole-color", "Hole colour", 0xFFFF4040).group("Render").visibleWhen(showAdvanced::get));
+    private final ColorSetting tunnelColor = add(new ColorSetting("tunnel-color", "Tunnel colour", 0xFF4060FF).group("Render").visibleWhen(showAdvanced::get));
+    private final ColorSetting stairColor = add(new ColorSetting("stair-color", "Staircase colour", 0xFFFF40FF).group("Render").visibleWhen(showAdvanced::get));
     private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
-        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.").group("Performance"));
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.").group("Performance").visibleWhen(showAdvanced::get));
 
     private final List<AABB> holes = new ArrayList<>();
     private final List<AABB> holes3x1 = new ArrayList<>();

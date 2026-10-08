@@ -59,12 +59,12 @@ This addon bundles base-finding, stash scouting, seed-cracking, and utility tool
 | Section | Included tools |
 | --- | --- |
 | **Core** | Seedcracker, Bedrock Finder, Texture Cracker, Donut RTP Stash Finder, Relog Loader |
-| **Finders** | Netherite Finder, Stash Finder, Chunk Finder, Spawner Finder, SusChunk Finder, SeedRay, Chunk Waypoints, Finder Overlay, Player Chunks, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Base Webhook, Chunk Keeper, Base Log Browser, Tunnel Base Finder, Tunnel Base Water, Nether Tunnel Finder, Structure Detector |
+| **Finders** | Netherite Finder, Stash Finder, Chunk Finder, Spawner Finder, SusChunk Finder (DOGS/GEODE/BETA/… modes), SeedRay, Finder Overlay, Player Chunks, Light Source Finder, Prime Chunk, Activity, Growth, Heat Map Radar, Raid Planner, Base Webhook, Chunk Keeper, Base Log Browser, Tunnel Base Finder (CRAWL/STANDING/AMETHYST + Water engine), Nether Tunnel Finder, Structure Detector |
 | **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, Spawner Protect |
 | **Render** | AutoRender, PaperRig, Scoreboard Hider, Storage Recorder |
-| **Fake** | FakePay, FakePayments, FakeRoles |
+| **Fake** | Fake Identity (fake /pay, fake incoming payments, fake rank — one module), Fake Player |
 | **Trading** | AH Flipper, AH Sniper, Shop Buyer, AH Sell |
-| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Player Panic, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Balance Tags, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter, Home Meta, Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Translate, Hole ESP, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, Name Protect, Mace PVP |
+| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Player Panic, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Balance Tags, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter, Home Meta, Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Translate, Hole ESP, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, Name Protect, Mace PVP, Waypoints (death + logout + finder-marker Y) |
 
 ### DonutSMP stash tools
 
@@ -109,6 +109,20 @@ This addon bundles base-finding, stash scouting, seed-cracking, and utility tool
 1. Download the jar from the releases page and place it in your `mods` folder alongside the AUTISM client.
 2. Install the required dependencies, especially [Fabric Loader](https://fabricmc.net/) and [Baritone](https://github.com/doghero002-cmd/baritone), if you plan to use movement-based modules.
 3. Launch the game, open the module menu, and enable only the tools you want to use.
+
+### New here? Use a loadout
+
+Instead of picking from the full module list, open the **QQL Setup** module (first in the menu) and press one button for what you want to do, or run the `.qql` command in chat:
+
+- `.qql` — list every loadout.
+- `.qql stash` — Stash Hunting (stash finder, relog loader, prime chunk, auto-render, ESP, …).
+- `.qql tunnel` — Tunnel Base hunting.
+- `.qql trading` — AH flipper + sniper + price check (sniper capped to 1 buy by default).
+- `.qql pvp` — everyday survival QoL + anti-death safety nets.
+- `.qql safety` — staff / anti-cheat detection and panic exits only.
+- Add `keep` to layer a loadout on top of your current modules (e.g. `.qql stash keep`); `.qql off` turns everything off.
+
+Most modules now hide their expert options behind a **Show advanced** toggle, so the default settings panel stays short — flip it on when you want the fine-tuning.
 
 ## Requirements
 

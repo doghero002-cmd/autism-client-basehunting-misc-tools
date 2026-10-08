@@ -61,10 +61,12 @@ public final class ChunkFinderModule extends Module {
             "scan-radius", "Scan radius (chunks)", 6, 1, 12, 1)
         .description("Chunk bubble around the player scanned.")
         .group("General"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal per-signal thresholds and farm-skip tuning.").group("General"));
     private final IntSetting rotatedThreshold = add(new IntSetting(
             "rotated-threshold", "Rotated deepslate", 1, 1, 20, 1)
         .description("Rotated (player-placed) deepslate blocks needed to flag.")
-        .group("Signals"));
+        .group("Signals").visibleWhen(showAdvanced::get));
     private final BoolSetting detectVeins = add(new BoolSetting(
             "veins", "Diorite/obsidian veins", true)
         .description("Flag enclosed diorite/granite/andesite + long obsidian veins.")
@@ -80,19 +82,19 @@ public final class ChunkFinderModule extends Module {
     private final BoolSetting ignoreItemChunks = add(new BoolSetting(
             "ignore-item-chunks", "Skip farm chunks (items/XP)", true)
         .description("Skip chunks with many dropped items or XP orbs (active farms).")
-        .group("Signals"));
+        .group("Signals").visibleWhen(showAdvanced::get));
     private final IntSetting maxItems = add(new IntSetting(
             "max-items", "Max items", 3, 0, 100, 1)
         .description("Dropped items in a chunk before it's treated as a farm and skipped.")
-        .group("Signals"));
+        .group("Signals").visibleWhen(() -> showAdvanced.get() && ignoreItemChunks.get()));
     private final IntSetting maxXP = add(new IntSetting(
             "max-xp", "Max XP orbs", 3, 0, 100, 1)
         .description("XP orbs in a chunk before it's treated as a farm and skipped.")
-        .group("Signals"));
+        .group("Signals").visibleWhen(() -> showAdvanced.get() && ignoreItemChunks.get()));
     private final BoolSetting ignorePlayerChunk = add(new BoolSetting(
             "ignore-player-chunk", "Ignore own chunk", true)
         .description("Don't flag the chunk you're standing in.")
-        .group("Signals"));
+        .group("Signals").visibleWhen(showAdvanced::get));
     private final BoolSetting tracer = add(new BoolSetting(
             "tracer", "Tracer", true)
         .description("Draw a tracer line from the camera to each flagged chunk.")

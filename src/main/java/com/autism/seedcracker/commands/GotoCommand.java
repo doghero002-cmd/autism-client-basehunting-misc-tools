@@ -104,7 +104,7 @@ public final class GotoCommand extends Command {
         root.then(LiteralArgumentBuilder.<AutismCommandSource>literal("death").executes(ctx -> {
             Minecraft mc = Minecraft.getInstance();
             String dim = mc.level == null ? "" : mc.level.dimension().identifier().toString();
-            BlockPos d = com.autism.seedcracker.modules.DeathWaypointModule.lastDeath(dim);
+            BlockPos d = com.autism.seedcracker.modules.WaypointsModule.lastDeath(dim);
             if (d == null) {
                 AutismClientMessaging.sendPrefixed("\u00a7e[GoTo] No death recorded in this dimension (enable Death Waypoint).");
                 return SUCCESS;
