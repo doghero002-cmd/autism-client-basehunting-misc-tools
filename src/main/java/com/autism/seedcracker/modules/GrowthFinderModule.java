@@ -59,26 +59,28 @@ public final class GrowthFinderModule extends Module {
             "tracer", "Tracer", false)
         .description("Draw a tracer line from the camera to each flagged chunk.")
         .group("Render"));
-    private final IntSetting chunksPerTick = add(new IntSetting(
-            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
-        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
-        .group("Performance"));
-    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private final BoolSetting notify = add(new BoolSetting(
             "notification", "Notification", true)
         .description("Toast + chat ping when a growth chunk is found.")
         .group("General"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal per-type toggles, scan rate and source estimation.").group("General"));
+    private final IntSetting chunksPerTick = add(new IntSetting(
+            "chunks-per-tick", "Chunks per tick", 1, 1, 32, 1)
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
+        .group("Performance").visibleWhen(showAdvanced::get));
+    private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
 
     // ---- per-type toggles ----
     private final BoolSetting vines = add(new BoolSetting("render-vines", "Vines", true)
-        .description("Count vines (regular + cave vines).").group("Types"));
+        .description("Count vines (regular + cave vines).").group("Types").visibleWhen(showAdvanced::get));
     private final BoolSetting berries = add(new BoolSetting("render-berries", "Berries", true)
-        .description("Count sweet-berry bushes.").group("Types"));
+        .description("Count sweet-berry bushes.").group("Types").visibleWhen(showAdvanced::get));
     private final BoolSetting dripstone = add(new BoolSetting("render-dripstone", "Dripstone", true)
-        .description("Count pointed dripstone / dripstone blocks.").group("Types"));
+        .description("Count pointed dripstone / dripstone blocks.").group("Types").visibleWhen(showAdvanced::get));
     private final BoolSetting sourceTracking = add(new BoolSetting("source-tracking", "Source estimation", true)
         .description("Estimate the farm/source chunk from weighted growth (Xenon logic).")
-        .group("General"));
+        .group("General").visibleWhen(showAdvanced::get));
 
     private final Set<ChunkPos> flagged = new HashSet<>();
     private final com.autism.seedcracker.finder.FinderReport reporter =

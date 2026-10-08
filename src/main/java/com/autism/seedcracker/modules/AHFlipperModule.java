@@ -75,25 +75,30 @@ public final class AHFlipperModule extends Module {
     private final IntSetting minProfit = add(new IntSetting("min-profit", "Min profit", 5000, 0, 10_000_000, 500)
         .description("Net profit (after tax) a flip must clear.").group("Filters"));
     private final IntSetting minRoi = add(new IntSetting("min-roi", "Min ROI (%)", 12, 1, 500, 1).group("Filters"));
-    private final IntSetting minSamples = add(new IntSetting("min-samples", "Min sales", 12, 3, 200, 1)
-        .description("Completed/inferred sales needed before a market is valued from sales instead of asks.").group("Filters"));
-    private final IntSetting minConfidence = add(new IntSetting("min-confidence", "Min confidence (%)", 35, 5, 95, 5).group("Filters"));
-    private final IntSetting maxHold = add(new IntSetting("max-hold", "Max hold (h)", 3, 1, 48, 1)
-        .description("Reject flips expected to take longer than this to resell.").group("Filters"));
     private final StringSetting maxBuy = add(new StringSetting("max-buy", "Max buy price", "")
         .description("Ignore listings above this (k/m/b ok). Blank = no cap.").group("Filters"));
-    private final IntSetting taxPercent = add(new IntSetting("tax", "Sale tax (%)", 0, 0, 50, 1)
-        .description("Auction tax taken from the resale; leave 0 until you've confirmed the server's rate.").group("Filters"));
-    private final BoolSetting askFallback = add(new BoolSetting("ask-fallback", "Ask-only fallback", true)
-        .description("While a market has too few sales, still flag listings far under the other live asks (alert only).").group("Filters"));
-    private final BoolSetting benchLosers = add(new BoolSetting("bench", "Bench losing markets", true)
-        .description("Skip markets whose paper flips lost money in the last 24h; they come back when the window rolls.").group("Filters"));
     private final BoolSetting alerts = add(new BoolSetting("alerts", "Chat alerts", true).group("Alerts"));
+
+    // Everything below is expert tuning - hidden until "Show advanced" so the default panel is
+    // just the data source, the profit/ROI floor and a buy cap.
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal sample/confidence/hold filters, tax, fallbacks and paper-trading.").group("Filters"));
+    private final IntSetting minSamples = add(new IntSetting("min-samples", "Min sales", 12, 3, 200, 1)
+        .description("Completed/inferred sales needed before a market is valued from sales instead of asks.").group("Filters").visibleWhen(showAdvanced::get));
+    private final IntSetting minConfidence = add(new IntSetting("min-confidence", "Min confidence (%)", 35, 5, 95, 5).group("Filters").visibleWhen(showAdvanced::get));
+    private final IntSetting maxHold = add(new IntSetting("max-hold", "Max hold (h)", 3, 1, 48, 1)
+        .description("Reject flips expected to take longer than this to resell.").group("Filters").visibleWhen(showAdvanced::get));
+    private final IntSetting taxPercent = add(new IntSetting("tax", "Sale tax (%)", 0, 0, 50, 1)
+        .description("Auction tax taken from the resale; leave 0 until you've confirmed the server's rate.").group("Filters").visibleWhen(showAdvanced::get));
+    private final BoolSetting askFallback = add(new BoolSetting("ask-fallback", "Ask-only fallback", true)
+        .description("While a market has too few sales, still flag listings far under the other live asks (alert only).").group("Filters").visibleWhen(showAdvanced::get));
+    private final BoolSetting benchLosers = add(new BoolSetting("bench", "Bench losing markets", true)
+        .description("Skip markets whose paper flips lost money in the last 24h; they come back when the window rolls.").group("Filters").visibleWhen(showAdvanced::get));
     private final BoolSetting alertSound = add(new BoolSetting("alert-sound", "Alert sound", true)
         .group("Alerts").visibleWhen(alerts::get));
     private final BoolSetting autoPaper = add(new BoolSetting("auto-paper", "Auto paper-trade", true)
         .description("Open a paper position for every sales-backed flip so you can see if the strategy pays before risking coins.")
-        .group("Alerts"));
+        .group("Alerts").visibleWhen(showAdvanced::get));
 
     private FlipEngine engine;
     private ApiFlipSource api;

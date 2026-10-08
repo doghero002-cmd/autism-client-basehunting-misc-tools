@@ -38,7 +38,7 @@ public final class AutoLogModule extends Module {
         .group("Conditions"));
     private final IntSetting health = add(new IntSetting("health", "Health (½-hearts)", 10, 1, 40, 1)
         .description("Disconnect at or below this total health in half-hearts (10 = 5 hearts; includes absorption).")
-        .group("Conditions"));
+        .group("Conditions").visibleWhen(() -> onLowHealth.get()));
     private final BoolSetting onDamage = add(new BoolSetting("on-damage", "Log on damage taken", false)
         .description("Disconnect the moment your health decreases.")
         .group("Conditions"));
@@ -50,10 +50,10 @@ public final class AutoLogModule extends Module {
         .group("Conditions"));
     private final IntSetting playerRange = add(new IntSetting("player-range", "Player range", 32, 4, 128, 1)
         .description("Radius (blocks) for the nearby-player check.")
-        .group("Conditions"));
+        .group("Conditions").visibleWhen(() -> onPlayerNear.get()));
     private final StringSetting whitelist = add(new StringSetting("whitelist", "Whitelisted players", "")
         .description("Comma-separated player names that never trigger a logout.")
-        .group("Filters"));
+        .group("Filters").visibleWhen(() -> onPlayerNear.get()));
     private final BoolSetting onFall = add(new BoolSetting("on-fall", "Log on big fall", false)
         .description("Disconnect when you are falling far enough to take heavy damage (into a hole/void).")
         .group("Conditions"));

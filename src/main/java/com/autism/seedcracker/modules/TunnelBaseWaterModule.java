@@ -175,6 +175,13 @@ public final class TunnelBaseWaterModule extends Module {
             "Water Client autonomous tunnel base-finder (beta). Digs until it finds a base, with shop restock + auto-mend/eat.");
     }
 
+    // Hidden from the menu: this engine is driven by TunnelBase Finder (which mirrors its settings),
+    // so users meet it there as one entry instead of a duplicate "(Water)" module.
+    @Override
+    public boolean showInModuleMenu() {
+        return false;
+    }
+
     @Override
     public void onEnable() {
         Minecraft mc = Minecraft.getInstance();

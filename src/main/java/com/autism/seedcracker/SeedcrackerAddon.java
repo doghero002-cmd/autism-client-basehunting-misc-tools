@@ -36,10 +36,7 @@ import com.autism.seedcracker.modules.ChunkFinderModule;
 import com.autism.seedcracker.modules.CoordSnapperModule;
 import com.autism.seedcracker.modules.ElytraWarnerModule;
 import com.autism.seedcracker.modules.EntityScannerModule;
-import com.autism.seedcracker.modules.FakePayModule;
-import com.autism.seedcracker.modules.FakePaymentsModule;
 import com.autism.seedcracker.modules.FakePlayerModule;
-import com.autism.seedcracker.modules.FakeRolesModule;
 import com.autism.seedcracker.modules.FlagDetectorModule;
 import com.autism.seedcracker.modules.FastPlaceModule;
 import com.autism.seedcracker.modules.GrowthFinderModule;
@@ -123,6 +120,10 @@ public final class SeedcrackerAddon extends AutismAddon {
         // resolved at runtime, never referenced at compile time). If the lookup fails on some future
         // client it degrades to one tab instead of failing to load.
 
+        // "Start here" setup panel first, so new users meet the one-click loadouts before the
+        // long module list.
+        reg(new com.autism.seedcracker.modules.QqlSetupModule());
+
         reg(new SeedcrackerModule());
         reg(new BedrockFinderModule());
         reg(new com.autism.seedcracker.modules.TextureCrackerModule());
@@ -140,7 +141,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new com.autism.seedcracker.modules.SusChunkBetaModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.SeedRayModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.SeedMapModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.ChunkWaypointsModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.FinderOverlayModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.PlayerChunksModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.LightSourceFinderModule(), "Finders");
@@ -162,7 +162,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Zelith entity / fake modules (ported), each under its own tab.
         regTab(new EntityScannerModule(), "Entity");
         regTab(new com.autism.seedcracker.modules.VisualRangeModule(), "Entity");
-        regTab(new com.autism.seedcracker.modules.LogoutSpotModule(), "Entity");
         regTab(new AntiTrapModule(), "Entity");
         regTab(new com.autism.seedcracker.modules.EyeFinderModule(), "Entity");
         regTab(new com.autism.seedcracker.modules.ItemFrameEspModule(), "Entity");
@@ -172,9 +171,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new PaperRigModule(), "Render");
         regTab(new ScoreboardHiderModule(), "Render");
         regTab(new com.autism.seedcracker.modules.StorageRecorderModule(), "Render");
-        regTab(new FakePayModule(), "Fake");
-        regTab(new FakePaymentsModule(), "Fake");
-        regTab(new FakeRolesModule(), "Fake");
+        regTab(new com.autism.seedcracker.modules.FakeIdentityModule(), "Fake");
 
         // Trading.
         regTab(new AHFlipperModule(), "Trading");
@@ -237,7 +234,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new FastPlaceModule(), utility);
         regTab(new SwingSpeedModule(), utility);
         regTab(new CoordSnapperModule(), utility);
-        regTab(new com.autism.seedcracker.modules.DeathWaypointModule(), utility);
+        regTab(new com.autism.seedcracker.modules.WaypointsModule(), utility);
         regTab(new com.autism.seedcracker.modules.BreadcrumbModule(), utility);
         regTab(new RegionMapModule(), utility);
         regTab(new WeatherNotifierModule(), utility);
@@ -256,6 +253,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new QuickMacroModule(), server);
         regTab(new FakePlayerModule(), "Fake");
 
+        AutismAddons.commands().register(new com.autism.seedcracker.commands.QqlCommand());
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());
         AutismAddons.commands().register(new com.autism.seedcracker.commands.TextureCrackCommand());

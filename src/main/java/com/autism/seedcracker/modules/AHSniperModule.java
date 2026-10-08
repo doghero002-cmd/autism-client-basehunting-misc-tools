@@ -59,28 +59,38 @@ public final class AHSniperModule extends Module {
             "mode", "Mode", Mode.MANUAL, Mode.values())
         .description("MANUAL = drive the /ah GUI (no key). API = poll the DonutSMP API (needs key).")
         .group("General"));
-    private final StringSetting apiKey = add(new StringSetting(
-            "api-key", "API key", "")
-        .description("DonutSMP API key (type /api in-game). Only used in API mode.")
-        .group("API"));
-    private final IntSetting refreshDelay = add(new IntSetting(
-            "refresh-delay", "Refresh delay (ticks)", 2, 0, 100, 1)
-        .description("Delay before re-opening / refreshing the auction page.")
+    private final IntSetting maxBuys = add(new IntSetting(
+            "max-buys", "Max buys (0 = endless)", 1, 0, 128, 1)
+        .description("Auto-disable after this many CONFIRMED purchases (runaway-spend failsafe). 1 = snipe one and stop.")
         .group("General"));
-    private final IntSetting buyDelay = add(new IntSetting(
-            "buy-delay", "Buy delay (ticks)", 2, 0, 100, 1)
-        .description("Delay before clicking to buy a matched listing.")
-        .group("General"));
-    private final IntSetting apiRefreshMs = add(new IntSetting(
-            "api-refresh-ms", "API refresh (ms)", 500, 150, 5000, 10)
-        .description("Base API poll interval (jittered +-30% so the cadence isn't a metronome; sub-150ms hammers the API and gets keys rate-limited).")
-        .group("API"));
     private final BoolSetting notify = add(new BoolSetting(
             "notify", "Notifications", true)
         .description("Chat notifications for finds / errors.")
         .group("General"));
+
+    // API mode only: the key + poll rate are hidden in MANUAL mode so the panel isn't confusing.
+    private final StringSetting apiKey = add(new StringSetting(
+            "api-key", "API key", "")
+        .description("DonutSMP API key (type /api in-game). Only used in API mode.")
+        .group("API").visibleWhen(() -> mode.get() == Mode.API));
+    private final IntSetting apiRefreshMs = add(new IntSetting(
+            "api-refresh-ms", "API refresh (ms)", 500, 150, 5000, 10)
+        .description("Base API poll interval (jittered +-30% so the cadence isn't a metronome; sub-150ms hammers the API and gets keys rate-limited).")
+        .group("API").visibleWhen(() -> mode.get() == Mode.API));
+
+    // Timing + debug tucked under advanced so the common case is just item/price/mode.
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal click/refresh timing and debug tracing.").group("General"));
+    private final IntSetting refreshDelay = add(new IntSetting(
+            "refresh-delay", "Refresh delay (ticks)", 2, 0, 100, 1)
+        .description("Delay before re-opening / refreshing the auction page.")
+        .group("Timing").visibleWhen(showAdvanced::get));
+    private final IntSetting buyDelay = add(new IntSetting(
+            "buy-delay", "Buy delay (ticks)", 2, 0, 100, 1)
+        .description("Delay before clicking to buy a matched listing.")
+        .group("Timing").visibleWhen(showAdvanced::get));
     private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
-        .description("Trace snipe/verify phases to chat + /flaglog.").group("General"));
+        .description("Trace snipe/verify phases to chat + /flaglog.").group("Timing").visibleWhen(showAdvanced::get));
 
     private final HttpClient http = com.autism.seedcracker.util.Http.CLIENT;
 
@@ -97,6 +107,7 @@ public final class AHSniperModule extends Module {
     private int preBuyCount = -1;
     private int verifyTicks = 0;
     private double pendingPrice = -1;
+    private int confirmedBuys = 0;
 
     public AHSniperModule() {
         super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper",
@@ -126,6 +137,7 @@ public final class AHSniperModule extends Module {
         preBuyCount = -1;
         verifyTicks = 0;
         pendingPrice = -1;
+        confirmedBuys = 0;
     }
 
     @Override
@@ -152,10 +164,17 @@ public final class AHSniperModule extends Module {
         if (preBuyCount >= 0) {
             int now = countOf(mc, resolveItem());
             if (now > preBuyCount) {
+                confirmedBuys++;
                 if (notify.get()) send("§a[AH Sniper] Purchase CONFIRMED (+" + (now - preBuyCount) + ")"
                     + (pendingPrice >= 0 ? " for " + formatPrice(pendingPrice) : "") + ".");
                 preBuyCount = -1;
                 pendingPrice = -1;
+                int cap = maxBuys.get();
+                if (cap > 0 && confirmedBuys >= cap) {
+                    send("§a[AH Sniper] Hit max buys (" + cap + ") - stopping.");
+                    setEnabledSilently(false);
+                    return;
+                }
             } else if (--verifyTicks <= 0) {
                 if (notify.get()) send("§e[AH Sniper] Purchase NOT confirmed - listing likely sniped or GUI stale.");
                 preBuyCount = -1;

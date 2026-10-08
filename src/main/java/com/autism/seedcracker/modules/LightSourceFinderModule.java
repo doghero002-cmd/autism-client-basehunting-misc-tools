@@ -47,18 +47,20 @@ public final class LightSourceFinderModule extends Module {
     private final IntSetting scanRadius = add(new IntSetting("scan-radius", "Scan radius (chunks)", 6, 1, 12, 1)
         .description("Chunk bubble around the player scanned.")
         .group("General"));
-    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 16, 1)
-        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
-        .group("Performance"));
     private final BoolSetting notify = add(new BoolSetting("notification", "Notification", true)
         .description("Toast + chat ping on a new lit chunk.")
         .group("General"));
     private final ColorSetting color = add(new ColorSetting("color", "Chunk colour", 0x8CFFE080)
         .description("Colour of lit-chunk markers.")
         .group("Render"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal scan-rate and tracer options.").group("General"));
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 16, 1)
+        .description("How many chunks to scan per tick. 1 = smoothest FPS, higher = faster full sweep.")
+        .group("Performance").visibleWhen(showAdvanced::get));
     private final BoolSetting tracer = add(new BoolSetting("tracer", "Tracer", false)
         .description("Tracer line to each lit chunk.")
-        .group("Render"));
+        .group("Render").visibleWhen(showAdvanced::get));
 
     private final com.autism.seedcracker.finder.ScanCursor scanCursor = new com.autism.seedcracker.finder.ScanCursor();
     private final Set<ChunkPos> flagged = new HashSet<>();

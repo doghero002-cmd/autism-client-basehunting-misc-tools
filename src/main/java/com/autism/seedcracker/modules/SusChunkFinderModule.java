@@ -14,6 +14,7 @@ import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
 import com.autism.seedcracker.compat.ClientNotify;
+import com.autism.seedcracker.compat.ModuleLookup;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
@@ -44,7 +45,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
  */
 public final class SusChunkFinderModule extends Module {
 
-    public enum Mode { DOGS, WATER, XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL, ACTIVITY, SIGNAL, GEODE, FARM }
+    public enum Mode { GEODE, DOGS, BETA, WATER, XENON, TYPES, NEW_CHUNKS, OLD_CHUNKS, TUNNEL, ACTIVITY, SIGNAL, FARM }
 
     private final EnumSetting<Mode> mode = add(new EnumSetting<>(
             "mode", "Mode", Mode.GEODE, Mode.values())
@@ -238,11 +239,27 @@ public final class SusChunkFinderModule extends Module {
 
     public SusChunkFinderModule() {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder",
-            "Flags suspicious chunks (XENON below-Y15 base detection, or per-block-type).");
+            "Flags suspicious chunks. Pick a Mode: GEODE/DOGS (recommended), BETA (fuses every detector, fewest false flags), or the raw single-signal modes.");
+    }
+
+    /** The hidden Beta engine module, driven by this module's BETA mode (menu shows one entry). */
+    private Module betaEngine() {
+        return ModuleLookup.get(SeedcrackerAddon.ID + ":sus-chunk-beta");
+    }
+
+    /** Keep the hidden Beta engine running only while this module is on AND in BETA mode. */
+    private void syncBetaEngine() {
+        Module beta = betaEngine();
+        if (beta == null) return;
+        boolean want = isEnabled() && mode.get() == Mode.BETA;
+        if (want != beta.isEnabled()) {
+            try { beta.setEnabled(want); } catch (Throwable ignored) {}
+        }
     }
 
     @Override
     public void onEnable() {
+        syncBetaEngine();
         flagged.clear();
         notified.clear();
         lastScan.clear();
@@ -272,7 +289,9 @@ public final class SusChunkFinderModule extends Module {
             geodeScanned.clear();
             scanCursorAge.reset();
             scanCursorTunnel.reset();
+            ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
         }
+        if ("mode".equals(settingId)) syncBetaEngine();
     }
 
     @Override
@@ -288,6 +307,7 @@ public final class SusChunkFinderModule extends Module {
         geodeVeto.clear();
         geodeScanned.clear();
         ChunkFlagRenderer.clear(SeedcrackerAddon.ID + ":z-sus-chunk-finder");
+        syncBetaEngine();
     }
 
     // ---- disk persistence (nyx ChunkActivityScanner behaviour) ----
@@ -341,7 +361,15 @@ public final class SusChunkFinderModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
 
+        // BETA mode is a facade: the hidden Beta engine does its own scanning + rendering, so this
+        // module stays out of the way (just make sure the engine is running).
+        if (mode.get() == Mode.BETA) {
+            syncBetaEngine();
+            return;
+        }
+
         switch (mode.get()) {
+            case BETA -> { /* handled above */ }
             case DOGS -> tickDogs(mc);
             case WATER -> tickWater(mc);
             case XENON -> tickXenon(mc);

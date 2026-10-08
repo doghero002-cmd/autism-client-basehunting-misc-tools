@@ -46,11 +46,13 @@ public final class BalanceTagsModule extends Module {
     private final IntSetting maxRows = add(new IntSetting("max-rows", "Max rows", 8, 1, 20, 1)
         .description("Nearest players listed on the panel.")
         .group("HUD"));
-    private final IntSetting hudX = add(new IntSetting("hud-x", "HUD X", 4, 0, 4000, 1).group("HUD"));
-    private final IntSetting hudY = add(new IntSetting("hud-y", "HUD Y", 120, 0, 4000, 1).group("HUD"));
-    private final IntSetting hudWidth = add(new IntSetting("hud-width", "HUD width", 160, 110, 260, 2).group("HUD"));
-    private final ColorSetting accent = add(new ColorSetting("hud-accent", "HUD accent", 0xFF54D66A).group("HUD"));
     private final BoolSetting showHp = add(new BoolSetting("show-hp", "Show HP", true).group("HUD"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal HUD position, width and accent colour.").group("HUD"));
+    private final IntSetting hudX = add(new IntSetting("hud-x", "HUD X", 4, 0, 4000, 1).group("HUD").visibleWhen(showAdvanced::get));
+    private final IntSetting hudY = add(new IntSetting("hud-y", "HUD Y", 120, 0, 4000, 1).group("HUD").visibleWhen(showAdvanced::get));
+    private final IntSetting hudWidth = add(new IntSetting("hud-width", "HUD width", 160, 110, 260, 2).group("HUD").visibleWhen(showAdvanced::get));
+    private final ColorSetting accent = add(new ColorSetting("hud-accent", "HUD accent", 0xFF54D66A).group("HUD").visibleWhen(showAdvanced::get));
 
     private static final HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
 
