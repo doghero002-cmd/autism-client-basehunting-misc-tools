@@ -1,22 +1,21 @@
 package com.autism.seedcracker.finder;
 
-import com.autism.seedcracker.compat.ClientNotify;
-
 import autismclient.util.AutismClientMessaging;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundEvents;
 
-/** Shared finder flag notification (toast + prefixed chat + optional ping sound). */
+/** Shared finder flag notification (one prefixed chat line + optional ping sound). */
 public final class FinderNotify {
     private FinderNotify() {}
 
     /**
      * @param tag   chat prefix with colour code, e.g. "§6[NetherTunnel]"
-     * @param msg   human message (also used for the toast)
+     * @param msg   human message
      * @param sound play the XP-orb ping
      */
     public static void flag(String tag, String msg, boolean sound) {
-        ClientNotify.warning(msg);
+        // One line only: ClientNotify.warning() is also chat (the overlay shim), so calling both
+        // double-posted every finder flag.
         AutismClientMessaging.sendPrefixed(tag + " §f" + msg);
         if (sound) {
             Minecraft mc = Minecraft.getInstance();
