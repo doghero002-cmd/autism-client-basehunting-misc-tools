@@ -53,6 +53,7 @@ import com.autism.seedcracker.modules.ShopBuyerModule;
 import com.autism.seedcracker.modules.SkinChangerModule;
 import com.autism.seedcracker.modules.SpawnerFinderModule;
 import com.autism.seedcracker.modules.SpawnerProtectModule;
+import com.autism.seedcracker.modules.ParkourModule;
 import com.autism.seedcracker.modules.SprintModule;
 import com.autism.seedcracker.modules.StashFinderModule;
 import com.autism.seedcracker.modules.StructureDetectorModule;
@@ -233,6 +234,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Small quality-of-life helpers.
         String utility = "Utility";
         regTab(new SprintModule(), utility);
+        regTab(new ParkourModule(), utility);
         regTab(new FastPlaceModule(), utility);
         regTab(new SwingSpeedModule(), utility);
         regTab(new CoordSnapperModule(), utility);
