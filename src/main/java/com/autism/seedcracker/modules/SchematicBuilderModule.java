@@ -608,9 +608,10 @@ public final class SchematicBuilderModule extends Module {
             && mc.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
             BlockPos hitPos = bhr.getBlockPos();
             if (!mc.level.getBlockState(hitPos).isAir() && mc.gameMode != null) {
+                // Key only: vanilla's continueAttack already drives continueDestroyBlock + swing
+                // while the key is down; calling it here too doubled break progress per tick
+                // (fast-break flag risk, A15).
                 mc.options.keyAttack.setDown(true);
-                mc.gameMode.continueDestroyBlock(hitPos, bhr.getDirection());
-                mc.player.swing(InteractionHand.MAIN_HAND);
             }
         }
         return true;
