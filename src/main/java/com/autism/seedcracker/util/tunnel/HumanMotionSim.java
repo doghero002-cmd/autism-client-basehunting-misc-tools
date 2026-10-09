@@ -96,7 +96,10 @@ public final class HumanMotionSim {
         float targetYaw = Mth.wrapDegrees((float) (Math.atan2(-dx, dz) * (180.0 / Math.PI)));
         int turnTicks = Math.max(1, turnSpeedTicks);
         float newYaw = Mth.rotLerp(1.0F / turnTicks, p.getYRot(), targetYaw);
-        LookRotation.apply(newYaw, 0.0F);
+        // Ease pitch toward level instead of pinning it to 0 every tick - a rigidly horizon-locked
+        // camera is a classic bot tell (A16), and it fought the player's own mouse.
+        float newPitch = Mth.rotLerp(1.0F / turnTicks, p.getXRot(), 0.0F);
+        LookRotation.apply(newYaw, newPitch);
         float yawErr = Math.abs(Mth.wrapDegrees(targetYaw - newYaw));
         if (yawErr > turnGateDeg) {
             setForward(false);
