@@ -19,6 +19,8 @@ public abstract class FakeRolesChatMixin {
     private ClientboundSystemChatPacket seedbased$fakeRoles(ClientboundSystemChatPacket packet) {
         Component original = packet.content();
         Component replaced = FakeIdentityModule.transform(original);
+        // Name Protect runs after Fake Identity so a fake role tag wears the fake name too.
+        replaced = com.autism.seedcracker.krypton.NameProtectModule.transform(replaced);
         if (replaced == original) {
             return packet;
         }

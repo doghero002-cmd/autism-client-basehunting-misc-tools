@@ -9,6 +9,7 @@
   "client": [
     "ClientLevelMixin",
     "ClientPacketListenerMixin",
+    "ConnectionSendMixin",
     "FakeRolesChatMixin",
     "HomeSetterChatMixin",
     "HudFlagTelemetryMixin",
