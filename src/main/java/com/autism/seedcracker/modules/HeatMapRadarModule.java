@@ -48,7 +48,7 @@ public final class HeatMapRadarModule extends Module {
     private boolean dirty = false;
 
     public HeatMapRadarModule() {
-        super(SeedcrackerAddon.ID + ":heatmap-radar", "HeatMap Radar",
+        super(SeedcrackerAddon.ID + ":heatmap-radar", "Heat Map Radar",
             "Per-server visited-chunk heat map so you never sweep the same area twice.");
     }
 

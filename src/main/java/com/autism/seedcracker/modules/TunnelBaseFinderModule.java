@@ -174,7 +174,7 @@ public final class TunnelBaseFinderModule extends Module {
         com.autism.seedcracker.util.Tuning.STUCK_TICKS_TUNNEL, com.autism.seedcracker.util.Tuning.STUCK_EPSILON);
 
     public TunnelBaseFinderModule() {
-        super(SeedcrackerAddon.ID + ":tunnel-base-finder", "TunnelBase Finder",
+        super(SeedcrackerAddon.ID + ":tunnel-base-finder", "Tunnel Base Finder",
             "Digs a tunnel and alerts on bases, with shop restock + auto-mend/eat. Pick a mining style: "
                 + "CRAWL (1x1 swim), STANDING (2x1 walk) or AMETHYST (wider hazard scan).");
     }
@@ -209,14 +209,14 @@ public final class TunnelBaseFinderModule extends Module {
             if (t != -1) offhandFromInventory(mc, t, Items.TOTEM_OF_UNDYING);
             else if (autoBuyTotem.get()) { state = State.BUYTOTEM; buyStage = BuyStage.NONE; }
             else if (kickOnNoTotem.get()) { disconnect(mc, "YOU DON'T HAVE TOTEM"); return; }
-            else AutismClientMessaging.sendPrefixed("§e[TunnelBase-Water] §fNo totem - continuing anyway (kick-on-no-totem is off).");
+            else AutismClientMessaging.sendPrefixed("§e[Tunnel Base] §fNo totem - continuing anyway (kick-on-no-totem is off).");
         }
         currentDirection = horizontalDir(mc);
         if (mc.player != null) lastSteerYaw = mc.player.getYRot();
         steerHoldTicks = 0;
         float[] v = dirValues(currentDirection);
         rotateTo(v[0], v[1], () -> state = State.MINING);
-        AutismClientMessaging.sendPrefixed("§c[TunnelBase-Water] §fStarting (Water logic). Fully automated - watch for flags.");
+        AutismClientMessaging.sendPrefixed("§c[Tunnel Base] §fStarting (Water logic). Fully automated - watch for flags.");
     }
 
     @Override
@@ -504,7 +504,7 @@ public final class TunnelBaseFinderModule extends Module {
             disconnect(mc, "YOU FOUND A " + reason);
         } else {
             playFoundSound(mc);
-            AutismClientMessaging.sendPrefixed("§a[TunnelBase-Water] §fYOU FOUND A " + reason + "!");
+            AutismClientMessaging.sendPrefixed("§a[Tunnel Base] §fYOU FOUND A " + reason + "!");
         }
     }
 
@@ -1179,7 +1179,7 @@ public final class TunnelBaseFinderModule extends Module {
             if (food == -1) {
                 if (buying.get()) { state = State.BUYCARROT; buyStage = BuyStage.NONE; return; }
                 if (noFoodCooldown <= 0) {
-                    AutismClientMessaging.sendPrefixed("§e[TunnelBase-Water] §fNo food in inventory - tunneling on while hungry (no sprint/regen).");
+                    AutismClientMessaging.sendPrefixed("§e[Tunnel Base] §fNo food in inventory - tunneling on while hungry (no sprint/regen).");
                 }
                 noFoodCooldown = 20 * 60; // retry food in a minute; don't ping-pong eat<->mine every tick
                 updateUsage(mc, false);
@@ -1660,10 +1660,10 @@ public final class TunnelBaseFinderModule extends Module {
     }
 
     private void disconnect(Minecraft mc, String text) {
-        AutismClientMessaging.sendPrefixed("§c[TunnelBase-Water] §f" + text);
+        AutismClientMessaging.sendPrefixed("§c[Tunnel Base] §f" + text);
         setEnabledSilently(false);
         if (mc.getConnection() != null) {
-            mc.getConnection().getConnection().disconnect(net.minecraft.network.chat.Component.literal("TunnelBase(Water) | " + text));
+            mc.getConnection().getConnection().disconnect(net.minecraft.network.chat.Component.literal("Tunnel Base | " + text));
         }
     }
 

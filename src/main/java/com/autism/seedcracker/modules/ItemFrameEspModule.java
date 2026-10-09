@@ -47,7 +47,7 @@ public final class ItemFrameEspModule extends Module {
     private final Set<BlockPos> notified = new HashSet<>();
 
     public ItemFrameEspModule() {
-        super(SeedcrackerAddon.ID + ":item-frame-esp", "ItemFrame ESP",
+        super(SeedcrackerAddon.ID + ":item-frame-esp", "Item Frame ESP",
             "Highlights item frames holding valuable items (trophy walls = bases).");
     }
 
