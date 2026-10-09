@@ -155,45 +155,45 @@ public final class SusChunkFinderModule extends Module {
         .group("General"));
 
     // TYPES-mode per-type toggles + per-type min-count sliders.
-    private final BoolSetting kelp = add(new BoolSetting("kelp", "Kelp", true).group("Types"));
+    private final BoolSetting kelp = add(new BoolSetting("kelp", "Kelp", true).group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting kelpCount = add(new IntSetting("kelp-count", "Kelp min count", 3, 1, 200, 1)
-        .description("Kelp blocks in a chunk needed to flag (dense kelp = a farm).").group("Types"));
-    private final BoolSetting caveVines = add(new BoolSetting("cave-vines", "Cave Vines", true).group("Types"));
+        .description("Kelp blocks in a chunk needed to flag (dense kelp = a farm).").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
+    private final BoolSetting caveVines = add(new BoolSetting("cave-vines", "Cave Vines", true).group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting caveVinesCount = add(new IntSetting("cave-vines-count", "Cave vines min count", 3, 1, 200, 1)
-        .description("Cave-vine blocks in a chunk needed to flag.").group("Types"));
-    private final BoolSetting vines = add(new BoolSetting("vines", "Vines", true).group("Types"));
+        .description("Cave-vine blocks in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
+    private final BoolSetting vines = add(new BoolSetting("vines", "Vines", true).group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting vinesCount = add(new IntSetting("vines-count", "Vines min count", 3, 1, 200, 1)
-        .description("Vine blocks in a chunk needed to flag.").group("Types"));
+        .description("Vine blocks in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final BoolSetting amethystShards = add(new BoolSetting("amethyst-shards", "Amethyst Shards", true)
         .description("Amethyst clusters/buds - harvested by players, so a strong base indicator.")
-        .group("Types"));
+        .group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting amethystShardsCount = add(new IntSetting("amethyst-shards-count", "Amethyst shards min count", 1, 1, 200, 1)
-        .description("Amethyst clusters/buds in a chunk needed to flag.").group("Types"));
+        .description("Amethyst clusters/buds in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final BoolSetting amethystBlocks = add(new BoolSetting("amethyst-blocks", "Amethyst Blocks", false)
         .description("Full amethyst/budding blocks (geode structure - not player-placed).")
-        .group("Types"));
+        .group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting amethystBlocksCount = add(new IntSetting("amethyst-blocks-count", "Amethyst blocks min count", 4, 1, 200, 1)
-        .description("Full amethyst/budding blocks in a chunk needed to flag.").group("Types"));
-    private final BoolSetting bamboo = add(new BoolSetting("bamboo", "Bamboo", true).group("Types"));
+        .description("Full amethyst/budding blocks in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
+    private final BoolSetting bamboo = add(new BoolSetting("bamboo", "Bamboo", true).group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting bambooCount = add(new IntSetting("bamboo-count", "Bamboo min count", 3, 1, 200, 1)
-        .description("Bamboo blocks in a chunk needed to flag (dense bamboo = a farm).").group("Types"));
-    private final BoolSetting beeNest = add(new BoolSetting("bee-nest", "Bee Nest", true).group("Types"));
+        .description("Bamboo blocks in a chunk needed to flag (dense bamboo = a farm).").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
+    private final BoolSetting beeNest = add(new BoolSetting("bee-nest", "Bee Nest", true).group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting beeNestCount = add(new IntSetting("bee-nest-count", "Bee nest min count", 1, 1, 200, 1)
-        .description("Bee nests/hives in a chunk needed to flag.").group("Types"));
-    private final BoolSetting rotatedDeepslate = add(new BoolSetting("rotated-deepslate", "Rotated Deepslate", true).group("Types"));
+        .description("Bee nests/hives in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
+    private final BoolSetting rotatedDeepslate = add(new BoolSetting("rotated-deepslate", "Rotated Deepslate", true).group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting rotatedDeepslateCount = add(new IntSetting("rotated-deepslate-count", "Rotated deepslate min count", 3, 1, 200, 1)
-        .description("Rotated (non-Y-axis) deepslate blocks in a chunk needed to flag.").group("Types"));
+        .description("Rotated (non-Y-axis) deepslate blocks in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final BoolSetting skullCandle = add(new BoolSetting("skull-candle", "Skulls / Candles", true)
-        .description("Mob skulls + candles (strong player-build / decoration markers, nyx signal).").group("Types"));
+        .description("Mob skulls + candles (strong player-build / decoration markers, nyx signal).").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting skullCandleCount = add(new IntSetting("skull-candle-count", "Skull/candle min count", 1, 1, 200, 1)
-        .description("Skull or candle blocks in a chunk needed to flag.").group("Types"));
+        .description("Skull or candle blocks in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final BoolSetting cocoa = add(new BoolSetting("cocoa", "Cocoa", false)
-        .description("Cocoa pods (a farm indicator, nyx signal).").group("Types"));
+        .description("Cocoa pods (a farm indicator, nyx signal).").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final IntSetting cocoaCount = add(new IntSetting("cocoa-count", "Cocoa min count", 3, 1, 200, 1)
-        .description("Cocoa pods in a chunk needed to flag.").group("Types"));
+        .description("Cocoa pods in a chunk needed to flag.").group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final BoolSetting villagerHall = add(new BoolSetting("villager-hall", "Villager hall (entities)", true)
         .description("Villager/zombie-villager/allay/vindicator/warden entities in a chunk - an active base or villager hall (nyx signal).")
-        .group("Types"));
+        .group("Types").visibleWhen(() -> mode.get() == Mode.TYPES));
     private final BoolSetting persistFlags = add(new BoolSetting("persist-flags", "Persist flags to disk", true)
         .description("Save flagged chunks to disk keyed by dimension and reload them on join (survives relog, nyx behaviour).")
         .group("General"));
