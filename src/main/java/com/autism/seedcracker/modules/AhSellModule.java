@@ -100,7 +100,8 @@ public final class AhSellModule extends Module {
             // We selected the slot last tick; the carried-item packet has landed. Send the command.
             guiActionDelay--;
             if (guiActionDelay > 0) return;
-            mc.getConnection().sendCommand("ah sell " + sellPrice.get().trim().replace(",", ""));
+            mc.getConnection().sendCommand("ah sell "
+                + com.autism.seedcracker.util.pure.PriceMath.parseAmount(sellPrice.get()));
             currentState = State.WAITING_FOR_GUI;
             guiActionDelay = com.autism.seedcracker.util.Humanizer.delay(10);
             return;
@@ -178,9 +179,8 @@ public final class AhSellModule extends Module {
         }
 
         if (sellableSlot != -1) {
-            try {
-                Long.parseLong(sellPrice.get().trim().replace(",", ""));
-            } catch (NumberFormatException e) {
+            // PriceMath accepts "15000", "15,000" and "1.5m" alike; -1/0 = not a price.
+            if (com.autism.seedcracker.util.pure.PriceMath.parseAmount(sellPrice.get()) <= 0) {
                 autismclient.util.AutismClientMessaging.sendPrefixed("§c[AH Sell] Invalid sell price. Disabling.");
                 setEnabledSilently(false);
                 return;
