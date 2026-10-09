@@ -229,14 +229,28 @@ public final class GoToModule extends Module {
         if (++cacheTicks < 40) return; // periodic full record + flush every ~2s
         cacheTicks = 0;
         recordAround(mc, pcx, pcz);
-        com.autism.seedcracker.motion.ChunkCache.flush();
+        com.autism.seedcracker.motion.ChunkCache.flushAsync();
     }
 
+    /** Budgeted: scans at most 48 NEW chunks per call (already-cached chunks cost one map lookup).
+     * Spiral order (nearest first) so the chunks the planner needs soonest are cached soonest;
+     * the rest fill in over the next few seconds of periodic calls. Fixes the render-thread freeze
+     * that scanning all render-distance² chunks in one tick caused. */
     private void recordAround(Minecraft mc, int pcx, int pcz) {
+        com.autism.seedcracker.motion.ChunkCache.center(pcx, pcz);
         int r = mc.options.getEffectiveRenderDistance();
-        for (int dx = -r; dx <= r; dx++) for (int dz = -r; dz <= r; dz++) {
-            int cx = pcx + dx, cz = pcz + dz;
-            if (mc.level.hasChunk(cx, cz)) com.autism.seedcracker.motion.ChunkCache.recordLoaded(mc, mc.level.getChunk(cx, cz));
+        int budget = 48;
+        for (int ring = 0; ring <= r && budget > 0; ring++) {
+            for (int dx = -ring; dx <= ring && budget > 0; dx++) {
+                for (int dz = -ring; dz <= ring && budget > 0; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue; // ring edge only
+                    int cx = pcx + dx, cz = pcz + dz;
+                    if (mc.level.hasChunk(cx, cz)
+                            && com.autism.seedcracker.motion.ChunkCache.recordLoaded(mc, mc.level.getChunk(cx, cz))) {
+                        budget--;
+                    }
+                }
+            }
         }
     }
 

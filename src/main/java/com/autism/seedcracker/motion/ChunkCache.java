@@ -79,10 +79,14 @@ public final class ChunkCache {
         dir = null;
     }
 
-    /** Record a chunk the player can currently see (call on the game thread when it loads / periodically). */
-    public static void recordLoaded(Minecraft mc, LevelChunk chunk) {
-        if (worldKey == null || chunk == null || chunk.isEmpty()) return;
+    /** Record a chunk the player can currently see (call on the game thread when it loads / periodically).
+     * Skips chunks already recorded this session: the live loaded grid always wins for loaded chunks, the
+     * cache only serves beyond-render-distance lookups, so staleness there is harmless (planner re-plans).
+     * @return true if the chunk was actually scanned (callers budget on this). */
+    public static boolean recordLoaded(Minecraft mc, LevelChunk chunk) {
+        if (worldKey == null || chunk == null || chunk.isEmpty()) return false;
         long cp = chunk.getPos().pack();
+        if (memory.containsKey(cp)) return false;
         LevelChunkSection[] secs = chunk.getSections();
         short[][] ids = new short[secs.length][];
         boolean any = false;
@@ -98,9 +102,35 @@ public final class ChunkCache {
             ids[i] = arr;
             any = true;
         }
-        if (!any) return;
+        if (!any) return false;
         memory.put(cp, ids);
         dirty.add(cp);
+        return true;
+    }
+
+    /** ponytail: hard cap on cached chunks (~140MB worst case at ~70KB/chunk). Evicted areas degrade to
+     * UNLOADED and the planner re-plans there; upgrade path is per-section palette compression. */
+    private static final int MAX_CHUNKS = 2048;
+    private static volatile long evictCenter;
+
+    /** Player chunk — the anchor eviction keeps chunks near. */
+    public static void center(int cx, int cz) { evictCenter = pack(cx, cz); }
+
+    /** Drop chunks farthest from the player until under the cap (background thread only). */
+    private static void maybeEvict() {
+        if (memory.size() <= MAX_CHUNKS) return;
+        long c = evictCenter;
+        int ccx = unpackX(c), ccz = unpackZ(c);
+        java.util.List<Long> keys = new java.util.ArrayList<>(memory.keySet());
+        keys.sort(java.util.Comparator.comparingLong(k -> {
+            long dx = unpackX(k) - ccx, dz = unpackZ(k) - ccz;
+            return -(dx * dx + dz * dz);
+        }));
+        for (Long k : keys) {
+            if (memory.size() <= MAX_CHUNKS) break;
+            if (dirty.contains(k)) continue; // never drop unsaved data
+            memory.remove(k);
+        }
     }
 
     /** Cached block at a world position, or null if that chunk was never seen. */
@@ -144,8 +174,10 @@ public final class ChunkCache {
         int minRz = Math.min(startCz, goalCz) - padRegions, maxRz = Math.max(startCz, goalCz) + padRegions;
         PRELOAD.execute(() -> {
             for (int rx = minRx >> 5; rx <= maxRx >> 5; rx++)
-                for (int rz = minRz >> 5; rz <= maxRz >> 5; rz++)
+                for (int rz = minRz >> 5; rz <= maxRz >> 5; rz++) {
                     loadRegionIntoMemory(rx, rz);
+                    maybeEvict(); // per-region: a far goal must never hold more than the cap in memory
+                }
         });
     }
 
@@ -153,7 +185,21 @@ public final class ChunkCache {
         return dir.resolve(regionX + "," + regionZ + ".bin");
     }
 
-    /** Write dirty chunks to disk (region files of 32x32 chunks). Cheap enough to call every few seconds. */
+    private static final java.util.concurrent.ExecutorService IO =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "qql-chunkcache-io");
+                t.setDaemon(true);
+                return t;
+            });
+
+    /** Flush + evict off the game thread. Call this from tick code, never flush() directly. */
+    public static void flushAsync() {
+        IO.submit(() -> {
+            try { flush(); maybeEvict(); } catch (Throwable ignored) {}
+        });
+    }
+
+    /** Write dirty chunks to disk (region files of 32x32 chunks). Runs on the IO thread via flushAsync. */
     public static synchronized void flush() {
         if (worldKey == null || dir == null || dirty.isEmpty()) return;
         Map<Long, short[][]> toWrite = new HashMap<>();
@@ -161,7 +207,7 @@ public final class ChunkCache {
             short[][] ids = memory.get(cp);
             if (ids != null) toWrite.put(cp, ids);
         }
-        dirty.clear();
+        dirty.removeAll(toWrite.keySet()); // not clear(): keeps flags added concurrently during the copy
         // Group by region (32x32 chunks) so each file holds a contiguous area.
         Map<Long, Map<Long, short[][]>> byRegion = new HashMap<>();
         for (var e : toWrite.entrySet()) {
