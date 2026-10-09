@@ -183,6 +183,8 @@ public final class WaypointsModule extends Module {
         Map<Integer, Spot> current = scratch;
         for (Player p : mc.level.players()) {
             if (p == mc.player) continue;
+            // Only tab-listed (real) players: NPCs despawning otherwise become fake logout spots (A19).
+            if (mc.getConnection().getPlayerInfo(p.getUUID()) == null) continue;
             current.put(p.getId(), new Spot(p.getPlainTextName(), p.getUUID(),
                 p.getX(), p.getY(), p.getZ(), System.currentTimeMillis()));
         }

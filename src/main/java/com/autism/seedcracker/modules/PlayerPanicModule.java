@@ -117,6 +117,8 @@ public final class PlayerPanicModule extends Module {
         List<String> out = new ArrayList<>();
         for (Player p : mc.level.players()) {
             if (p == mc.player || p.isSpectator()) continue;
+            // NPCs (shop bots/holograms) are not in the tab list - don't panic over them (A19).
+            if (mc.getConnection() == null || mc.getConnection().getPlayerInfo(p.getUUID()) == null) continue;
             String name = p.getPlainTextName();
             if (safe.contains(name.toLowerCase(Locale.ROOT))) continue;
             if (mc.player.distanceToSqr(p) > r2) continue;
