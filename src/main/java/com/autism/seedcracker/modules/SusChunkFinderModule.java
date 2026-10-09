@@ -326,15 +326,18 @@ public final class SusChunkFinderModule extends Module {
     }
 
     // ---- disk persistence (nyx ChunkActivityScanner behaviour) ----
+    /** Last known dimension key so a save on game-leave (level already null) hits the right file. */
+    private String lastDimKey = "unknown";
+
     private java.nio.file.Path flagsFile() {
         Minecraft mc = Minecraft.getInstance();
         // dimension().toString() is "ResourceKey[... / ...]" - brackets, spaces, and a slash that
         // nests a junk directory. Use the identifier itself.
-        String dim = mc.level != null
-            ? mc.level.dimension().identifier().toString().replace(':', '_')
-            : "unknown";
+        if (mc.level != null) {
+            lastDimKey = mc.level.dimension().identifier().toString().replace(':', '_');
+        }
         return autismclient.AutismClientAddon.FOLDER.toPath()
-            .resolve("sus-chunk-flags-" + dim + ".txt");
+            .resolve("sus-chunk-flags-" + lastDimKey + ".txt");
     }
 
     private void loadFlags() {
@@ -361,6 +364,8 @@ public final class SusChunkFinderModule extends Module {
 
     @Override
     public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+        // Save BEFORE clearing - this used to wipe the session's flags without persisting them (A14).
+        if (persistFlags.get()) saveFlags();
         // Packet-history intel is per-server: chunk coords from the last server are phantom
         // flags on the next one, and the sets otherwise grow unbounded all session.
         newChunks.clear();
@@ -392,7 +397,15 @@ public final class SusChunkFinderModule extends Module {
         }
         ChunkFlagRenderer.feed(SeedcrackerAddon.ID + ":z-sus-chunk-finder", flagged, color.get(), tracer.get());
         reporter.tick(mc, flagged);
+
+        // Crash insurance: flags used to persist only on clean disable (A14).
+        if (persistFlags.get() && System.currentTimeMillis() - lastFlagSaveMs > 60_000) {
+            lastFlagSaveMs = System.currentTimeMillis();
+            saveFlags();
+        }
     }
+
+    private long lastFlagSaveMs;
 
     // ---- BETA mode (fused multi-signal scanner, merged from the old Sus Chunk Finder (Beta)) ----
 
