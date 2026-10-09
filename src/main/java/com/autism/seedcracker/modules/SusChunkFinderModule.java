@@ -1390,7 +1390,12 @@ public final class SusChunkFinderModule extends Module {
         if (hasUngrown) {
             for (int dx = -spread; dx <= spread; dx++) {
                 for (int dz = -spread; dz <= spread; dz++) {
-                    geodeVeto.add(ckey(pos.x() + dx, pos.z() + dz));
+                    long nk = ckey(pos.x() + dx, pos.z() + dz);
+                    // Never veto a chunk that has its own real signal: chunks are scanned once, so
+                    // a natural neighbour scanned AFTER the geode used to veto it forever and GEODE
+                    // mode almost never flagged (ledger #11).
+                    if (geodeSelf.getOrDefault(nk, 0) > 0) continue;
+                    geodeVeto.add(nk);
                 }
             }
         } else {

@@ -626,21 +626,33 @@ public final class DonutRTPStashFinderModule extends Module {
     private final Set<Long> loggedBases = new HashSet<>();
     private int ticksUntilScan = 0;
 
-    /** True if pos lies within the structure exclusion radius of a SeedCracker-detected structure. */
-    private boolean insideStructure(BlockPos pos) {
-        if (!skipStructures.get()) return false;
+    /**
+     * Structure positions snapshotted ONCE per scan pass. insideStructure() used to re-run every
+     * active finder's full chunk scan PER STASH BLOCK - in a chest-dense base that was hundreds of
+     * full scans per pass and froze the game (ledger #22).
+     */
+    private List<BlockPos> snapshotStructurePositions() {
+        List<BlockPos> out = new ArrayList<>();
+        if (!skipStructures.get()) return out;
         try {
             kaptainwutax.seedcrackerX.SeedCracker sc = kaptainwutax.seedcrackerX.SeedCracker.get();
-            if (sc == null) return false;
+            if (sc == null) return out;
             kaptainwutax.seedcrackerX.finder.FinderQueue fq = kaptainwutax.seedcrackerX.finder.FinderQueue.get();
-            if (fq == null) return false;
-            double rSq = (double) structureExclusionRadius.get() * structureExclusionRadius.get();
+            if (fq == null) return out;
             for (kaptainwutax.seedcrackerX.finder.Finder finder : fq.finderControl.getActiveFinders()) {
-                for (BlockPos sp : safeFindPositions(finder)) {
-                    if (sp.distSqr(pos) <= rSq) return true;
-                }
+                out.addAll(safeFindPositions(finder));
             }
         } catch (Throwable ignored) {}
+        return out;
+    }
+
+    /** True if pos lies within the structure exclusion radius of any snapshotted structure position. */
+    private boolean insideStructure(BlockPos pos, List<BlockPos> structurePositions) {
+        if (structurePositions.isEmpty()) return false;
+        double rSq = (double) structureExclusionRadius.get() * structureExclusionRadius.get();
+        for (BlockPos sp : structurePositions) {
+            if (sp.distSqr(pos) <= rSq) return true;
+        }
         return false;
     }
 
@@ -664,6 +676,7 @@ public final class DonutRTPStashFinderModule extends Module {
         int hiY = maxY.get();
         int px = (int) mc.player.getX();
         int pz = (int) mc.player.getZ();
+        List<BlockPos> structures = snapshotStructurePositions(); // once per pass, not per block
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = px - r; x <= px + r; x++) {
             for (int z = pz - r; z <= pz + r; z++) {
@@ -674,7 +687,7 @@ public final class DonutRTPStashFinderModule extends Module {
                     if (st.isAir()) continue;
                     String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
                     if (!targets.contains(id)) continue;
-                    if (insideStructure(pos)) continue;
+                    if (insideStructure(pos, structures)) continue;
                     found.add(pos.immutable());
                 }
             }
