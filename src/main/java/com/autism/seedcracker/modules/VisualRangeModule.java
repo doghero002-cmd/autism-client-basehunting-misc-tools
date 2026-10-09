@@ -54,7 +54,11 @@ public final class VisualRangeModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.player != null) {
             for (Player p : mc.level.players()) {
-                if (p != mc.player) inRange.put(p.getId(), snapshot(p));
+                // Tab-list check skips server NPCs (shop/hologram bots) - ledger A19.
+                if (p != mc.player && mc.getConnection() != null
+                    && mc.getConnection().getPlayerInfo(p.getUUID()) != null) {
+                    inRange.put(p.getId(), snapshot(p));
+                }
             }
         }
     }
@@ -73,6 +77,8 @@ public final class VisualRangeModule extends Module {
         Map<Integer, Seen> current = new HashMap<>();
         for (Player p : mc.level.players()) {
             if (p == mc.player) continue;
+            // NPCs are not in the tab list; without this they fire enter/leave alerts (A19).
+            if (mc.getConnection() == null || mc.getConnection().getPlayerInfo(p.getUUID()) == null) continue;
             current.put(p.getId(), snapshot(p));
         }
 

@@ -91,6 +91,8 @@ public final class PanicPayModule extends Module {
         double r2 = (double) radius.get() * radius.get();
         for (Player p : mc.level.players()) {
             if (p == mc.player || p.isSpectator()) continue;
+            // Never pay out over an NPC: real players are in the tab list, bots are not (A19).
+            if (mc.getConnection() == null || mc.getConnection().getPlayerInfo(p.getUUID()) == null) continue;
             if (safe.contains(p.getPlainTextName().toLowerCase())) continue;
             if (mc.player.distanceToSqr(p) > r2) continue;
 

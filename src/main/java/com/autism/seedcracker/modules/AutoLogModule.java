@@ -142,6 +142,8 @@ public final class AutoLogModule extends Module {
             double rangeSq = (double) playerRange.get() * playerRange.get();
             for (Player other : mc.level.players()) {
                 if (other == mc.player || other.isSpectator()) continue;
+                // Don't disconnect over a server NPC (not in the tab list) - ledger A19.
+                if (mc.getConnection() == null || mc.getConnection().getPlayerInfo(other.getUUID()) == null) continue;
                 if (isWhitelisted(other.getName().getString())) continue;
                 if (mc.player.distanceToSqr((Entity) other) <= rangeSq) {
                     reason = "player nearby: " + other.getName().getString();
