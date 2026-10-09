@@ -19,6 +19,11 @@ public final class PriceMath {
     /** Price from one tooltip/chat line, or -1 if the line doesn't look like a price line. */
     public static double parseLine(String line) {
         if (line == null || line.isEmpty()) return -1;
+        // "Each: $100" / "$100 per" lines are PER-UNIT; every consumer treats our result as the
+        // listing total and divides by count, so taking them double-divides (A7). Skip them -
+        // the total line ("Price: $6,400") is always present alongside.
+        String lower = line.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("each") || lower.contains(" per ") || lower.endsWith(" per")) return -1;
         Matcher m = DOLLAR.matcher(line);
         if (!m.find()) {
             m = KEYWORD.matcher(line);

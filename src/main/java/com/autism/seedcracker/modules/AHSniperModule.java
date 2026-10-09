@@ -162,6 +162,9 @@ public final class AHSniperModule extends Module {
         // Purchase verification: the buy click is only "bought" once the item count actually
         // rose in our inventory. A vanished listing (someone sniped it first) reports honestly.
         if (preBuyCount >= 0) {
+            // DonutSMP opens a confirm GUI after the listing click; without clicking its confirm
+            // button the purchase silently dies when the verify window expires (A6).
+            clickConfirmIfPresent(mc);
             int now = countOf(mc, resolveItem());
             if (now > preBuyCount) {
                 confirmedBuys++;
@@ -403,6 +406,37 @@ public final class AHSniperModule extends Module {
     private void click(Minecraft mc, AbstractContainerMenu menu, int slot) {
         if (mc.gameMode == null) return;
         com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
+    }
+
+    private int lastConfirmContainerId = -1;
+
+    /**
+     * If the open container is a purchase-confirm GUI (small chest with a confirm button), click
+     * the confirm slot once per container instance. Confirm buttons are green-ish items or carry
+     * "confirm"/"buy" in their name; the cancel side is red - never clicked.
+     */
+    private void clickConfirmIfPresent(Minecraft mc) {
+        AbstractContainerMenu menu = mc.player.containerMenu;
+        if (menu == null || menu == mc.player.inventoryMenu) return;
+        // The AH list itself is bigger than 45 slots; confirm GUIs are small.
+        if (menu.slots.size() > 45 || menu.containerId == lastConfirmContainerId) return;
+        int playerSlots = 36;
+        int containerSlots = Math.max(0, menu.slots.size() - playerSlots);
+        for (int i = 0; i < containerSlots; i++) {
+            ItemStack stack = menu.slots.get(i).getItem();
+            if (stack == null || stack.isEmpty()) continue;
+            String name = itemName(stack).toLowerCase(Locale.ROOT);
+            String id = stack.getItem().toString().toLowerCase(Locale.ROOT);
+            boolean confirmish = name.contains("confirm") || name.contains("buy") || name.contains("purchase")
+                || id.contains("lime") || id.contains("green_concrete") || id.contains("emerald");
+            boolean cancelish = name.contains("cancel") || name.contains("deny") || id.contains("red");
+            if (confirmish && !cancelish) {
+                lastConfirmContainerId = menu.containerId;
+                if (notify.get()) send("§7[AH Sniper] Confirming purchase...");
+                click(mc, menu, i);
+                return;
+            }
+        }
     }
 
     private void closeScreen(Minecraft mc) {
