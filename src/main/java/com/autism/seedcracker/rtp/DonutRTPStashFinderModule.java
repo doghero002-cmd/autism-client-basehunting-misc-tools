@@ -170,82 +170,87 @@ public final class DonutRTPStashFinderModule extends Module {
         .description("Disable the module once a base is logged (Save & RTP mode).")
         .group("Behaviour"));
 
+    // All the Baritone passthrough tuning hides behind one switch - defaults are the proven run.
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced (Baritone)", false)
+        .description("Reveal the ~30 Baritone passthrough settings (movement, avoidance, falling, render, elytra).")
+        .group("Behaviour"));
+
     // ---- Baritone: core toggles ----
     private final BoolSetting allowBreak = add(new BoolSetting("b-allow-break", "Allow break", true)
-        .description("Let Baritone break blocks.").group("Baritone"));
+        .description("Let Baritone break blocks.").group("Baritone").visibleWhen(showAdvanced::get));
     private final BoolSetting allowPlace = add(new BoolSetting("b-allow-place", "Allow place", true)
-        .description("Let Baritone place blocks.").group("Baritone"));
+        .description("Let Baritone place blocks.").group("Baritone").visibleWhen(showAdvanced::get));
     private final BoolSetting allowSprint = add(new BoolSetting("b-allow-sprint", "Allow sprint", true)
-        .description("Let Baritone sprint.").group("Baritone"));
+        .description("Let Baritone sprint.").group("Baritone").visibleWhen(showAdvanced::get));
     private final BoolSetting autoEat = add(new BoolSetting("b-auto-eat", "Auto eat", true)
-        .description("Let Baritone eat automatically.").group("Baritone"));
+        .description("Let Baritone eat automatically.").group("Baritone").visibleWhen(showAdvanced::get));
     private final BoolSetting autoTool = add(new BoolSetting("b-auto-tool", "Auto tool", true)
-        .description("Automatically select the best tool.").group("Baritone"));
+        .description("Automatically select the best tool.").group("Baritone").visibleWhen(showAdvanced::get));
     private final BoolSetting allowInventory = add(new BoolSetting("b-allow-inventory", "Allow inventory moves", false)
-        .description("Let Baritone move items to the hotbar.").group("Baritone"));
+        .description("Let Baritone move items to the hotbar.").group("Baritone").visibleWhen(showAdvanced::get));
 
     // ---- Baritone: movement ----
     private final BoolSetting allowParkour = add(new BoolSetting("b-allow-parkour", "Allow parkour", false)
-        .description("Allow parkour jumps (can be unreliable).").group("Baritone Movement"));
+        .description("Allow parkour jumps (can be unreliable).").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting allowParkourPlace = add(new BoolSetting("b-allow-parkour-place", "Allow parkour place", false)
-        .description("Allow placing blocks mid-parkour.").group("Baritone Movement"));
+        .description("Allow placing blocks mid-parkour.").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting allowDiagonalAscend = add(new BoolSetting("b-allow-diagonal-ascend", "Allow diagonal ascend", false)
-        .description("Allow ascending diagonally.").group("Baritone Movement"));
+        .description("Allow ascending diagonally.").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting allowDiagonalDescend = add(new BoolSetting("b-allow-diagonal-descend", "Allow diagonal descend", false)
-        .description("Allow descending diagonally (unsafe in the nether).").group("Baritone Movement"));
+        .description("Allow descending diagonally (unsafe in the nether).").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting allowDownward = add(new BoolSetting("b-allow-downward", "Allow downward mining", true)
-        .description("Allow mining the block directly beneath its feet.").group("Baritone Movement"));
+        .description("Allow mining the block directly beneath its feet.").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting allowVines = add(new BoolSetting("b-allow-vines", "Allow vines", false)
-        .description("Enable vine pathing (gimmicky, can trap Baritone).").group("Baritone Movement"));
+        .description("Enable vine pathing (gimmicky, can trap Baritone).").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting assumeStep = add(new BoolSetting("b-assume-step", "Assume step", false)
-        .description("Assume step functionality (don't jump on ascend).").group("Baritone Movement"));
+        .description("Assume step functionality (don't jump on ascend).").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting sprintAscends = add(new BoolSetting("b-sprint-ascends", "Sprint ascends", true)
-        .description("Sprint and jump a block early on ascends.").group("Baritone Movement"));
+        .description("Sprint and jump a block early on ascends.").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting freeLook = add(new BoolSetting("b-free-look", "Free look", true)
-        .description("Move without forcing client-sided rotations.").group("Baritone Movement"));
+        .description("Move without forcing client-sided rotations.").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting antiCheat = add(new BoolSetting("b-anti-cheat", "Anti-cheat compatibility", true)
-        .description("Adjust behavior to work better on anti-cheats.").group("Baritone Movement"));
+        .description("Adjust behavior to work better on anti-cheats.").group("Baritone Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting legitMode = add(new BoolSetting("b-legit-mode", "Legit / smooth movement", true)
         .description("Force a human-looking Baritone profile (free look, clamped reach, slowed/randomized rotations, no render) so it doesn't head-flick. Overrides the render settings above.")
-        .group("Baritone Movement"));
+        .group("Baritone Movement").visibleWhen(showAdvanced::get));
 
     // ---- Baritone: blocks / avoidance ----
     private final BoolSetting avoidUpdatingFalling = add(new BoolSetting("b-avoid-updating-falling", "Avoid updating falling blocks", true)
-        .description("Never trigger cascading sand/gravel falls (helps avoid lava too).").group("Baritone Avoidance"));
+        .description("Never trigger cascading sand/gravel falls (helps avoid lava too).").group("Baritone Avoidance").visibleWhen(showAdvanced::get));
     private final BoolSetting pauseMiningForFalling = add(new BoolSetting("b-pause-mining-falling", "Pause mining for falling blocks", true)
-        .description("Wait until falling blocks settle before continuing.").group("Baritone Avoidance"));
+        .description("Wait until falling blocks settle before continuing.").group("Baritone Avoidance").visibleWhen(showAdvanced::get));
     private final BoolSetting avoidance = add(new BoolSetting("b-avoidance", "Mob avoidance", false)
-        .description("Avoid mobs and spawners (small performance cost).").group("Baritone Avoidance"));
+        .description("Avoid mobs and spawners (small performance cost).").group("Baritone Avoidance").visibleWhen(showAdvanced::get));
     private final IntSetting mobAvoidanceRadius = add(new IntSetting("b-mob-avoid-radius", "Mob avoid radius", 8, 0, 32, 1)
-        .description("Distance to avoid mobs.").group("Baritone Avoidance").visibleWhen(() -> avoidance.get()));
+        .description("Distance to avoid mobs.").group("Baritone Avoidance").visibleWhen(() -> showAdvanced.get() && avoidance.get()));
     private final IntSetting spawnerAvoidanceRadius = add(new IntSetting("b-spawner-avoid-radius", "Spawner avoid radius", 16, 0, 48, 1)
-        .description("Distance to avoid mob spawners.").group("Baritone Avoidance").visibleWhen(() -> avoidance.get()));
+        .description("Distance to avoid mob spawners.").group("Baritone Avoidance").visibleWhen(() -> showAdvanced.get() && avoidance.get()));
 
     // ---- Baritone: falling ----
     private final IntSetting maxFallNoWater = add(new IntSetting("b-max-fall-no-water", "Max fall (no water)", 3, 0, 20, 1)
-        .description("How far Baritone may fall onto solid ground without a water bucket.").group("Baritone Falling"));
+        .description("How far Baritone may fall onto solid ground without a water bucket.").group("Baritone Falling").visibleWhen(showAdvanced::get));
     private final BoolSetting allowWaterBucketFall = add(new BoolSetting("b-allow-water-bucket-fall", "Allow water bucket fall", true)
-        .description("Allow falling arbitrary distances with a water bucket (unreliable).").group("Baritone Falling"));
+        .description("Allow falling arbitrary distances with a water bucket (unreliable).").group("Baritone Falling").visibleWhen(showAdvanced::get));
     private final IntSetting maxFallBucket = add(new IntSetting("b-max-fall-bucket", "Max fall (bucket)", 20, 0, 60, 1)
-        .description("How far Baritone may fall with a water bucket.").group("Baritone Falling").visibleWhen(() -> allowWaterBucketFall.get()));
+        .description("How far Baritone may fall with a water bucket.").group("Baritone Falling").visibleWhen(() -> showAdvanced.get() && allowWaterBucketFall.get()));
 
     // ---- Baritone: render ----
     private final BoolSetting renderPath = add(new BoolSetting("b-render-path", "Render path", true)
-        .description("Render the current path.").group("Baritone Render"));
+        .description("Render the current path.").group("Baritone Render").visibleWhen(showAdvanced::get));
     private final BoolSetting renderGoal = add(new BoolSetting("b-render-goal", "Render goal", true)
-        .description("Render the current goal.").group("Baritone Render"));
+        .description("Render the current goal.").group("Baritone Render").visibleWhen(showAdvanced::get));
     private final BoolSetting renderCachedChunks = add(new BoolSetting("b-render-cached-chunks", "Render cached chunks", false)
-        .description("Render cached chunks semi-transparently (can hurt FPS).").group("Baritone Render"));
+        .description("Render cached chunks semi-transparently (can hurt FPS).").group("Baritone Render").visibleWhen(showAdvanced::get));
 
     // ---- Baritone: elytra ----
     private final BoolSetting elytraAutoJump = add(new BoolSetting("b-elytra-auto-jump", "Elytra auto jump", false)
-        .description("Automatically path to and jump off ledges to start flying.").group("Baritone Elytra"));
+        .description("Automatically path to and jump off ledges to start flying.").group("Baritone Elytra").visibleWhen(showAdvanced::get));
     private final BoolSetting elytraAutoSwap = add(new BoolSetting("b-elytra-auto-swap", "Elytra auto swap", true)
-        .description("Swap to a fresh elytra when durability is low.").group("Baritone Elytra"));
+        .description("Swap to a fresh elytra when durability is low.").group("Baritone Elytra").visibleWhen(showAdvanced::get));
     private final BoolSetting elytraConserveFireworks = add(new BoolSetting("b-elytra-conserve-fireworks", "Conserve fireworks", false)
-        .description("Avoid using fireworks while descending.").group("Baritone Elytra"));
+        .description("Avoid using fireworks while descending.").group("Baritone Elytra").visibleWhen(showAdvanced::get));
     private final IntSetting elytraMinDurability = add(new IntSetting("b-elytra-min-durability", "Elytra min durability", 5, 1, 100, 1)
-        .description("Minimum elytra durability before swapping/landing.").group("Baritone Elytra"));
+        .description("Minimum elytra durability before swapping/landing.").group("Baritone Elytra").visibleWhen(showAdvanced::get));
 
     public DonutRTPStashFinderModule() {
         super(SeedcrackerAddon.ID + ":donut-rtp", "Donut RTP Stash Finder",
