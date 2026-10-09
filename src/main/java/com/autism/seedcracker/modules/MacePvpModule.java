@@ -116,6 +116,16 @@ public final class MacePvpModule extends Module {
     }
 
     @Override
+    public void onDisable() {
+        // Never leave the jump key stuck down.
+        if (jumpHoldTicks > 0) {
+            jumpHoldTicks = 0;
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.options != null) mc.options.keyJump.setDown(false);
+        }
+    }
+
+    @Override
     public void onGameLeft() {
         if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
@@ -125,6 +135,7 @@ public final class MacePvpModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
         if (cooldownWait > 0) cooldownWait--;
+        tickJumpRelease(mc);
         tickSwapBack(mc); // Anubis: return to the pre-swap held slot after the swing delay
 
         LivingEntity target = nearestTarget(mc);
@@ -217,10 +228,20 @@ public final class MacePvpModule extends Module {
 
     // ---- elytra ----
 
+    private int jumpHoldTicks;
+
     private void deployElytra(Minecraft mc) {
         // The client re-deploys the elytra by pressing jump while airborne with elytra equipped.
+        // The press must survive a full input tick - releasing via mc.execute() lands in the SAME
+        // tick, so the game never saw it (A21). Hold for 2 ticks, released in tick().
         mc.options.keyJump.setDown(true);
-        mc.execute(() -> mc.options.keyJump.setDown(false));
+        jumpHoldTicks = 2;
+    }
+
+    private void tickJumpRelease(Minecraft mc) {
+        if (jumpHoldTicks > 0 && --jumpHoldTicks == 0) {
+            mc.options.keyJump.setDown(false);
+        }
     }
 
     private boolean hasElytra(Minecraft mc) {

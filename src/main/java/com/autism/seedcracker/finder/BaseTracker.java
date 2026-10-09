@@ -14,7 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class BaseTracker {
 
-    private static final long TTL_MS = 500L;
+    // Finders report on a ~1s cadence (see StashFinder's reportTicks), so the TTL must outlive two
+    // report intervals or every entry expires between reports and the HUD flickers.
+    private static final long TTL_MS = 2_500L;
 
     public record Entry(int blockX, int blockZ, int confidence, String source, long lastMs) {}
 
