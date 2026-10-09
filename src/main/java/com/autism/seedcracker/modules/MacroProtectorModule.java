@@ -54,7 +54,7 @@ public final class MacroProtectorModule extends Module {
         "AHSniperModule", "AHFlipperModule", "AhSellModule", "TPASpammerModule",
         "AntiAFKModule", "SpawnerProtectModule",
         "ChestStealerModule", "AutoStoreModule", "AutoReplenishModule", "AutoSmeltModule",
-        "HomeMetaModule");
+        "HomeSetterModule");
 
     private long lastTripMs = 0;
 

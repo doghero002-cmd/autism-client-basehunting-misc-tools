@@ -48,6 +48,7 @@ public final class FlipEngine {
     private long lastRankAt;
     private int inferredThisSession;
     private int apiSalesThisSession;
+    private int ownSalesThisSession;
 
     public final Tuning tuning = new Tuning();
 
@@ -78,9 +79,17 @@ public final class FlipEngine {
 
     /** The pass reached the last page: diff against the previous complete pass to infer sales. */
     public int completeScan(long now) {
+        return completeScan(now, null);
+    }
+
+    /**
+     * As {@link #completeScan(long)}; when {@code localPlayer} is set, our own vanished listings
+     * are recorded as confirmed fills (full weight) instead of discounted inferences.
+     */
+    public int completeScan(long now, String localPlayer) {
         if (scanSearchKey == null || scanBuffer.isEmpty()) return 0;
         SaleInference.Scan current = new SaleInference.Scan(scanSearchKey, now, scanBuffer);
-        List<Sale> inferred = inference.infer(lastCompleteScan.get(scanSearchKey), current);
+        List<Sale> inferred = inference.infer(lastCompleteScan.get(scanSearchKey), current, localPlayer);
         lastCompleteScan.put(scanSearchKey, current);
         Map<String, List<Listing>> byItem = new HashMap<>();
         for (Listing l : scanBuffer) byItem.computeIfAbsent(l.itemKey(), k -> new ArrayList<>()).add(l);
@@ -105,6 +114,30 @@ public final class FlipEngine {
 
     public int scanBufferSize() {
         return scanBuffer.size();
+    }
+
+    // ---- own-sale chat feed (keyless ground truth) ----
+
+    /**
+     * A "<buyer> bought your <item> for $X" chat line: a CONFIRMED sale of our own listing, no API
+     * key needed. Enters the store as inferred=false (full weight) and removes the matching ask
+     * from the book. Returns true if the sale was new.
+     */
+    public boolean ingestOwnSale(String localPlayer, String itemKey, int count, long totalPrice, long now) {
+        if (itemKey == null || itemKey.isBlank() || count <= 0 || totalPrice <= 0) return false;
+        String saleKey = "own:" + localPlayer + ":" + itemKey + ":" + count + ":" + totalPrice + ":" + (now / 60_000);
+        Sale sale = new Sale(saleKey, now, localPlayer, itemKey, count, totalPrice, false);
+        int added = store.addSales(List.of(sale));
+        if (added > 0) {
+            ownSalesThisSession++;
+            store.removeListing(itemKey, SaleInference.listingKey(localPlayer, itemKey, count, totalPrice));
+            store.save(false);
+        }
+        return added > 0;
+    }
+
+    public int ownSalesThisSession() {
+        return ownSalesThisSession;
     }
 
     // ---- API feed ----

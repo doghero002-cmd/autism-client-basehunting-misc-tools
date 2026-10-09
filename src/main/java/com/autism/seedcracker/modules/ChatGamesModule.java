@@ -67,16 +67,18 @@ public final class ChatGamesModule extends Module {
     private final StringSetting replyPrefix = add(new StringSetting("reply-prefix", "Reply prefix", "")
         .description("Text before the answer (e.g. '/answer '). Blank = plain chat or the command the prompt mentions.")
         .group("Reply"));
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal command detection, typing speed, delays and skip-chance humanizing.").group("Reply"));
     private final BoolSetting autoDetectCommand = add(new BoolSetting("auto-detect-command", "Use prompt's command", true)
-        .description("If the prompt says to use /answer, /quiz etc., reply with that command.").group("Reply"));
+        .description("If the prompt says to use /answer, /quiz etc., reply with that command.").group("Reply").visibleWhen(showAdvanced::get));
     private final IntSetting typeSpeed = add(new IntSetting("type-speed", "Typing speed (chars/s)", 9, 3, 30, 1)
-        .description("Simulated read + type time. Instant answers are the #1 chat-game bot tell.").group("Reply"));
+        .description("Simulated read + type time. Instant answers are the #1 chat-game bot tell.").group("Reply").visibleWhen(showAdvanced::get));
     private final IntSetting maxDelay = add(new IntSetting("max-delay", "Max delay (s)", 6, 1, 20, 1)
-        .description("Never wait longer than this, or someone else wins.").group("Reply"));
+        .description("Never wait longer than this, or someone else wins.").group("Reply").visibleWhen(showAdvanced::get));
     private final IntSetting skipChance = add(new IntSetting("skip-chance", "Skip chance (%)", 0, 0, 80, 5)
-        .description("Randomly sit out some rounds so you don't win every single one.").group("Reply"));
+        .description("Randomly sit out some rounds so you don't win every single one.").group("Reply").visibleWhen(showAdvanced::get));
     private final IntSetting cooldownMs = add(new IntSetting("cooldown-ms", "Cooldown (ms)", 3000, 0, 60000, 250)
-        .description("Minimum time between answers.").group("Reply"));
+        .description("Minimum time between answers.").group("Reply").visibleWhen(showAdvanced::get));
     private final StringSetting aiEndpoint = add(new StringSetting("ai-endpoint", "AI endpoint", "https://api.openai.com/v1/chat/completions")
         .description("OpenAI-compatible chat-completions URL (OpenAI, OpenRouter, Ollama...).")
         .group("AI").visibleWhen(() -> mode.get() == AnswerMode.AI));
@@ -84,7 +86,7 @@ public final class ChatGamesModule extends Module {
         .group("AI").visibleWhen(() -> mode.get() == AnswerMode.AI));
     private final StringSetting aiKey = add(new StringSetting("ai-key", "AI API key", "")
         .description("Blank for local endpoints like Ollama.").group("AI").visibleWhen(() -> mode.get() == AnswerMode.AI));
-    private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false).group("General"));
+    private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false).group("General").visibleWhen(showAdvanced::get));
 
     private ChatGameSolver solver;
     private long lastAnswerMs;

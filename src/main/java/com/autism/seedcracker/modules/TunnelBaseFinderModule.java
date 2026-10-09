@@ -68,14 +68,18 @@ public final class TunnelBaseFinderModule extends Module {
     private final BoolSetting requireSpawner = add(new BoolSetting("require-spawner", "Require spawner", true)
         .description("Only flag a BASE when a spawner is ALSO loaded. Chest/shulker/piston counts alone (kelp farms, shops, lush caves) won't trigger.")
         .group("Base Detection"));
-    private final IntSetting obiSlot = add(new IntSetting("obsidian-slot", "Obsidian slot", 2, 1, 9, 1).group("Slots"));
-    private final IntSetting pearlSlot = add(new IntSetting("pearl-slot", "Pearl slot", 3, 1, 9, 1).group("Slots"));
-    private final IntSetting xpSlot = add(new IntSetting("bottle-slot", "Bottle slot", 4, 1, 9, 1).group("Slots"));
-    private final IntSetting carrotSlot = add(new IntSetting("carrot-slot", "GoldenCarrot slot", 5, 1, 9, 1).group("Slots"));
+    // Expert tuning hidden behind one switch - the defaults are the recommended run.
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal hotbar slots, humanize, turn/steer tuning, totem price and detection thresholds.")
+        .group("General"));
+    private final IntSetting obiSlot = add(new IntSetting("obsidian-slot", "Obsidian slot", 2, 1, 9, 1).group("Slots").visibleWhen(showAdvanced::get));
+    private final IntSetting pearlSlot = add(new IntSetting("pearl-slot", "Pearl slot", 3, 1, 9, 1).group("Slots").visibleWhen(showAdvanced::get));
+    private final IntSetting xpSlot = add(new IntSetting("bottle-slot", "Bottle slot", 4, 1, 9, 1).group("Slots").visibleWhen(showAdvanced::get));
+    private final IntSetting carrotSlot = add(new IntSetting("carrot-slot", "GoldenCarrot slot", 5, 1, 9, 1).group("Slots").visibleWhen(showAdvanced::get));
     private final BoolSetting humanize = add(new BoolSetting("humanize", "Humanize", true)
-        .description("Randomise shop/mend action delays.").group("General"));
+        .description("Randomise shop/mend action delays.").group("General").visibleWhen(showAdvanced::get));
     private final IntSetting delayRandomness = add(new IntSetting("delay-randomness", "Delay randomness", 3, 0, 10, 1)
-        .group("General").visibleWhen(() -> humanize.get()));
+        .group("General").visibleWhen(() -> showAdvanced.get() && humanize.get()));
     private final BoolSetting kickOnNoTotem = add(new BoolSetting("kick-on-no-totem", "Kick on no totem", true)
         .description("Disconnect when you have no totem (startup + when it pops). OFF = just warn and keep tunneling (risky).")
         .group("Totem"));
@@ -84,22 +88,22 @@ public final class TunnelBaseFinderModule extends Module {
         .group("Totem"));
     private final autismclient.api.module.StringSetting totemPrice = add(new autismclient.api.module.StringSetting("totem-price", "Totem price", "50000")
         .description("The /shop totem price (for reference - the buy flow clicks the totem slot; the price is informational / for your tracking).")
-        .group("Totem").visibleWhen(() -> autoBuyTotem.get()));
+        .group("Totem").visibleWhen(() -> showAdvanced.get() && autoBuyTotem.get()));
     private final IntSetting turnSpeed = add(new IntSetting("turn-speed", "Turn speed", 12, 2, 40, 1)
         .description("Degrees per tick the view turns toward a new direction (higher = snappier, lower = slower/smoother).")
-        .group("Movement"));
+        .group("Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting turnWhileWalking = add(new BoolSetting("turn-while-walking", "Turn while walking", true)
         .description("Keep walking while turning to a new direction (looks less bot-like than stop-turn-go).")
-        .group("Movement"));
+        .group("Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting manualSteer = add(new BoolSetting("manual-steer", "Steer with mouse", true)
         .description("Turn the tunnel by looking: turn your camera past ~35 degrees and the tunnel adopts that direction instead of forcing itself back straight.")
-        .group("Movement"));
+        .group("Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting followCamera = add(new BoolSetting("follow-camera", "Follow camera", true)
         .description("DEFAULT: the tunnel continuously follows where you look. The heading tracks the nearest cardinal to your camera and the movement rotation matches your exact view, so the tunnel bends as you turn. Off = only manual-steer on deliberate turns.")
         .group("Movement"));
     private final IntSetting followDeadband = add(new IntSetting("follow-deadband", "Follow deadband", 6, 0, 30, 1)
         .description("Degrees your camera must drift from the current heading before the tunnel re-centres on it (stops jitter; 0 = track every tiny movement).")
-        .group("Movement").visibleWhen(() -> followCamera.get()));
+        .group("Movement").visibleWhen(() -> showAdvanced.get() && followCamera.get()));
     private final BoolSetting backgroundRun = add(new BoolSetting("background-run", "Run while tabbed out", true)
         .description("Keep tunneling while the window is unfocused: blocks the pause menu on alt-tab and auto-closes it if it slipped in.")
         .group("General"));
@@ -112,11 +116,11 @@ public final class TunnelBaseFinderModule extends Module {
 
     // ---- Base-detection thresholds (separate settings group) ----
     private final IntSetting chestThreshold = add(new IntSetting("chest-threshold", "Chest/barrel count", 35, 1, 200, 1)
-        .description("Chests/barrels below Y0 in loaded chunks needed to count as a BASE.").group("Base Detection"));
+        .description("Chests/barrels below Y0 in loaded chunks needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
     private final IntSetting shulkerThreshold = add(new IntSetting("shulker-threshold", "Shulker count", 35, 1, 200, 1)
-        .description("Shulker boxes below Y0 needed to count as a BASE.").group("Base Detection"));
+        .description("Shulker boxes below Y0 needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
     private final IntSetting pistonThreshold = add(new IntSetting("piston-threshold", "Moving piston count", 10, 1, 100, 1)
-        .description("Moving pistons below Y0 needed to count as a BASE.").group("Base Detection"));
+        .description("Moving pistons below Y0 needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
 
     // ---- Buying (master toggle for all /shop restock) ----
     private final BoolSetting buying = add(new BoolSetting("buying", "Enable buying", true)
@@ -124,7 +128,7 @@ public final class TunnelBaseFinderModule extends Module {
         .group("Buying"));
     private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
         .description("Trace state/phase/buy transitions to chat + /flaglog, and every tick into motion-trace.log (problems + their lead-up in motion-errors.log).")
-        .group("General"));
+        .group("General").visibleWhen(showAdvanced::get));
 
     // ---- state ----
     private enum State { NONE, MINING, GOABOVEHAZARD, YRECOVERY, BUYOBI, PEARL, BUYPEARL, AUTOMEND, BUYXP, AUTOEAT, BUYCARROT, BUYTOTEM }
