@@ -300,6 +300,24 @@ public final class DonutRTPStashFinderModule extends Module {
     public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
+    @Override
+    public void onGameJoin() {
+        // Relog persistence keeps the module enabled across a reconnect, but the controller's
+        // attempt state belongs to the old world - without a restart it idled forever (A23).
+        if (!isEnabled() || controller == null) return;
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            if (!isEnabled() || controller == null) return;
+            phase = Phase.RTP;
+            loggedThisLanding = false;
+            RtpEnvironmentSnapshot env = buildSnapshot(mc);
+            if (env != null) {
+                controller.start(env);
+                AutismClientMessaging.sendPrefixed("§7[RTP] Rejoined - resuming the RTP cycle.");
+            }
+        });
+    }
+
     // ------------------------------------------------------------------
     // Engine wiring
     // ------------------------------------------------------------------

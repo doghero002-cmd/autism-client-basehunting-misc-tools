@@ -62,6 +62,8 @@ public final class AutoFireworkModule extends Module {
             if (requireElytra.get()) {
                 ItemStack chest = mc.player.getInventory().getItem(38); // chest armour slot
                 if (!chest.is(Items.ELYTRA)) { setEnabledSilently(false); return; }
+                // Equipped isn't flying: a rocket used on the ground is wasted (A20).
+                if (!mc.player.isFallFlying()) { setEnabledSilently(false); return; }
             }
             ItemStack held = mc.player.getMainHandItem();
             if (held.is(Items.FIREWORK_ROCKET) || held.is(Items.BOW) || held.is(Items.CROSSBOW)) {
