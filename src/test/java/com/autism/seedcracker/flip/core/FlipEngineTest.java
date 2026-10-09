@@ -126,6 +126,42 @@ class FlipEngineTest {
     }
 
     @Test
+    void ownVanishedListingIsConfirmedFillEvenAboveFloor() {
+        SaleInference inf = new SaleInference(SaleInference.Config.defaults());
+        // "mine" is priced way above floor - as a stranger's listing it would be ignored
+        // (probably cancelled), but as OUR listing it's a confirmed fill at full weight.
+        Listing mine = new Listing("mine", NOW, "Me_Player", ITEM, 16, 400_000);
+        List<Listing> before = List.of(listing("a", 90_000), mine, listing("d", 95_000));
+        List<Listing> after = List.of(listing("a", 90_000), listing("d", 95_000));
+        List<Sale> got = inf.infer(new SaleInference.Scan("q", NOW, before),
+            new SaleInference.Scan("q", NOW + 5 * MIN, after), "me_player");
+        assertEquals(1, got.size());
+        assertEquals(400_000, got.get(0).totalPrice());
+        assertFalse(got.get(0).inferred(), "own fill is ground truth, not an inference");
+        assertTrue(got.get(0).saleKey().startsWith("fill:"));
+    }
+
+    @Test
+    void ownSaleChatLinesParse() {
+        OwnSaleParser.OwnSale s1 = OwnSaleParser.parse("PlayerX bought your 64x Diamond Block for $1,200,000");
+        assertNotNull(s1);
+        assertEquals("PlayerX", s1.buyer());
+        assertEquals(64, s1.count());
+        assertEquals(1_200_000, s1.totalPrice());
+        assertEquals("diamond_block", OwnSaleParser.itemKeyFromDisplayName(s1.itemDisplayName()));
+
+        OwnSaleParser.OwnSale s2 = OwnSaleParser.parse("\u00a7aSomeGuy purchased your Enchanted Golden Apple for $500k\u00a7r");
+        assertNotNull(s2);
+        assertEquals(1, s2.count());
+        assertEquals(500_000, s2.totalPrice());
+        assertEquals("enchanted_golden_apple", OwnSaleParser.itemKeyFromDisplayName(s2.itemDisplayName()));
+
+        assertNull(OwnSaleParser.parse("PlayerX bought 64x Diamond Block for $100"), "not OUR sale - no 'your'");
+        assertNull(OwnSaleParser.parse("You paid Bob $500"), "unrelated money line");
+        assertNull(OwnSaleParser.parse(null));
+    }
+
+    @Test
     void untrustworthyScanPairsInferNothing() {
         SaleInference inf = new SaleInference(SaleInference.Config.defaults());
         List<Listing> before = List.of(listing("a", 90_000), listing("b", 91_000), listing("c", 92_000));

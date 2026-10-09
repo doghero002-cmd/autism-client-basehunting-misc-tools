@@ -76,48 +76,53 @@ public final class SchematicBuilderModule extends Module {
     private final EnumSetting<BuildOrder> buildOrder = add(new EnumSetting<>("build-order", "Build order", BuildOrder.ADAPTIVE, BuildOrder.values())
         .description("ADAPTIVE = advance at 95% of a layer (skips unreachable spots, faster). LAYERED = strict printer: a layer must be 100% placed before the next starts (keeps retrying misses).")
         .group("Build"));
-    private final IntSetting placeDelay = add(new IntSetting("place-delay", "Place delay (ticks)", 2, 0, 20, 1)
-        .description("Ticks to wait between block placements.").group("Build"));
-    private final IntSetting rotationSteps = add(new IntSetting("rotation", "Rotate schematic", 0, 0, 3, 1)
-        .description("Rotate the whole schematic 0/90/180/270 degrees.").group("Build"));
-    private final BoolSetting silentPlace = add(new BoolSetting("silent-place", "Silent rotation", false)
-        .description("Face placement via movement packets (camera stays). OFF eases the real camera (recommended - the crosshair must be on the block to place).")
-        .group("Build"));
-    public enum AimStyle { LEGIT, WIND_GRAVITY }
-    private final EnumSetting<AimStyle> aimStyle = add(new EnumSetting<>("aim-style", "Aim style", AimStyle.WIND_GRAVITY, AimStyle.values())
-        .description("Placement aim easing. LEGIT = time-eased human mouse. WIND_GRAVITY = wocky AdvancedRotationModel (velocity + gust + gravity, most human).")
-        .group("Build"));
     private final BoolSetting renderGhost = add(new BoolSetting("render-ghost", "Ghost preview", true)
         .description("Render the layer-by-layer ghost boxes.").group("Render"));
-    private final ColorSetting placedColor = add(new ColorSetting("placed-color", "Placed colour", 0x6400FF00).group("Render"));
-    private final ColorSetting currentColor = add(new ColorSetting("current-color", "Current layer colour", 0x9600FFFF).group("Render"));
-    private final ColorSetting missedColor = add(new ColorSetting("missed-color", "Missed colour", 0x78FF0000).group("Render"));
-    private final ColorSetting futureColor = add(new ColorSetting("future-color", "Future colour", 0x40808080).group("Render"));
-    private final BoolSetting pathfind = add(new BoolSetting("pathfind", "A* pathfinding", true)
-        .description("Walk around obstacles to reach blocks (straight-line walk when off).").group("Build"));
-    private final BoolSetting legitWalk = add(new BoolSetting("legit-walk", "Legit walk (key-press)", true)
-        .description("Walk by pressing real movement keys (nyx HumanMotionSim) with ledge/fall-hazard stop - most legit, no velocity/packet edits.")
-        .group("Build"));
-    private final BoolSetting scaffold = add(new BoolSetting("scaffold", "Scaffold bridging", true)
-        .description("Place temporary blocks to bridge gaps / reach high spots while building.").group("Build"));
     private final BoolSetting restock = add(new BoolSetting("restock", "Chest restock", false)
         .description("OPTIONAL: when a needed block is missing, open a nearby chest/barrel/shulker/ender-chest and take it, then resume.")
         .group("Restock"));
-    private final BoolSetting clearBlocks = add(new BoolSetting("clear-blocks", "Mine out wrong blocks", true)
-        .description("Mine out blocks occupying schematic spots (where it wants air or a different block) before placing.")
-        .group("Build"));
-    private final BoolSetting autoTool = add(new BoolSetting("auto-tool", "Auto tool swap", true)
-        .description("Swap to the best hotbar tool when mining out a block (faster clearing).")
-        .group("Build"));
     private final IntSetting chestRange = add(new IntSetting("chest-range", "Chest range", 12, 4, 32, 1)
         .description("How far (blocks) to search for a chest with the needed block.")
         .group("Restock").visibleWhen(() -> restock.get()));
     private final IntSetting chestDelay = add(new IntSetting("chest-delay", "Chest action delay", 4, 0, 20, 1)
         .description("Ticks between opening / taking from a chest.")
         .group("Restock").visibleWhen(() -> restock.get()));
+
+    // Everything below is expert tuning - the defaults are the recommended behaviour.
+    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
+        .description("Reveal placement timing, aim/walk styles, scaffold/mining toggles, ghost colours and debug.")
+        .group("Build"));
+    private final IntSetting placeDelay = add(new IntSetting("place-delay", "Place delay (ticks)", 2, 0, 20, 1)
+        .description("Ticks to wait between block placements.").group("Build").visibleWhen(showAdvanced::get));
+    private final IntSetting rotationSteps = add(new IntSetting("rotation", "Rotate schematic", 0, 0, 3, 1)
+        .description("Rotate the whole schematic 0/90/180/270 degrees.").group("Build").visibleWhen(showAdvanced::get));
+    private final BoolSetting silentPlace = add(new BoolSetting("silent-place", "Silent rotation", false)
+        .description("Face placement via movement packets (camera stays). OFF eases the real camera (recommended - the crosshair must be on the block to place).")
+        .group("Build").visibleWhen(showAdvanced::get));
+    public enum AimStyle { LEGIT, WIND_GRAVITY }
+    private final EnumSetting<AimStyle> aimStyle = add(new EnumSetting<>("aim-style", "Aim style", AimStyle.WIND_GRAVITY, AimStyle.values())
+        .description("Placement aim easing. LEGIT = time-eased human mouse. WIND_GRAVITY = wocky AdvancedRotationModel (velocity + gust + gravity, most human).")
+        .group("Build").visibleWhen(showAdvanced::get));
+    private final ColorSetting placedColor = add(new ColorSetting("placed-color", "Placed colour", 0x6400FF00).group("Render").visibleWhen(showAdvanced::get));
+    private final ColorSetting currentColor = add(new ColorSetting("current-color", "Current layer colour", 0x9600FFFF).group("Render").visibleWhen(showAdvanced::get));
+    private final ColorSetting missedColor = add(new ColorSetting("missed-color", "Missed colour", 0x78FF0000).group("Render").visibleWhen(showAdvanced::get));
+    private final ColorSetting futureColor = add(new ColorSetting("future-color", "Future colour", 0x40808080).group("Render").visibleWhen(showAdvanced::get));
+    private final BoolSetting pathfind = add(new BoolSetting("pathfind", "A* pathfinding", true)
+        .description("Walk around obstacles to reach blocks (straight-line walk when off).").group("Build").visibleWhen(showAdvanced::get));
+    private final BoolSetting legitWalk = add(new BoolSetting("legit-walk", "Legit walk (key-press)", true)
+        .description("Walk by pressing real movement keys (nyx HumanMotionSim) with ledge/fall-hazard stop - most legit, no velocity/packet edits.")
+        .group("Build").visibleWhen(showAdvanced::get));
+    private final BoolSetting scaffold = add(new BoolSetting("scaffold", "Scaffold bridging", true)
+        .description("Place temporary blocks to bridge gaps / reach high spots while building.").group("Build").visibleWhen(showAdvanced::get));
+    private final BoolSetting clearBlocks = add(new BoolSetting("clear-blocks", "Mine out wrong blocks", true)
+        .description("Mine out blocks occupying schematic spots (where it wants air or a different block) before placing.")
+        .group("Build").visibleWhen(showAdvanced::get));
+    private final BoolSetting autoTool = add(new BoolSetting("auto-tool", "Auto tool swap", true)
+        .description("Swap to the best hotbar tool when mining out a block (faster clearing).")
+        .group("Build").visibleWhen(showAdvanced::get));
     private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
         .description("Trace layer/task/restock/verify transitions to chat + /flaglog (diagnose stalls).")
-        .group("Build"));
+        .group("Build").visibleWhen(showAdvanced::get));
 
     // ---- state ----
     private final Map<BlockPos, BlockState> schematic = new HashMap<>();

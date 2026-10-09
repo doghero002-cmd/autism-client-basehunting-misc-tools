@@ -247,7 +247,6 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Server chat/command helpers (homes, TPA, chat games, macros).
         String server = "Server Tools";
         regTab(new HomeSetterModule(), server);
-        regTab(new com.autism.seedcracker.modules.HomeMetaModule(), server);
         regTab(new TPASpammerModule(), server);
         regTab(new AutoTPAModule(), server);
         regTab(new ChatGamesModule(), server);

@@ -15,6 +15,7 @@ import com.autism.seedcracker.flip.GuiListingReader;
 import com.autism.seedcracker.flip.core.FlipModel.Basis;
 import com.autism.seedcracker.flip.core.FlipModel.Listing;
 import com.autism.seedcracker.flip.core.FlipModel.Opportunity;
+import com.autism.seedcracker.flip.core.OwnSaleParser;
 import com.autism.seedcracker.market.AhGui;
 
 import autismclient.api.module.BoolSetting;
@@ -180,6 +181,32 @@ public final class AHFlipperModule extends Module {
         if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
+    /**
+     * Keyless ground truth: "<buyer> bought your <item> for $X" chat lines are confirmed sales of
+     * our own listings - no API key, no inference. Runs on the network thread, so the store write
+     * is marshalled onto the client thread.
+     */
+    @Override
+    public boolean onPacketReceive(net.minecraft.network.protocol.Packet<?> packet) {
+        if (engine == null) return false;
+        if (!(packet instanceof net.minecraft.network.protocol.game.ClientboundSystemChatPacket chat)) return false;
+        String line = chat.content() == null ? null : chat.content().getString();
+        OwnSaleParser.OwnSale sale = OwnSaleParser.parse(line);
+        if (sale == null) return false;
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            if (engine == null || mc.player == null) return;
+            String me = mc.player.getGameProfile().name();
+            boolean added = engine.ingestOwnSale(me, OwnSaleParser.itemKeyFromDisplayName(sale.itemDisplayName()),
+                sale.count(), sale.totalPrice(), System.currentTimeMillis());
+            if (added && alerts.get()) {
+                AutismClientMessaging.sendPrefixed("§aAH Flipper: recorded your sale of §f"
+                    + sale.count() + "x " + sale.itemDisplayName() + "§a for §6$" + String.format("%,d", sale.totalPrice()));
+            }
+        });
+        return false; // never cancel the chat line
+    }
+
     /** Moves a pasted key into the restricted key file and blanks the setting so configs never hold it. */
     private void consumeKeySetting() {
         String key = apiKey.get().trim();
@@ -273,7 +300,7 @@ public final class AHFlipperModule extends Module {
         if (!pageRead || pageCooldown > 0 || AhGui.pagedWithin(1000)) return;
         int next = AhGui.findNextPageSlot(menu, slots);
         if (next < 0) {
-            int inferred = engine.completeScan(now);
+            int inferred = engine.completeScan(now, mc.player.getGameProfile().name());
             if (inferred > 0 && alerts.get()) {
                 AutismClientMessaging.sendPrefixed("§7[AH Flipper] Pass complete: §f" + inferred + "§7 sales inferred.");
             }

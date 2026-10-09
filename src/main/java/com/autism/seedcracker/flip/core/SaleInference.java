@@ -43,6 +43,16 @@ public final class SaleInference {
 
     /** Sales inferred from {@code previous} -> {@code current}; empty when the pair isn't trustworthy. */
     public List<Sale> infer(Scan previous, Scan current) {
+        return infer(previous, current, null);
+    }
+
+    /**
+     * As {@link #infer(Scan, Scan)}, but listings owned by {@code localPlayer} (case-insensitive)
+     * that vanish are CONFIRMED fills, not inferences: you can't mistake your own listing selling
+     * for someone else's cancellation. They bypass the price-floor filter and enter at full weight
+     * (GoNuts OrderFillTracker behaviour). A fill is still subject to the scan-pair sanity checks.
+     */
+    public List<Sale> infer(Scan previous, Scan current, String localPlayer) {
         if (previous == null || current == null || !previous.searchKey().equals(current.searchKey())) return List.of();
         long gap = current.completedAt() - previous.completedAt();
         if (gap <= 0 || gap > config.maxGapMillis()) return List.of();
@@ -67,6 +77,12 @@ public final class SaleInference {
         long soldAt = previous.completedAt() + gap / 2;
         List<Sale> out = new ArrayList<>();
         for (Listing l : vanished) {
+            boolean ownFill = localPlayer != null && localPlayer.equalsIgnoreCase(l.seller());
+            if (ownFill) {
+                // Our own listing vanishing is a confirmed fill at its exact ask - no floor filter.
+                out.add(new Sale("fill:" + l.listingKey(), soldAt, l.seller(), l.itemKey(), l.count(), l.totalPrice(), false));
+                continue;
+            }
             Double floor = floorByMarket.get(marketKey(l));
             if (floor == null || l.unitPrice() > floor * config.maxAboveFloor()) continue;
             out.add(new Sale("inf:" + l.listingKey(), soldAt, l.seller(), l.itemKey(), l.count(), l.totalPrice(), true));

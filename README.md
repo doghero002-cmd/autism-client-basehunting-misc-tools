@@ -63,8 +63,8 @@ This addon bundles base-finding, stash scouting, seed-cracking, and utility tool
 | **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, Spawner Protect |
 | **Render** | AutoRender, PaperRig, Scoreboard Hider, Storage Recorder |
 | **Fake** | Fake Identity (fake /pay, fake incoming payments, fake rank — one module), Fake Player |
-| **Trading** | AH Flipper, AH Sniper, Shop Buyer, AH Sell |
-| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, FreeLook, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Player Panic, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Balance Tags, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter, Home Meta, Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Translate, Hole ESP, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, Name Protect, Mace PVP, Waypoints (death + logout + finder-marker Y) |
+| **Trading** | AH Flipper (API-key mode *and* keyless mode — page scans + your own confirmed sales from chat/fills), AH Sniper, Shop Buyer, AH Sell |
+| **Dogs Misc Tools** | Sprint, AntiAFK, FastPlace, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Player Panic, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Balance Tags, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter (SET + META modes), Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Translate, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, Name Protect, Mace PVP, Waypoints (death + logout + finder-marker Y) |
 
 ### DonutSMP stash tools
 
@@ -102,7 +102,7 @@ This addon bundles base-finding, stash scouting, seed-cracking, and utility tool
 - **Chest Stealer** — fast container pickup and inventory management.
 - **Auto Replenish** — automatic item restock workflow.
 - **Balance Tags** — tags and tracking for balance-heavy inventory work.
-- **Translate** and **Home Meta** — helpful multitool utility modules for quick in-game workflows.
+- **Translate** and **Home Setter's META mode** — helpful multitool utilities for quick in-game workflows.
 
 ## Quick Start
 
@@ -131,7 +131,7 @@ Most modules now hide their expert options behind a **Show advanced** toggle, so
 - [Fabric Loader](https://fabricmc.net/) `0.19.3+` and Fabric API
 - [AUTISM Client](https://github.com/AutismDevelopment/Autism-Client) (any compatible version)
 - [Baritone](https://github.com/cabaletta/baritone) (`baritone-meteor`) — required for the RTP / Relog / search movement
-- DonutSMP API key — only needed for the AH Flipper’s live mode
+- DonutSMP API key — optional; the AH Flipper's API mode uses it, but keyless mode works without one (page scans + your own confirmed sales)
 
 ## Install
 

@@ -3,39 +3,57 @@ package com.autism.seedcracker.modules;
 import com.autism.seedcracker.SeedcrackerAddon;
 
 import autismclient.api.module.BoolSetting;
+import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Home Setter.
  *
- * A one-shot module: enabling it deletes the configured home slot, waits a beat, then sets it to
- * your current position by running the server's home commands, then auto-disables. Works with
- * both /delhome+sethome style plugins and /home+sethome style via a custom command template.
- *
- * Clean-room port of the obfuscated Zelith "HomeSetter" module.
+ * One-shot home tool with two modes:
+ *  - SET:  delete the configured home slot, wait a beat, set it at your position, auto-disable.
+ *          (Clean-room port of the obfuscated Zelith "HomeSetter".)
+ *  - META: /sethome (twice), /rtp away, wait for the teleport, /home back, auto-disable - the
+ *          Anubis HomeMeta stash/escape sequence, merged in so it isn't a separate menu entry.
  */
 public final class HomeSetterModule extends Module {
 
+    public enum Mode { SET, META }
+
+    private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Mode", Mode.SET, Mode.values())
+        .description("SET = set the home slot at your position. META = sethome, /rtp away, then /home back (stash/escape sequence).")
+        .group("General"));
     private final IntSetting slot = add(new IntSetting("slot", "Home slot", 1, 1, 10, 1)
         .description("Which home slot number to set.")
         .group("General"));
     private final BoolSetting deleteFirst = add(new BoolSetting("delete-first", "Delete old home first", true)
         .description("Run the delete command before setting, to overwrite an existing home.")
-        .group("General"));
+        .group("General").visibleWhen(() -> mode.get() == Mode.SET));
     private final StringSetting setCommand = add(new StringSetting("set-command", "Set command", "sethome %slot%")
         .description("Command used to set the home. %slot% is replaced with the slot number.")
-        .group("General"));
+        .group("General").visibleWhen(() -> mode.get() == Mode.SET));
     private final StringSetting deleteCommand = add(new StringSetting("delete-command", "Delete command", "delhome %slot%")
         .description("Command used to delete the home. %slot% is replaced with the slot number.")
-        .group("General"));
+        .group("General").visibleWhen(() -> mode.get() == Mode.SET));
     private final IntSetting delayMs = add(new IntSetting("delay-ms", "Delay (ms)", 750, 100, 5000, 50)
         .description("Milliseconds to wait between the delete and set commands.")
-        .group("General"));
+        .group("General").visibleWhen(() -> mode.get() == Mode.SET));
+
+    // META mode (Anubis HomeMeta): sethome -> /rtp -> wait for the teleport -> /home back.
+    private final IntSetting metaDelayTicks = add(new IntSetting("meta-delay", "Step delay (ticks)", 20, 5, 100, 1)
+        .description("Ticks between sequence steps (20 = 1s). Raise on laggy servers.")
+        .group("Meta").visibleWhen(() -> mode.get() == Mode.META));
+    private final StringSetting metaRtpCommand = add(new StringSetting("meta-rtp", "RTP command", "rtp")
+        .description("Command used to teleport away.")
+        .group("Meta").visibleWhen(() -> mode.get() == Mode.META));
+    private final IntSetting metaRtpTimeout = add(new IntSetting("meta-rtp-timeout", "RTP timeout (s)", 15, 5, 60, 1)
+        .description("Give up if the RTP teleport hasn't happened after this long.")
+        .group("Meta").visibleWhen(() -> mode.get() == Mode.META));
 
     // SilentHome (Water port): hide the server's "Home set"/"Home deleted" confirmation lines so
     // nothing appears in chat while setting a stash home, optionally logging to a webhook instead.
@@ -81,6 +99,10 @@ public final class HomeSetterModule extends Module {
         if (mc.player == null || mc.level == null || mc.getConnection() == null) {
             AutismClientMessaging.sendPrefixed("§c[Home Setter] Join a world first.");
             setEnabledSilently(false);
+            return;
+        }
+        if (mode.get() == Mode.META) {
+            startMeta(mc);
             return;
         }
         running = true;
@@ -131,6 +153,73 @@ public final class HomeSetterModule extends Module {
     @Override
     public void onDisable() {
         running = false;
+        metaStep = MetaStep.IDLE;
+    }
+
+    // ---- META mode: sethome -> rtp -> wait for teleport -> home back ----
+
+    private enum MetaStep { IDLE, SETHOME_1, SETHOME_2, RTP, WAIT_TELEPORT, HOME_BACK }
+
+    private MetaStep metaStep = MetaStep.IDLE;
+    private int metaTicks;
+    private Vec3 metaStartPos;
+    private long metaRtpSentAt;
+
+    private void startMeta(Minecraft mc) {
+        running = true;
+        metaStep = MetaStep.SETHOME_1;
+        metaTicks = 0;
+        metaStartPos = mc.player.position();
+        AutismClientMessaging.sendPrefixed("§7[Home Meta] Starting: sethome -> rtp -> home back.");
+    }
+
+    @Override
+    public void tick() {
+        if (metaStep == MetaStep.IDLE) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.getConnection() == null) { abortMeta("left the world"); return; }
+
+        if (metaStep == MetaStep.WAIT_TELEPORT) {
+            // The RTP lands when we've moved far from the start point.
+            if (mc.player.position().distanceToSqr(metaStartPos) > 64 * 64) {
+                metaStep = MetaStep.HOME_BACK;
+                metaTicks = 0;
+            } else if (System.currentTimeMillis() - metaRtpSentAt > metaRtpTimeout.get() * 1000L) {
+                abortMeta("rtp timed out");
+            }
+            return;
+        }
+
+        if (++metaTicks < metaDelayTicks.get()) return;
+        metaTicks = 0;
+        String setCmd = buildCommand(setCommand.get(), slot.get());
+        switch (metaStep) {
+            case SETHOME_1 -> { sendCommand(mc, setCmd); metaStep = MetaStep.SETHOME_2; }
+            // ponytail: double-sethome mirrors Anubis HomeMeta (some servers eat the first under lag)
+            case SETHOME_2 -> { sendCommand(mc, setCmd); metaStep = MetaStep.RTP; }
+            case RTP -> {
+                sendCommand(mc, buildCommand(metaRtpCommand.get(), slot.get()));
+                metaRtpSentAt = System.currentTimeMillis();
+                metaStep = MetaStep.WAIT_TELEPORT;
+            }
+            case HOME_BACK -> {
+                sendCommand(mc, "home " + slot.get());
+                AutismClientMessaging.sendPrefixed("§a[Home Meta] Done - heading home.");
+                finishMeta();
+            }
+            default -> { }
+        }
+    }
+
+    private void abortMeta(String why) {
+        AutismClientMessaging.sendPrefixed("§c[Home Meta] Aborted: " + why + ".");
+        finishMeta();
+    }
+
+    private void finishMeta() {
+        metaStep = MetaStep.IDLE;
+        running = false;
+        setEnabledSilently(false);
     }
 
     private static String buildCommand(String template, int slotNumber) {
