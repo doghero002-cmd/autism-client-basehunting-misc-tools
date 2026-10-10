@@ -9,6 +9,7 @@ import java.util.Set;
 
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.compat.ClientNotify;
+import com.autism.seedcracker.compat.ModuleLookup;
 import com.autism.seedcracker.flip.ApiFlipSource;
 import com.autism.seedcracker.flip.FlipEngine;
 import com.autism.seedcracker.flip.GuiListingReader;
@@ -42,8 +43,9 @@ import net.minecraft.world.inventory.InventoryMenu;
  *    confidence).
  *  - API KEY (optional): real completed sales + recently-listed book from api.donutsmp.net.
  *
- * Trading is paper-only: positions settle only on a LATER real/inferred sale at the target, and
- * markets whose paper flips lose get benched. It never buys for you; open .flip to see the list.
+ * Paper positions settle only on a LATER real/inferred sale at the target; losing markets can
+ * be benched. Optional capped auto-buy uses the sniper's verified purchase flow. Ask-only
+ * opportunities remain alerts, never purchases. Open .flip to see the list.
  */
 public final class AHFlipperModule extends Module {
 
@@ -77,7 +79,15 @@ public final class AHFlipperModule extends Module {
         .description("Net profit (after tax) a flip must clear.").group("Filters"));
     private final IntSetting minRoi = add(new IntSetting("min-roi", "Min ROI (%)", 12, 1, 500, 1).group("Filters"));
     private final StringSetting maxBuy = add(new StringSetting("max-buy", "Max buy price", "")
-        .description("Ignore listings above this (k/m/b ok). Blank = no cap.").group("Filters"));
+        .description("Ignore listings above this (k/m/b ok). Blank = no per-listing cap; invalid values reject all deals.").group("Filters"));
+    private final BoolSetting autoBuy = add(new BoolSetting("auto-buy", "Auto-buy flips", false)
+        .description("Buy sales-backed flips through AH Sniper. Requires a budget; ask-only deals stay alerts.").group("Buying"));
+    private final StringSetting buyBudget = add(new StringSetting("buy-budget", "Buy budget", "")
+        .description("Total coins reserved per enable (k/m/b ok). Set a positive amount to allow buys. Failed attempts stay reserved.")
+        .group("Buying").visibleWhen(autoBuy::get));
+    private final IntSetting maxBuys = add(new IntSetting("max-buys", "Max buy attempts", 1, 1, 128, 1)
+        .description("Stop auto-buy after this many attempts, including unconfirmed buys. Re-enable the module to reset.")
+        .group("Buying").visibleWhen(autoBuy::get));
     private final BoolSetting alerts = add(new BoolSetting("alerts", "Chat alerts", true).group("Alerts"));
 
     // Everything below is expert tuning - hidden until "Show advanced" so the default panel is
@@ -105,6 +115,12 @@ public final class AHFlipperModule extends Module {
     private ApiFlipSource api;
     private long nextApiPollAt;
     private final Set<String> alerted = new HashSet<>();
+    private final Set<String> attempted = new HashSet<>();
+    private AHSniperModule purchaseExecutor;
+    private Listing pendingBuy;
+    private int buyAttempts;
+    private long reservedCoins;
+    private String buyStatus = "waiting for sales-backed deals";
 
     // auto-paging state
     private int lastContainerId = -1;
@@ -154,7 +170,17 @@ public final class AHFlipperModule extends Module {
         api = new ApiFlipSource(dir.resolve("api-key.txt"));
         consumeKeySetting();
         alerted.clear();
+        attempted.clear();
+        buyAttempts = 0;
+        reservedCoins = 0;
+        pendingBuy = null;
+        purchaseExecutor = null;
+        buyStatus = "waiting for sales-backed deals";
         resetPaging();
+        watchIndex = 0;
+        idleSince = -1;
+        idlePos = null;
+        nextRescanAt = 0;
         nextApiPollAt = 0;
         String mode = source.get() == Source.KEYLESS || !api.hasKey()
             ? "keyless - open /ah (or set a watchlist) to start learning"
@@ -168,6 +194,7 @@ public final class AHFlipperModule extends Module {
 
     @Override
     public void onDisable() {
+        cancelPurchase();
         if (engine != null) engine.save();
         if (api != null) api.close();
         api = null;
@@ -177,8 +204,44 @@ public final class AHFlipperModule extends Module {
 
     @Override
     public void onGameLeft() {
-        if (engine != null) engine.save();
+        cancelPurchase();
+        resetPaging();
+        idleSince = -1;
+        idlePos = null;
+        if (engine != null) {
+            engine.save();
+            engine.resetBook();
+        }
         if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+
+    @Override
+    protected void onOptionValueChanged(String name) {
+        if (engine != null) engine.invalidateRank();
+        if (name.equals("auto-buy") || name.equals("buy-budget") || name.equals("max-buys")
+            || name.equals("max-buy") || name.equals("min-profit") || name.equals("min-roi")
+            || name.equals("min-confidence") || name.equals("min-samples") || name.equals("tax")
+            || name.equals("source")) cancelPurchase();
+    }
+
+    @Override
+    protected void onSettingsReset() {
+        cancelPurchase();
+        if (engine != null) engine.invalidateRank();
+    }
+
+    @Override
+    public boolean onPacketSend(net.minecraft.network.protocol.Packet<?> packet) {
+        if (packet instanceof net.minecraft.network.protocol.game.ServerboundContainerClosePacket) {
+            Minecraft.getInstance().execute(this::cancelPurchase);
+        }
+        return false;
+    }
+
+    private void cancelPurchase() {
+        if (pendingBuy != null && purchaseExecutor != null) purchaseExecutor.cancelFlip();
+        pendingBuy = null;
+        purchaseExecutor = null;
     }
 
     /**
@@ -194,10 +257,12 @@ public final class AHFlipperModule extends Module {
         OwnSaleParser.OwnSale sale = OwnSaleParser.parse(line);
         if (sale == null) return false;
         Minecraft mc = Minecraft.getInstance();
+        FlipEngine activeEngine = engine;
+        var connection = mc.getConnection();
         mc.execute(() -> {
-            if (engine == null || mc.player == null) return;
+            if (engine != activeEngine || mc.player == null || mc.getConnection() != connection) return;
             String me = mc.player.getGameProfile().name();
-            boolean added = engine.ingestOwnSale(me, OwnSaleParser.itemKeyFromDisplayName(sale.itemDisplayName()),
+            boolean added = activeEngine.ingestOwnSale(me, OwnSaleParser.itemKeyFromDisplayName(sale.itemDisplayName()),
                 sale.count(), sale.totalPrice(), System.currentTimeMillis());
             if (added && alerts.get()) {
                 AutismClientMessaging.sendPrefixed("§aAH Flipper: recorded your sale of §f"
@@ -228,15 +293,25 @@ public final class AHFlipperModule extends Module {
         syncTuning();
         long now = System.currentTimeMillis();
 
-        if (source.get() != Source.KEYLESS && api != null && api.hasKey() && now >= nextApiPollAt) {
+        if (source.get() != Source.KEYLESS && api != null && api.hasKey() && mc.getConnection() != null
+            && now >= nextApiPollAt) {
             nextApiPollAt = now + com.autism.seedcracker.util.Humanizer.delayMs(30_000);
-            api.poll(sales -> mc.execute(() -> { if (engine != null) engine.ingestApiSales(sales); }),
-                listings -> mc.execute(() -> { if (engine != null) engine.ingestApiListings(listings); }));
+            FlipEngine activeEngine = engine;
+            ApiFlipSource activeApi = api;
+            var connection = mc.getConnection();
+            api.poll(sales -> mc.execute(() -> {
+                if (engine == activeEngine && api == activeApi && mc.getConnection() == connection) activeEngine.ingestApiSales(sales);
+            }), listings -> mc.execute(() -> {
+                if (engine == activeEngine && api == activeApi && mc.getConnection() == connection) activeEngine.ingestApiListings(listings);
+            }));
         }
 
         boolean readPages = source.get() != Source.API || api == null || !api.hasKey();
         AbstractContainerMenu menu = mc.player.containerMenu;
-        if (menu == null || menu instanceof InventoryMenu) {
+        if (AhGui.purchasing()) {
+            if (engine.scanning()) engine.abortScan();
+            resetPaging();
+        } else if (menu == null || menu instanceof InventoryMenu) {
             if (engine.scanning()) engine.abortScan();
             resetPaging();
             if (readPages) tickWatchlist(mc, now);
@@ -245,7 +320,11 @@ public final class AHFlipperModule extends Module {
             if (readPages) tickPages(mc, menu, now);
         }
 
-        for (Opportunity o : engine.rank(now)) maybeAlert(o, now);
+        List<Opportunity> opportunities = engine.rank(now);
+        for (Opportunity o : opportunities) {
+            if (!o.listing().seller().equalsIgnoreCase(mc.player.getGameProfile().name())) maybeAlert(o, now);
+        }
+        tickAutoBuy(mc, opportunities, now);
     }
 
     private void syncTuning() {
@@ -256,7 +335,7 @@ public final class AHFlipperModule extends Module {
         t.minConfidence = minConfidence.get() / 100.0;
         t.maxHoldHours = maxHold.get();
         long cap = com.autism.seedcracker.util.pure.PriceMath.parseAmount(maxBuy.get());
-        t.maxBuy = cap > 0 ? cap : Long.MAX_VALUE;
+        t.maxBuy = maxBuy.get().isBlank() ? Long.MAX_VALUE : Math.max(0, cap);
         t.salesTaxPercent = taxPercent.get();
         t.askFallback = askFallback.get();
         t.benchLosers = benchLosers.get();
@@ -266,10 +345,14 @@ public final class AHFlipperModule extends Module {
 
     private void tickPages(Minecraft mc, AbstractContainerMenu menu, long now) {
         int slots = AhGui.containerSlots(mc, menu);
-        if (!AhGui.isListingPage(slots)) return;
-        if (menu.containerId != lastContainerId) {
-            lastContainerId = menu.containerId;
+        if (!AhGui.isAuctionPage(mc, menu)) {
+            engine.abortScan();
             resetPaging();
+            return;
+        }
+        if (menu.containerId != lastContainerId) {
+            resetPaging();
+            lastContainerId = menu.containerId;
             String title = mc.gui.screen() == null ? "" : mc.gui.screen().getTitle().getString();
             engine.beginScan(title.toLowerCase(Locale.ROOT).trim());
             scanStartPos = mc.player.position();
@@ -290,6 +373,7 @@ public final class AHFlipperModule extends Module {
             lastPageSignature = signature;
             engine.addPage(page);
             pageRead = true;
+            pageCooldown = Math.max(pageCooldown, com.autism.seedcracker.util.Humanizer.delay(pageDelay.get()));
         }
         if (!autoPage.get() || !engine.scanning() || mc.gameMode == null) return;
 
@@ -306,7 +390,7 @@ public final class AHFlipperModule extends Module {
             }
             return;
         }
-        if (pagesTurned >= maxPages.get()) {
+        if (pagesTurned + 1 >= maxPages.get()) {
             engine.abortScan();
             return;
         }
@@ -350,6 +434,71 @@ public final class AHFlipperModule extends Module {
         mc.getConnection().sendCommand("ah " + AhGui.searchName(item));
     }
 
+    private void tickAutoBuy(Minecraft mc, List<Opportunity> opportunities, long now) {
+        if (pendingBuy != null) {
+            if (purchaseExecutor != null && purchaseExecutor.flipBusy()) {
+                buyStatus = "buying " + pendingBuy.itemKey();
+                return;
+            }
+            if (purchaseExecutor != null && purchaseExecutor.lastFlipBought()) {
+                engine.forgetListing(pendingBuy);
+                ClientNotify.success("[AH Flipper] Bought " + pendingBuy.count() + "x " + pendingBuy.itemKey()
+                    + " for " + PriceCheckModule.compact(pendingBuy.totalPrice()) + ".");
+            } else {
+                ClientNotify.warning("[AH Flipper] Buy not confirmed; the attempt stays reserved and will not be retried.");
+            }
+            pendingBuy = null;
+            purchaseExecutor = null;
+        }
+        if (!autoBuy.get()) return;
+        if (buyAttempts >= maxBuys.get()) {
+            buyStatus = "buy limit reached";
+            autoBuy.set(false);
+            ClientNotify.success("[AH Flipper] Buy limit reached; scanning continues. Re-enable the module to reset.");
+            return;
+        }
+        long budget = com.autism.seedcracker.util.pure.PriceMath.parseAmount(buyBudget.get());
+        if (budget <= 0) {
+            if (!buyStatus.equals("set a positive Buy budget")) ClientNotify.warning("[AH Flipper] Set a positive Buy budget before auto-buying.");
+            buyStatus = "set a positive Buy budget";
+            return;
+        }
+        long remaining = budget - reservedCoins;
+        if (remaining <= 0) {
+            buyStatus = "buy budget used";
+            autoBuy.set(false);
+            ClientNotify.warning("[AH Flipper] Buy budget used; scanning continues.");
+            return;
+        }
+        var module = ModuleLookup.get(SeedcrackerAddon.ID + ":ah-sniper");
+        if (!(module instanceof AHSniperModule sniper) || sniper.isEnabled() || sniper.flipBusy() || AhGui.purchasing()) {
+            buyStatus = "waiting for AH Sniper";
+            return;
+        }
+        buyStatus = "waiting for sales-backed deals";
+        for (Opportunity opportunity : opportunities) {
+            Listing listing = opportunity.listing();
+            if (attempted.contains(listing.listingKey())
+                || opportunity.expectedProfit() < minProfit.get() || opportunity.roiPercent() < minRoi.get()
+                || opportunity.confidence() < minConfidence.get() / 100.0
+                || listing.totalPrice() > engine.tuning.maxBuy
+                || !AhGui.canAutoBuy(opportunity, mc.player.getGameProfile().name(), now, remaining)) continue;
+            if (!sniper.tryBuyFlip(listing)) {
+                buyStatus = "open /ah or close the other screen";
+                return;
+            }
+            attempted.add(listing.listingKey());
+            buyAttempts++;
+            reservedCoins += listing.totalPrice();
+            pendingBuy = listing;
+            purchaseExecutor = sniper;
+            buyStatus = "buying " + listing.itemKey();
+            engine.abortScan();
+            resetPaging();
+            return;
+        }
+    }
+
     // ---- alerts / paper ----
 
     private void maybeAlert(Opportunity o, long now) {
@@ -376,6 +525,7 @@ public final class AHFlipperModule extends Module {
     @Override
     public String info() {
         if (engine == null) return "idle";
+        if (autoBuy.get() || pendingBuy != null) return buyStatus;
         if (engine.scanning()) return "scanning p" + (pagesTurned + 1) + " (" + engine.scanBufferSize() + ")";
         int flips = engine.rank(System.currentTimeMillis()).size();
         return flips + " flips, " + engine.knownSales() + " sales";

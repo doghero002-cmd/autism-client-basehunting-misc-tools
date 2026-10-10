@@ -9,6 +9,10 @@ import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 import com.autism.seedcracker.SeedcrackerAddon;
+import com.autism.seedcracker.flip.GuiListingReader;
+import com.autism.seedcracker.flip.core.FlipModel.Listing;
+import com.autism.seedcracker.market.AhGui;
+import com.autism.seedcracker.util.ActionPacer;
 
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.EnumSetting;
@@ -21,7 +25,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerInput;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -31,8 +34,8 @@ import net.minecraft.world.item.ItemStack;
  * Watches the DonutSMP auction house for a specific item at or under a target price and buys it
  * the moment it appears. Two modes:
  *
- *  - MANUAL: no API key needed. Drives the normal /ah GUI - opens /ah <item>, switches to the
- *    "Recently Listed" sort, scans the listing slots and clicks a matching cheap listing to buy.
+ *  - MANUAL: no API key needed. Drives the normal /ah GUI - opens /ah <item>, scans
+ *    listing pages and clicks a matching cheap listing to buy.
  *    Requires the auction GUI to stay open.
  *  - API: uses the DonutSMP REST API (paste your /api key) to poll recently-listed auctions, then
  *    opens /ah <seller> and buys the match. Works without you staring at the GUI.
@@ -103,11 +106,22 @@ public final class AHSniperModule extends Module {
     private long lastApiCall;
     private long nextApiGap = 500; // jittered per-poll
     private boolean warnedUnparseable; // once per enable, not per scan
-    /** Pending purchase verification: target-item count before the buy click. */
+    private Listing preparedListing;
+    private AbstractContainerMenu preparedMenu;
+    private int preparedSlot = -1;
+    private Listing pendingListing;
     private int preBuyCount = -1;
-    private int verifyTicks = 0;
-    private double pendingPrice = -1;
-    private int confirmedBuys = 0;
+    private long verifyDeadline;
+    private boolean confirmSent;
+    private int confirmedBuys;
+    private int apiGeneration;
+    private CompletableFuture<java.util.List<com.google.gson.JsonObject>> apiQuery;
+
+    // The flipper borrows this executor without changing the user's sniper settings or toggle.
+    private Listing flipTarget;
+    private long flipDeadline;
+    private boolean flipSearchSent;
+    private boolean lastFlipBought;
 
     public AHSniperModule() {
         super(SeedcrackerAddon.ID + ":ah-sniper", "AH Sniper",
@@ -116,7 +130,8 @@ public final class AHSniperModule extends Module {
 
     @Override
     public void onEnable() {
-        if (parsePrice(price.get()) < 0) {
+        cancelWork();
+        if (parsePrice(price.get()) <= 0) {
             send("§c[AH Sniper] Invalid price: " + price.get());
             setEnabledSilently(false);
             return;
@@ -134,89 +149,226 @@ public final class AHSniperModule extends Module {
         currentSeller = "";
         lastApiCall = 0;
         warnedUnparseable = false;
-        preBuyCount = -1;
-        verifyTicks = 0;
-        pendingPrice = -1;
         confirmedBuys = 0;
     }
 
     @Override
     public void onDisable() {
+        cancelWork();
+    }
+
+    private void cancelWork() {
+        apiGeneration++;
+        if (apiQuery != null) apiQuery.cancel(true);
+        apiQuery = null;
         isAuctionSniping = false;
         apiQueryInProgress = false;
+        currentSeller = "";
+        auctionPageCounter = -1;
+        delayCounter = 0;
+        cancelFlip();
+        resetPurchase();
     }
 
     @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    protected void onOptionValueChanged(String name) {
+        if (name.equals("mode") || name.equals("item") || name.equals("price")
+            || name.equals("api-key") || name.equals("max-buys")) cancelWork();
+    }
+
+    @Override
+    protected void onSettingsReset() {
+        cancelWork();
+    }
+
+    @Override
+    public boolean onPacketSend(net.minecraft.network.protocol.Packet<?> packet) {
+        if (packet instanceof net.minecraft.network.protocol.game.ServerboundContainerClosePacket) {
+            Minecraft.getInstance().execute(() -> {
+                if (pendingListing != null || preparedListing != null || flipTarget != null) {
+                    failPurchase("Container closed; purchase cancelled.");
+                }
+            });
+        }
+        return false;
+    }
+
+    @Override
+    public void onGameLeft() {
+        onDisable(); // A pending purchase must never cross a connection/dimension change.
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+
+    @Override
+    public boolean ticksWhenDisabled() {
+        return true;
+    }
+
+    @Override
+    public boolean hasDisabledTickWork() {
+        return flipTarget != null;
+    }
+
+    public boolean flipBusy() {
+        return flipTarget != null;
+    }
+
+    public boolean lastFlipBought() {
+        return lastFlipBought;
+    }
+
+    public boolean tryBuyFlip(Listing target) {
+        Minecraft mc = Minecraft.getInstance();
+        if (isEnabled() || flipTarget != null || target == null || !target.isValid()
+            || mc.player == null || mc.level == null || mc.getConnection() == null
+            || target.seller() == null || !target.seller().matches("[A-Za-z0-9_]{3,16}")
+            || target.seller().equalsIgnoreCase(mc.player.getGameProfile().name())
+            || (mc.gui.screen() != null && !isAuctionGui(mc.player.containerMenu))) return false;
+        resetPurchase();
+        delayCounter = 0;
+        flipTarget = target;
+        lastFlipBought = false;
+        flipSearchSent = false;
+        flipDeadline = System.currentTimeMillis() + 15_000;
+        AhGui.setPurchasing(true);
+        return true;
+    }
+
+    public void cancelFlip() {
+        if (flipTarget == null) return;
+        flipTarget = null;
+        lastFlipBought = false;
+        resetPurchase();
+    }
+
+    private void finishFlip(boolean bought) {
+        flipTarget = null;
+        lastFlipBought = bought;
+        resetPurchase();
+    }
+
+    private void resetPurchase() {
+        preparedListing = null;
+        preparedMenu = null;
+        preparedSlot = -1;
+        pendingListing = null;
+        preBuyCount = -1;
+        verifyDeadline = 0;
+        confirmSent = false;
+        isProcessing = false;
+        AhGui.setPurchasing(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
+        if (mc.player == null || mc.level == null) return;
+        long now = System.currentTimeMillis();
         com.autism.seedcracker.util.DebugProbe.setEnabled(id(), debug.get());
-        com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state",
-            (preBuyCount >= 0 ? "VERIFY(" + verifyTicks + "t)" : isAuctionSniping ? "SNIPING " + currentSeller
-                : mode.get() == Mode.API ? "API_POLL" : "MANUAL")
-                + (isProcessing ? " processing" : ""));
-        // Purchase verification: the buy click is only "bought" once the item count actually
-        // rose in our inventory. A vanished listing (someone sniped it first) reports honestly.
+        com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state", info());
         if (preBuyCount >= 0) {
-            // DonutSMP opens a confirm GUI after the listing click; without clicking its confirm
-            // button the purchase silently dies when the verify window expires (A6).
-            clickConfirmIfPresent(mc);
-            int now = countOf(mc, resolveItem());
-            if (now > preBuyCount) {
-                confirmedBuys++;
-                if (notify.get()) send("§a[AH Sniper] Purchase CONFIRMED (+" + (now - preBuyCount) + ")"
-                    + (pendingPrice >= 0 ? " for " + formatPrice(pendingPrice) : "") + ".");
-                preBuyCount = -1;
-                pendingPrice = -1;
-                int cap = maxBuys.get();
-                if (cap > 0 && confirmedBuys >= cap) {
-                    send("§a[AH Sniper] Hit max buys (" + cap + ") - stopping.");
-                    setEnabledSilently(false);
-                    return;
-                }
-            } else if (--verifyTicks <= 0) {
-                if (notify.get()) send("§e[AH Sniper] Purchase NOT confirmed - listing likely sniped or GUI stale.");
-                preBuyCount = -1;
-                pendingPrice = -1;
-            } else {
-                return; // keep waiting before doing anything else
-            }
+            verifyPurchase(mc, now);
+            return;
+        }
+        if (flipTarget != null && now >= flipDeadline) {
+            finishFlip(false);
+            return;
+        }
+        if (flipTarget == null && maxBuys.get() > 0 && confirmedBuys >= maxBuys.get()) {
+            setEnabledSilently(false);
+            return;
         }
         if (delayCounter > 0) {
             delayCounter--;
             return;
         }
-        if (mode.get() == Mode.API) handleApiMode(mc);
+        if (flipTarget != null) handleFlip(mc);
+        else if (mode.get() == Mode.API) handleApiMode(mc);
         else handleManualMode(mc);
     }
 
-    /** Total of the target item across the player inventory. */
-    private static int countOf(Minecraft mc, Item item) {
-        if (item == null) return 0;
+    private void verifyPurchase(Minecraft mc, long now) {
+        if (AhGui.delivered(preBuyCount, countOf(mc, pendingListing.itemKey()), pendingListing.count())) {
+            long paid = pendingListing.totalPrice();
+            if (flipTarget != null) {
+                finishFlip(true);
+            } else {
+                confirmedBuys++;
+                resetPurchase();
+                send("§a[AH Sniper] Purchase confirmed for " + formatPrice(paid) + ".");
+                if (maxBuys.get() > 0 && confirmedBuys >= maxBuys.get()) {
+                    send("§a[AH Sniper] Hit max buys (" + maxBuys.get() + ") - stopping.");
+                    setEnabledSilently(false);
+                }
+            }
+            return;
+        }
+        if (now >= verifyDeadline) {
+            failPurchase("Purchase not confirmed; stopping to avoid buying twice.");
+            return;
+        }
+        clickConfirmIfPresent(mc);
+    }
+
+    private void failPurchase(String reason) {
+        if (flipTarget != null) finishFlip(false);
+        else {
+            send("§e[AH Sniper] " + reason);
+            resetPurchase();
+            setEnabledSilently(false);
+        }
+    }
+
+    private static int countOf(Minecraft mc, String itemKey) {
         int n = 0;
         for (int i = 0; i < 36; i++) {
             ItemStack s = mc.player.getInventory().getItem(i);
-            if (!s.isEmpty() && s.is(item)) n += s.getCount();
+            if (!s.isEmpty() && itemKey.equals(GuiListingReader.itemKey(s))) n += s.getCount();
         }
         return n;
+    }
+
+    private void handleFlip(Minecraft mc) {
+        AbstractContainerMenu menu = mc.player.containerMenu;
+        if (isAuctionGui(menu) && scanListingSlots(mc, menu)) return;
+        if (mc.gui.screen() != null && !isAuctionGui(menu)) {
+            finishFlip(false); // Never replace a chest, inventory, chat or another user's screen.
+            return;
+        }
+        if (!flipSearchSent) {
+            if (sendCommand(mc, "ah " + flipTarget.seller())) {
+                flipSearchSent = true;
+                delayCounter = 20;
+            }
+        } else if (isAuctionGui(menu)) {
+            int next = AhGui.findNextPageSlot(menu, AhGui.containerSlots(mc, menu));
+            if (next >= 0 && click(mc, menu, next)) AhGui.notePageTurn();
+            delayCounter = 20;
+        }
     }
 
     // ---- MANUAL mode (drive the open /ah GUI) ----
 
     private void handleManualMode(Minecraft mc) {
-        AbstractContainerMenu menu = mc.player.containerMenu;
-        // If no container is open (player inventory has same menu reference but no extra slots), open /ah.
-        if (!isAuctionGui(menu)) {
-            String name = prettyItemName();
-            sendCommand(mc, "ah " + name);
-            delayCounter = 20;
+        if (resolveItem() == null || parsePrice(price.get()) <= 0) {
+            failPurchase("Invalid item or max price.");
             return;
         }
-        scanListingSlots(mc, menu);
+        AbstractContainerMenu menu = mc.player.containerMenu;
+        if (!isAuctionGui(menu)) {
+            if (mc.gui.screen() == null && sendCommand(mc, "ah " + prettyItemName())) delayCounter = 20;
+            return;
+        }
+        if (scanListingSlots(mc, menu)) return;
+        int slots = AhGui.containerSlots(mc, menu);
+        int control = AhGui.findNextPageSlot(menu, slots);
+        if (control < 0) control = AhGui.findRefreshSlot(menu, slots);
+        if (control >= 0) {
+            if (click(mc, menu, control)) AhGui.notePageTurn();
+        } else {
+            sendCommand(mc, "ah " + prettyItemName());
+        }
+        delayCounter = Math.max(20, refreshDelay.get() + 20);
     }
 
     // ---- API mode (poll DonutSMP, then open seller page) ----
@@ -235,100 +387,120 @@ public final class AHSniperModule extends Module {
                 delayCounter = 100;
                 return;
             }
+            if (mc.getConnection() == null || parsePrice(price.get()) <= 0 || resolveItem() == null) return;
             apiQueryInProgress = true;
-            queryApi(key).thenAccept(list -> {
-                // Hop back to the client thread before touching snipe state: processApiResponse
-                // mutates isAuctionSniping/currentSeller/auctionPageCounter, which tick() reads on
-                // the main thread. Running it on the async thread was a data race.
+            int generation = apiGeneration;
+            var connection = mc.getConnection();
+            String requestedItem = itemId.get();
+            String requestedPrice = price.get();
+            apiQuery = queryApi(key, generation);
+            apiQuery.whenComplete((list, error) -> mc.execute(() -> {
+                if (generation != apiGeneration || !isEnabled() || mode.get() != Mode.API
+                    || mc.getConnection() != connection) return;
                 apiQueryInProgress = false;
-                mc.execute(() -> processApiResponse(mc, list));
-            });
+                apiQuery = null;
+                if (error == null && itemId.get().equals(requestedItem) && price.get().equals(requestedPrice)) {
+                    processApiResponse(mc, list);
+                }
+            }));
         } else {
-            // We found a seller via the API: open their page and buy.
+            if (auctionPageCounter == -1) {
+                if (mc.gui.screen() != null && !isAuctionGui(menu)) return;
+                if (sendCommand(mc, "ah " + currentSeller)) {
+                    auctionPageCounter = 80;
+                    delayCounter = 20;
+                }
+                return;
+            }
             if (!isAuctionGui(menu)) {
-                if (auctionPageCounter == -1) {
-                    sendCommand(mc, "ah " + currentSeller);
-                    auctionPageCounter = 0;
-                } else if (auctionPageCounter <= 40) {
-                    auctionPageCounter++;
-                } else {
+                if (--auctionPageCounter <= 0) {
                     isAuctionSniping = false;
                     currentSeller = "";
                 }
+                return;
+            }
+            if (scanListingSlots(mc, menu)) return;
+            int next = AhGui.findNextPageSlot(menu, AhGui.containerSlots(mc, menu));
+            if (next >= 0) {
+                if (click(mc, menu, next)) AhGui.notePageTurn();
+                delayCounter = 20;
             } else {
-                auctionPageCounter = -1;
-                scanListingSlots(mc, menu);
+                isAuctionSniping = false;
+                currentSeller = "";
+                closeScreen(mc);
             }
         }
     }
 
-    /** Scan the listing area for the target item at/under price and click to buy. */
-    private void scanListingSlots(Minecraft mc, AbstractContainerMenu menu) {
-        Item target = resolveItem();
-        double maxPrice = parsePrice(price.get());
-        if (target == null || maxPrice < 0) return;
-
-        int limit = Math.min(menu.slots.size(), 45);
+    /** Scan only the auction container, then recheck the exact listing after the buy delay. */
+    private boolean scanListingSlots(Minecraft mc, AbstractContainerMenu menu) {
+        Item target = flipTarget == null ? resolveItem() : null;
+        long maxPrice = flipTarget == null ? parsePrice(price.get()) : flipTarget.totalPrice();
+        if ((flipTarget == null && target == null) || maxPrice <= 0) return false;
+        int limit = AhGui.containerSlots(mc, menu);
+        long now = System.currentTimeMillis();
         for (int i = 0; i < limit; i++) {
-            Slot slot = menu.slots.get(i);
-            if (slot == null) continue;
-            ItemStack stack = slot.getItem();
-            if (stack == null || stack.isEmpty()) continue;
-            if (!stack.is(target)) continue;
-            if (!isValidAuctionItem(stack)) continue;
-
-            double listingPrice = readListingPrice(stack);
-            if (listingPrice > maxPrice) continue;
-            // Fail closed: an unparseable price means we CANNOT verify it's under budget - buying
-            // blind is how you pay 10x market for a renamed item.
-            if (listingPrice < 0) {
-                if (notify.get() && !warnedUnparseable) {
+            ItemStack stack = menu.slots.get(i).getItem();
+            if (stack.isEmpty() || (target != null && !stack.is(target))) continue;
+            Listing listing = GuiListingReader.read(stack, now);
+            if (listing == null) {
+                if (target != null && !warnedUnparseable) {
                     warnedUnparseable = true;
                     send("§e[AH Sniper] Skipping " + itemName(stack) + " - price not readable from the lore.");
                 }
                 continue;
             }
+            if (listing.totalPrice() > maxPrice
+                || listing.seller().equalsIgnoreCase(mc.player.getGameProfile().name())) continue;
+            if (flipTarget != null && !AhGui.sameListing(flipTarget, listing)) continue;
+            if (flipTarget == null && mode.get() == Mode.API && isAuctionSniping
+                && !listing.seller().equalsIgnoreCase(currentSeller)) continue;
 
-            if (isProcessing) {
-                preBuyCount = countOf(mc, target); // snapshot BEFORE the click for verification
-                pendingPrice = listingPrice;
-                verifyTicks = 40; // 2s for the server to deliver the item
-                click(mc, menu, i);
+            if (isProcessing && preparedMenu == menu && preparedSlot == i
+                && AhGui.sameListing(preparedListing, listing)) {
+                int before = countOf(mc, listing.itemKey());
+                if (!click(mc, menu, i)) return true;
+                pendingListing = listing;
+                preBuyCount = before;
+                verifyDeadline = now + 8_000;
+                confirmSent = false;
+                preparedListing = null;
+                preparedMenu = null;
                 isProcessing = false;
-                delayCounter = com.autism.seedcracker.util.Humanizer.delay(Math.max(1, refreshDelay.get()));
-                return;
+                AhGui.setPurchasing(true);
+                return true;
             }
+            preparedListing = listing;
+            preparedMenu = menu;
+            preparedSlot = i;
             isProcessing = true;
+            AhGui.setPurchasing(true);
             delayCounter = com.autism.seedcracker.util.Humanizer.delay(Math.max(1, buyDelay.get()));
-            return;
+            return true;
         }
-
-        // Nothing matched: if we were sniping a specific seller, close + reset; else refresh.
-        if (isAuctionSniping) {
-            isAuctionSniping = false;
-            currentSeller = "";
-            closeScreen(mc);
-        } else {
-            // Click the "next page" / refresh area if present, else just wait.
-            delayCounter = Math.max(2, refreshDelay.get() + 20);
-        }
+        preparedListing = null;
+        preparedMenu = null;
+        isProcessing = false;
+        AhGui.setPurchasing(flipTarget != null);
+        return false;
     }
 
     // ---- DonutSMP REST API ----
 
-    private CompletableFuture<java.util.List<com.google.gson.JsonObject>> queryApi(String key) {
+    private CompletableFuture<java.util.List<com.google.gson.JsonObject>> queryApi(String key, int generation) {
         return CompletableFuture.supplyAsync(() -> {
             java.util.List<com.google.gson.JsonObject> out = new java.util.ArrayList<>();
             try {
                 HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.donutsmp.net/v1/auction/list/1"))
+                    .timeout(Duration.ofSeconds(10))
                     .header("Authorization", "Bearer " + key)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{\"sort\": \"recently_listed\"}"))
                     .build();
                 HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
                 if (resp.statusCode() != 200) {
-                    if (notify.get()) send("§c[AH Sniper] API error: " + resp.statusCode());
+                    apiError(generation, "API error: " + resp.statusCode());
                     return out;
                 }
                 com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
@@ -338,23 +510,33 @@ public final class AHSniperModule extends Module {
                     }
                 }
             } catch (Exception e) {
-                if (notify.get()) send("§c[AH Sniper] API query failed: " + e.getMessage());
+                apiError(generation, "API query failed (" + e.getClass().getSimpleName() + ").");
             }
             return out;
         });
     }
 
+    private void apiError(int generation, String message) {
+        Minecraft.getInstance().execute(() -> {
+            if (generation != apiGeneration || !isEnabled()) return;
+            delayCounter = 100;
+            send("§c[AH Sniper] " + message);
+        });
+    }
+
     private void processApiResponse(Minecraft mc, java.util.List<com.google.gson.JsonObject> list) {
-        String wantId = itemId.get().trim().toLowerCase(Locale.ROOT);
-        double maxPrice = parsePrice(price.get());
+        if (mc.player == null) return;
+        Identifier wantId = Identifier.tryParse(itemId.get().trim());
+        long maxPrice = parsePrice(price.get());
+        if (wantId == null || maxPrice <= 0) return;
         for (com.google.gson.JsonObject auction : list) {
             try {
                 String id = auction.getAsJsonObject("item").get("id").getAsString().toLowerCase(Locale.ROOT);
                 long priceVal = auction.get("price").getAsLong();
                 String seller = auction.getAsJsonObject("seller").get("name").getAsString();
-                // Match on the bare item name (minecraft:netherite_ingot -> netherite_ingot).
-                String bare = wantId.contains(":") ? wantId.substring(wantId.indexOf(':') + 1) : wantId;
-                if (id.contains(bare) && (double) priceVal <= maxPrice) {
+                if (wantId.equals(Identifier.tryParse(id)) && priceVal > 0 && priceVal <= maxPrice
+                    && seller.matches("[A-Za-z0-9_]{3,16}")
+                    && !seller.equalsIgnoreCase(mc.player.getGameProfile().name())) {
                     if (notify.get()) send("§a[AH Sniper] Found " + id + " for " + formatPrice(priceVal)
                         + " §r(<= " + formatPrice(maxPrice) + ") from §e" + seller);
                     isAuctionSniping = true;
@@ -369,20 +551,9 @@ public final class AHSniperModule extends Module {
     // ---- helpers ----
 
     private boolean isAuctionGui(AbstractContainerMenu menu) {
-        if (menu == null) return false;
-        // The auction GUI exposes many container slots beyond the player's own inventory menu.
         Minecraft mc = Minecraft.getInstance();
-        return mc.player != null && menu != mc.player.inventoryMenu && menu.slots.size() > 45;
-    }
-
-    private boolean isValidAuctionItem(ItemStack stack) {
-        return !stack.isEmpty();
-    }
-
-    /** Listing price from price-looking lore lines only (shared anchored parser) - the old
-     *  "lowest number anywhere" matched enchant levels and stack counts. -1 if unknown. */
-    private double readListingPrice(ItemStack stack) {
-        return com.autism.seedcracker.market.ListingPriceParser.parse(stack);
+        return mc.player != null && menu != null && menu != mc.player.inventoryMenu
+            && AhGui.isAuctionPage(mc, menu);
     }
 
     private Item resolveItem() {
@@ -394,63 +565,60 @@ public final class AHSniperModule extends Module {
     }
 
     private String prettyItemName() {
-        Item item = resolveItem();
-        if (item == null) return itemId.get();
-        return new ItemStack(item).getHoverName().getString();
+        return AhGui.searchName(itemId.get());
     }
 
     private String itemName(ItemStack stack) {
         return stack.getHoverName().getString();
     }
 
-    private void click(Minecraft mc, AbstractContainerMenu menu, int slot) {
-        if (mc.gameMode == null) return;
-        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction(); mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
+    private boolean click(Minecraft mc, AbstractContainerMenu menu, int slot) {
+        if (mc.gameMode == null || menu != mc.player.containerMenu || slot < 0
+            || slot >= AhGui.containerSlots(mc, menu) || !ActionPacer.tryAction()) return false;
+        com.autism.seedcracker.util.ContainerMutex.notifyContainerAction();
+        mc.gameMode.handleContainerInput(menu.containerId, slot, 0, ContainerInput.PICKUP, mc.player);
+        return true;
     }
 
-    private int lastConfirmContainerId = -1;
-
-    /**
-     * If the open container is a purchase-confirm GUI (small chest with a confirm button), click
-     * the confirm slot once per container instance. Confirm buttons are green-ish items or carry
-     * "confirm"/"buy" in their name; the cancel side is red - never clicked.
-     */
+    /** Count container slots, not container + inventory; a 27-slot dialog has 63 total slots. */
     private void clickConfirmIfPresent(Minecraft mc) {
+        if (confirmSent || pendingListing == null) return;
         AbstractContainerMenu menu = mc.player.containerMenu;
         if (menu == null || menu == mc.player.inventoryMenu) return;
-        // The AH list itself is bigger than 45 slots; confirm GUIs are small.
-        if (menu.slots.size() > 45 || menu.containerId == lastConfirmContainerId) return;
-        int playerSlots = 36;
-        int containerSlots = Math.max(0, menu.slots.size() - playerSlots);
-        for (int i = 0; i < containerSlots; i++) {
-            ItemStack stack = menu.slots.get(i).getItem();
-            if (stack == null || stack.isEmpty()) continue;
-            String name = itemName(stack).toLowerCase(Locale.ROOT);
-            String id = stack.getItem().toString().toLowerCase(Locale.ROOT);
-            boolean confirmish = name.contains("confirm") || name.contains("buy") || name.contains("purchase")
-                || id.contains("lime") || id.contains("green_concrete") || id.contains("emerald");
-            boolean cancelish = name.contains("cancel") || name.contains("deny") || id.contains("red");
-            if (confirmish && !cancelish) {
-                lastConfirmContainerId = menu.containerId;
-                if (notify.get()) send("§7[AH Sniper] Confirming purchase...");
-                click(mc, menu, i);
-                return;
+        int slots = AhGui.containerSlots(mc, menu);
+        if (!AhGui.isConfirmDialog(slots, AhGui.screenTitle(mc))) return;
+        int previewSlot = -1;
+        for (int i = 0; i < slots; i++) {
+            Listing preview = GuiListingReader.read(menu.slots.get(i).getItem(), System.currentTimeMillis());
+            if (AhGui.sameListing(pendingListing, preview)) {
+                previewSlot = i;
+                break;
             }
         }
+        if (previewSlot < 0) return; // Unknown price/seller or an unrelated chest is not a confirmation.
+        int confirm = AhGui.findConfirmSlot(menu, slots, previewSlot);
+        if (confirm < 0) return;
+        double shownPrice = com.autism.seedcracker.market.ListingPriceParser.parse(menu.slots.get(confirm).getItem());
+        if (shownPrice >= 0 && Math.round(shownPrice) != pendingListing.totalPrice()) {
+            failPurchase("Confirmation price changed; not buying.");
+            return;
+        }
+        if (click(mc, menu, confirm)) confirmSent = true; // Reset per purchase, even if the server reuses its menu id.
     }
 
     private void closeScreen(Minecraft mc) {
         if (mc.player != null) mc.player.closeContainer();
     }
 
-    private void sendCommand(Minecraft mc, String command) {
-        if (mc.getConnection() == null) return;
+    private boolean sendCommand(Minecraft mc, String command) {
+        if (mc.getConnection() == null || !ActionPacer.tryAction()) return false;
         if (command.startsWith("/")) mc.getConnection().sendCommand(command.substring(1));
         else mc.getConnection().sendCommand(command);
+        return true;
     }
 
     /** Parse "1k"/"2.5m"/"1b"/plain numbers into a price, or -1 on error (shared parser). */
-    static double parsePrice(String raw) {
+    static long parsePrice(String raw) {
         if (raw == null) return -1;
         return com.autism.seedcracker.util.pure.PriceMath.parseAmount(raw.replace("$", ""));
     }
@@ -468,6 +636,9 @@ public final class AHSniperModule extends Module {
 
     @Override
     public String info() {
-        return isAuctionSniping ? "buying" : "watching";
+        if (preBuyCount >= 0) return confirmSent ? "waiting for item" : "confirming purchase";
+        if (isProcessing) return "checking listing";
+        if (flipTarget != null) return "buying flip";
+        return isAuctionSniping ? "finding seller" : "watching";
     }
 }

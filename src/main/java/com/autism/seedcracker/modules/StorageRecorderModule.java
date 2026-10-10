@@ -2,6 +2,12 @@ package com.autism.seedcracker.modules;
 
 import com.autism.seedcracker.compat.ModuleLookup;
 
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.render.BlockEspRenderer;
+import com.autism.seedcracker.util.pure.StorageClearState;
 
 import autismclient.api.module.ActionSetting;
 import autismclient.api.module.BoolSetting;
@@ -64,19 +71,21 @@ public final class StorageRecorderModule extends Module {
         .description("Loaded chunks swept per tick for storage block entities.")
         .group("Record").visibleWhen(showAdvanced::get));
     private final ActionSetting clear = add(new ActionSetting("clear", "Clear record", this::clearRecord)
-        .buttonLabel("Clear").description("Forget everything recorded for this server+dimension.")
+        .buttonLabel("Clear").description("Clear this server+dimension's record, including its saved file. Cleared positions stay ignored for this recording session until observed gone; new storage positions can still be recorded.")
         .group("Record"));
     private final autismclient.api.module.KeybindSetting clearBind = add(new autismclient.api.module.KeybindSetting(
             "clear-bind", "Clear key", -1)
-        .description("Key that clears the record (same as the Clear button). -1 = unbound.")
+        .description("Clear the current server+dimension's record, not the module toggle. Gameplay only; release then press after enabling or closing a screen. -1 = unbound. New storage can still be recorded.")
         .group("Record"));
-    private boolean clearWasDown = false;
+    private final StorageClearState clearState = new StorageClearState();
 
     /** Recorded storage: packed BlockPos -> block kind ordinal (for color only; kind is cosmetic). */
     private final Map<Long, Byte> record = new ConcurrentHashMap<>();
     private String loadedKey = null;
     private int sweepX = Integer.MIN_VALUE, sweepZ; // rolling chunk sweep cursor
     private long dirtyAtMs = 0L;
+    private long diskRetryAtMs = 0L;
+    private boolean diskErrorShown = false;
 
     private static final byte KIND_STORAGE = 0;
     private static final byte KIND_SPAWNER = 1;
@@ -164,6 +173,7 @@ public final class StorageRecorderModule extends Module {
 
     @Override
     public void onEnable() {
+        clearState.reset();
         BlockEspRenderer.init();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) {
@@ -175,9 +185,16 @@ public final class StorageRecorderModule extends Module {
 
     @Override
     public void onDisable() {
-        if (persist.get()) saveRecord();
-        record.clear();
-        loadedKey = null;
+        releaseRecord();
+    }
+
+    private void releaseRecord() {
+        clearState.reset();
+        if (!persist.get() || saveRecord()) {
+            record.clear();
+            loadedKey = null;
+            dirtyAtMs = 0L;
+        }
         cachedFeeds = null;
         clearFeeds();
     }
@@ -193,31 +210,25 @@ public final class StorageRecorderModule extends Module {
 
     @Override
     public void onGameLeft() {
-        if (persist.get()) saveRecord();
-        record.clear();
-        loadedKey = null;
+        releaseRecord();
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-
-        // Clear keybind (edge-triggered, so one press = one clear).
-        // GLFW directly: the client's AutismBindUtil exists on 5.0 but is obfuscated away on 5.1,
-        // and GLFW is always on the classpath (Minecraft ships LWJGL), so this works on every client.
-        boolean down = isClearPressed(mc, clearBind.get());
-        if (down && !clearWasDown) clearRecord();
-        clearWasDown = down;
-
-        // Dimension/server switch: swap the record file.
-        String key = recordKey(mc);
-        if (!key.equals(loadedKey)) {
-            if (loadedKey != null && persist.get()) saveRecord();
-            record.clear();
-            cachedFeeds = null;
-            loadedKey = key;
-            if (persist.get()) loadRecordFile();
+        if (mc.player == null || mc.level == null) {
+            clearState.disarm();
+            return;
+        }
+        // Select the current file before either clear path can act on it.
+        if (!loadRecord(mc)) {
+            clearState.disarm();
+            clearFeeds();
+            return;
+        }
+        int bind = clearBind.get();
+        if (clearState.poll(bind, isClearPressed(mc, bind), mc.isWindowActive() && mc.gui.screen() == null)) {
+            clearRecord();
         }
 
         refreshEspSync();
@@ -233,10 +244,9 @@ public final class StorageRecorderModule extends Module {
             BlockEspRenderer.feedBoxes(id() + ":" + g.key, g.boxes, g.argb);
         }
 
-        // Debounced autosave (records grow while flying/tunneling; don't write every tick).
+        // Save from the first unsaved change, even while new storage keeps being discovered.
         if (persist.get() && dirtyAtMs != 0L && System.currentTimeMillis() - dirtyAtMs > 10_000L) {
             saveRecord();
-            dirtyAtMs = 0L;
         }
     }
 
@@ -267,25 +277,36 @@ public final class StorageRecorderModule extends Module {
             LevelChunk chunk = mc.level.getChunk(cx, cz);
             swept.put(chunk.getPos().pack(), chunk);
 
-            // Record what's here now.
+            // Record what's here now, excluding positions deliberately cleared this session.
             for (Map.Entry<BlockPos, BlockEntity> e : chunk.getBlockEntities().entrySet()) {
                 byte kind = classify(e.getValue());
-                if (kind < 0) continue;
-                if (record.put(e.getKey().asLong(), kind) == null) dirtyAtMs = System.currentTimeMillis();
+                long packed = e.getKey().asLong();
+                if (kind < 0 || !clearState.allowsRecord(packed)) continue;
+                Byte previous = record.put(packed, kind);
+                if (previous == null || previous != kind) markDirty();
             }
         }
         if (swept.isEmpty()) return;
         // ONE prune pass for all swept chunks (a full-map removeIf per chunk was 16 passes/tick).
         // Entries in unloaded chunks are untouched - that's the whole point of the recorder.
-        record.keySet().removeIf(packed -> {
+        java.util.function.Predicate<Long> gone = packed -> {
             BlockPos pos = BlockPos.of(packed);
             LevelChunk chunk = swept.get(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4));
             if (chunk == null) return false;
             Block b = chunk.getBlockState(pos).getBlock();
-            boolean gone = !matchesTargets(b) && !(spawners.get() && b == Blocks.SPAWNER);
-            if (gone) dirtyAtMs = System.currentTimeMillis();
-            return gone;
+            return !matchesTargets(b) && !(spawners.get() && b == Blocks.SPAWNER);
+        };
+        // Changing target settings is not evidence that deliberately forgotten storage is gone.
+        clearState.observeMissing(packed -> {
+            BlockPos pos = BlockPos.of(packed);
+            LevelChunk chunk = swept.get(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4));
+            return chunk != null && !chunk.getBlockState(pos).hasBlockEntity();
         });
+        if (record.keySet().removeIf(gone)) markDirty();
+    }
+
+    private void markDirty() {
+        if (dirtyAtMs == 0L) dirtyAtMs = System.currentTimeMillis();
     }
 
     private byte classify(BlockEntity be) {
@@ -361,44 +382,95 @@ public final class StorageRecorderModule extends Module {
         return (server + "_" + dim).replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private java.nio.file.Path recordFile() {
+    private Path recordFile() {
         return autismclient.AutismClientAddon.FOLDER.toPath()
             .resolve("storage-recorder").resolve(loadedKey + ".txt");
     }
 
-    private void loadRecord(Minecraft mc) {
-        loadedKey = recordKey(mc);
+    private boolean loadRecord(Minecraft mc) {
+        String key = recordKey(mc);
+        if (key.equals(loadedKey)) return true;
+        if (persist.get() && System.currentTimeMillis() < diskRetryAtMs) return false;
+        if (loadedKey != null && persist.get() && !saveRecord()) return false;
         record.clear();
-        if (persist.get()) loadRecordFile();
+        dirtyAtMs = 0L;
+        clearState.reset();
+        cachedFeeds = null;
+        clearFeeds();
+        sweepX = Integer.MIN_VALUE;
+        loadedKey = key;
+        if (persist.get() && !loadRecordFile()) {
+            record.clear();
+            loadedKey = null;
+            return false;
+        }
+        diskRetryAtMs = 0L;
+        diskErrorShown = false;
+        return true;
     }
 
-    private void loadRecordFile() {
+    private boolean loadRecordFile() {
         try {
-            java.nio.file.Path f = recordFile();
-            if (!java.nio.file.Files.exists(f)) return;
-            for (String line : java.nio.file.Files.readAllLines(f)) {
+            for (String line : Files.readAllLines(recordFile())) {
                 String[] p = line.trim().split(",");
                 if (p.length != 2) continue;
-                record.put(Long.parseLong(p[0]), Byte.parseByte(p[1]));
+                try {
+                    record.put(Long.parseLong(p[0]), Byte.parseByte(p[1]));
+                } catch (NumberFormatException ignored) {
+                    // One malformed entry must not hide the rest of the saved record.
+                }
             }
-        } catch (Throwable ignored) {}
+            return true;
+        } catch (NoSuchFileException ignored) {
+            return true;
+        } catch (IOException | SecurityException e) {
+            diskFailure("Cannot read the saved record; recording paused until it can be loaded.");
+            return false;
+        }
     }
 
-    private void saveRecord() {
-        if (loadedKey == null) return;
+    private boolean saveRecord() {
+        if (loadedKey == null || dirtyAtMs == 0L) return true;
+        if (System.currentTimeMillis() < diskRetryAtMs) return false;
+        Path f = recordFile();
+        Path pending = f.resolveSibling(f.getFileName() + ".tmp");
         try {
-            java.nio.file.Path f = recordFile();
-            java.nio.file.Files.createDirectories(f.getParent());
+            Files.createDirectories(f.getParent());
             List<String> lines = new ArrayList<>(record.size());
             for (Map.Entry<Long, Byte> e : record.entrySet()) lines.add(e.getKey() + "," + e.getValue());
-            java.nio.file.Files.write(f, lines);
-        } catch (Throwable ignored) {}
+            Files.write(pending, lines);
+            try {
+                Files.move(pending, f, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(pending, f, StandardCopyOption.REPLACE_EXISTING);
+            }
+            dirtyAtMs = 0L;
+            diskRetryAtMs = 0L;
+            diskErrorShown = false;
+            return true;
+        } catch (IOException | SecurityException e) {
+            diskFailure("Cannot save the record; kept in memory and will retry before switching records.");
+            return false;
+        } finally {
+            try {
+                Files.deleteIfExists(pending);
+            } catch (IOException | SecurityException e) {
+                diskFailure("Cannot remove a leftover save file; record kept.");
+            }
+        }
     }
 
-    /** Same encoding as the client's keybinds: mouse buttons are -1000-button, keys are GLFW codes, -1 = unbound. */
+    private void diskFailure(String message) {
+        diskRetryAtMs = System.currentTimeMillis() + 10_000L;
+        if (!diskErrorShown) AutismClientMessaging.sendPrefixed("Storage Recorder: " + message);
+        diskErrorShown = true;
+    }
+
+    /** GLFW is shared by both clients; the client's bind helper is absent on 5.1. */
     private static boolean isClearPressed(Minecraft mc, int bind) {
-        if (bind == -1 || mc.getWindow() == null) return false;
+        if (!StorageClearState.validBind(bind) || mc.getWindow() == null) return false;
         long handle = mc.getWindow().handle();
+        if (handle == 0L) return false;
         if (bind <= -1000) {
             return org.lwjgl.glfw.GLFW.glfwGetMouseButton(handle, -1000 - bind) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
         }
@@ -406,13 +478,28 @@ public final class StorageRecorderModule extends Module {
     }
 
     private void clearRecord() {
-        record.clear();
-        cachedFeeds = null;
-        if (loadedKey != null) {
-            try { java.nio.file.Files.deleteIfExists(recordFile()); } catch (Throwable ignored) {}
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) {
+            AutismClientMessaging.sendPrefixed("Storage Recorder: join a world before clearing its record.");
+            return;
         }
+        if (!loadRecord(mc)) {
+            AutismClientMessaging.sendPrefixed("Storage Recorder: record not cleared; the current record could not be selected safely.");
+            return;
+        }
+        try {
+            Files.deleteIfExists(recordFile());
+        } catch (IOException | SecurityException e) {
+            AutismClientMessaging.sendPrefixed("Storage Recorder: record not cleared; could not delete its saved file.");
+            return;
+        }
+        clearState.clear(record);
+        dirtyAtMs = 0L;
+        diskRetryAtMs = 0L;
+        diskErrorShown = false;
+        cachedFeeds = null;
         clearFeeds();
-        AutismClientMessaging.sendPrefixed("Storage Recorder: record cleared.");
+        AutismClientMessaging.sendPrefixed("Storage Recorder: current server+dimension record cleared. New storage can still be recorded.");
     }
 
     @Override

@@ -79,7 +79,7 @@ dependencies {
     implementation(latticg)
     include(latticg)
 
-    // Unit tests (pure-logic classes only - no Minecraft bootstrap in tests).
+    // Mostly pure unit tests, plus a small item-lore bootstrap regression.
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

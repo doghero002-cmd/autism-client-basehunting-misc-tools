@@ -63,8 +63,20 @@ This addon bundles base-finding, stash scouting, seed-cracking, and utility tool
 | **Entity** | Entity Scanner, AntiTrap, Eye Finder, Item Frame ESP, Bone Dropper, Spawner Protect |
 | **Render** | AutoRender, PaperRig, Scoreboard Hider, Storage Recorder |
 | **Fake** | Fake Identity (fake /pay, fake incoming payments, fake rank — one module), Fake Player |
-| **Trading** | AH Flipper (API-key mode *and* keyless mode — page scans + your own confirmed sales from chat/fills), AH Sniper, Shop Buyer, AH Sell |
-| **Dogs Misc Tools** | Sprint, Parkour (edge auto-jump), AntiAFK, FastPlace, AutoEat, AutoMine, SwingSpeed, CoordSnapper, FakePlayer, AutoLog, Player Panic, Flag Detector, Macro Protector, Spectator Detector, Panic Pay, Anti-Cheat Guesser, Fake Latency, Position Packet Filter, Coordinate Protector, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Balance Tags, AutoTool, TPASpammer, Tab Detector, Weather Notifier, Home Setter (SET + META modes), Skin Changer, Chat Games, Region Map, Schematic Builder, Elytra Warner, Translate, Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP, Key Pearl, Auto Firework, Auto TPA, Quick Macro, Name Protect, Mace PVP, Waypoints (death + logout + finder-marker Y) |
+| **Trading** | AH Flipper (keyless/API learning, optional capped auto-buy), AH Sniper, Price Check, Shop Buyer, AH Sell |
+| **Automation** | GoTo, AntiAFK, AutoEat, AutoMine, AutoTool, AutoFish, Inventory Cleaner, Auto Store, Auto Smelt, Chest Stealer, Auto Replenish, Schematic Builder, Gather, Elytra Travel |
+| **Combat** | Mace PVP, Key Pearl, Auto Firework, Elytra Warner |
+| **Safety** | AutoLog, Player Panic, Panic Pay, Flag Detector, Anti-Cheat Guesser, Macro Protector, Spectator Detector, Tab Detector, Session Guard, Coordinate Protector, Position Packet Filter, Fake Latency, Name Protect |
+| **ESP** | Hole Tunnel Stairs ESP, Amethyst ESP, Bedrock Hole ESP |
+| **Utility** | Sprint, Parkour, FastPlace, SwingSpeed, CoordSnapper, Waypoints, Breadcrumb, Region Map, Weather Notifier, Skin Changer, Translate, Balance Tags |
+| **Server Tools** | Home Setter (SET + META), TPASpammer, Auto TPA, Chat Games, ChatBot, Quick Macro |
+
+### Auction buying, maps and clearing records
+
+- **AH Flipper:** alerts and paper trading are the default. For purchases, enable **Auto-buy flips**, set a positive **Buy budget**, and leave **AH Sniper** off so the flipper can use its purchase executor. Only fresh sales-backed deals qualify; ask-only estimates never buy. The default limit is **one attempt per enable**. Attempts reserve their full price even when unconfirmed, so failed verification cannot cause repeated spending. Re-enable the flipper to reset the limits. Auto-buy does not automatically sell the purchased item.
+- **AH Sniper:** set the target item and maximum full-stack price, then enable it. It checks the live listing again before clicking and handles the purchase confirmation. Unconfirmed purchases stop the sniper rather than retrying blindly.
+- **Region Map:** the built-in image requires no file setup. Custom PNGs are optional; unreadable files fall back to the built-in map and warn once. Toggle the module off/on to retry a repaired file at the same path.
+- **Storage Recorder:** **Record → Clear key** is an optional keybind, unbound by default. It runs the same action as **Clear record**, only during gameplay with no screen open. Clearing affects the current server/dimension, not the module toggle. Already-cleared positions stay hidden until observed absent or the session ends; new positions continue recording.
 
 ### DonutSMP stash tools
 
@@ -135,7 +147,13 @@ Most modules now hide their expert options behind a **Show advanced** toggle, so
 
 ## Install
 
-1. Download the jar from [Releases](../../releases).
+1. Download the matching jar from [Releases](../../releases); install **one**, not both:
+
+   | Jar suffix | AUTISM Client | Addon API |
+   | --- | --- | --- |
+   | `<version>.jar` | V4 / `5.1-26.2` | v4 |
+   | `<version>+client5.0.jar` | `5.0-26.2` | v3 |
+
 2. Drop it in your `mods` folder alongside the AUTISM client and Baritone if you plan to use movement-based tools.
 3. Launch the game and open the module menu to enable the features you want.
 
@@ -155,11 +173,22 @@ From the project root, build the addon with either of these commands:
 
 The jar is produced in `build/libs/`. A pre-built copy of the latest release is also tracked under `dist/`.
 
-> **Required for builds:** the AUTISM Client API jar must be present in `libs/` to compile. The build resolves it via a `flatDir` repository. The repo tracks the pinned compile target `libs/autism-5.0-26.2-dev.jar`. The additional client jars used during development (`autism-5.1-26.2.jar` = Client V4, `autism-earlyfix.jar`) are **not tracked** — if you need to build against Client V4 / EarlyFix, drop `autism-<version>.jar` into `libs/` and point `autism` in `gradle/libs.versions.toml` at that version, then rebuild.
->
-> To upgrade the client, drop the new `autism-<version>.jar` into `libs/` and bump `autism` in `gradle/libs.versions.toml`. The project is currently pinned to AUTISM Client `5.1-26.2` (V4, addon API v4). At runtime the addon declares the lower of that and the installed client's API version, so the same jar also loads on the public `5.0-26.2` client (API v3).
->
-> **AUTISM Client version:** the build resolves the API with a Maven version range (`[3.4,)`), so it uses the newest client you have published locally instead of locking to one exact version. The built jar declares `autism: "*"` and loads on compatible client versions. If a new major client release changes the API, the addon may need source updates. Incase for people with v6 (v 5.1 jar) put that in libs folder for build to be compatible 
+The build resolves the exact vendored client jar from `libs/` using `autism` in `gradle/libs.versions.toml`, not a Maven version range. Java 25 is required.
+
+Build both variants for each release, with the same source revision:
+
+1. API v4: set `autism = "5.1-26.2"` and `mod-version = "<version>"`; build against `libs/autism-5.1-26.2.jar`.
+2. API v3: set `autism = "5.0-26.2-dev"` and `mod-version = "<version>+client5.0"`; build against `libs/autism-5.0-26.2-dev.jar`.
+3. Restore the API v4 catalog values after building. Attach both jars to the GitHub Release and label their client versions.
+
+On this Windows workspace:
+
+```powershell
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\ms-25.0.4"
+.\gradlew.bat build --offline
+```
+
+The runtime dependency is `autism: "*"`; the addon's API handshake still checks compatibility. Use the matching release variant rather than relying on cross-version compatibility.
 
 ## Credits
 

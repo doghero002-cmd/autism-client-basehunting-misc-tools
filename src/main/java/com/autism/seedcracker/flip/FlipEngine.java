@@ -46,6 +46,7 @@ public final class FlipEngine {
     private List<Opportunity> ranked = List.of();
     private Set<String> benched = Set.of();
     private long lastRankAt;
+    private boolean rankDirty = true;
     private int inferredThisSession;
     private int apiSalesThisSession;
     private int ownSalesThisSession;
@@ -69,6 +70,7 @@ public final class FlipEngine {
     /** One page's listings; they also merge into the live book so alerts work mid-scan. */
     public void addPage(List<Listing> page) {
         store.mergeBook(page);
+        invalidateRank();
         if (scanSearchKey == null) return;
         for (Listing l : page) {
             boolean dup = false;
@@ -94,6 +96,7 @@ public final class FlipEngine {
         Map<String, List<Listing>> byItem = new HashMap<>();
         for (Listing l : scanBuffer) byItem.computeIfAbsent(l.itemKey(), k -> new ArrayList<>()).add(l);
         byItem.forEach(store::replaceBook);
+        invalidateRank();
         int added = store.addSales(inferred);
         inferredThisSession += added;
         scanSearchKey = null;
@@ -131,6 +134,7 @@ public final class FlipEngine {
         if (added > 0) {
             ownSalesThisSession++;
             store.removeListing(itemKey, SaleInference.listingKey(localPlayer, itemKey, count, totalPrice));
+            invalidateRank();
             store.save(false);
         }
         return added > 0;
@@ -146,18 +150,39 @@ public final class FlipEngine {
         apiSalesThisSession += store.addSales(sales);
         // A real sale proves the matching ask is gone.
         for (Sale s : sales) store.removeListing(s.itemKey(), SaleInference.listingKey(s.seller(), s.itemKey(), s.count(), s.totalPrice()));
+        invalidateRank();
         store.save(false);
     }
 
     public void ingestApiListings(List<Listing> listings) {
         store.mergeBook(listings);
+        invalidateRank();
+    }
+
+    public void invalidateRank() {
+        rankDirty = true;
+    }
+
+    public void forgetListing(Listing listing) {
+        store.removeListing(listing.itemKey(), listing.listingKey());
+        invalidateRank();
+    }
+
+    /** Sales history survives reconnects; live asks and incomplete passes do not. */
+    public void resetBook() {
+        abortScan();
+        lastCompleteScan.clear();
+        store.clearBook();
+        ranked = List.of();
+        invalidateRank();
     }
 
     // ---- evaluation ----
 
     /** Best-first opportunities across every item with a known book; cached for 2s. */
     public List<Opportunity> rank(long now) {
-        if (now - lastRankAt < 2_000) return ranked;
+        if (!rankDirty && now - lastRankAt < 2_000) return ranked;
+        rankDirty = false;
         lastRankAt = now;
         MarketAnalyzer analyzer = new MarketAnalyzer(MarketAnalyzer.Config.defaults().withHalfLifeHours(tuning.halfLifeHours));
         OpportunityDetector detector = new OpportunityDetector(

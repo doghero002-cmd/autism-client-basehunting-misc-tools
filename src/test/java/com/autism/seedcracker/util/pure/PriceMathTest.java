@@ -53,5 +53,20 @@ class PriceMathTest {
         assertEquals(-1L, PriceMath.parseAmount(""));
         assertEquals(-1L, PriceMath.parseAmount(null));
         assertEquals(-1L, PriceMath.parseAmount("k"));
+        assertEquals(-1L, PriceMath.parseAmount("NaN"));
+        assertEquals(-1L, PriceMath.parseAmount("Infinity"));
+        assertEquals(-1L, PriceMath.parseAmount("1e100"));
+        assertEquals(-1L, PriceMath.parseAmount("9223372036854775808"));
+        assertEquals(-1L, PriceMath.parseAmount("-0.5"));
+    }
+
+    @Test
+    void coinAmountsAreExactAndFractionalCoinsTruncate() {
+        assertEquals(Long.MAX_VALUE, PriceMath.parseAmount("9223372036854775807"));
+        assertEquals(1234L, PriceMath.parseAmount("1.234k"));
+        assertEquals(1L, PriceMath.parseAmount("1.9"));
+        assertEquals(-1.0, PriceMath.parseLine("Price: $" + "9".repeat(400)));
+        assertEquals(-1.0, PriceMath.parseLine("Each: $100"));
+        assertEquals(-1.0, PriceMath.parseLine("$100 per item"));
     }
 }
