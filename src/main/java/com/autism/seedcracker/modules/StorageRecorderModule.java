@@ -66,6 +66,11 @@ public final class StorageRecorderModule extends Module {
     private final ActionSetting clear = add(new ActionSetting("clear", "Clear record", this::clearRecord)
         .buttonLabel("Clear").description("Forget everything recorded for this server+dimension.")
         .group("Record"));
+    private final autismclient.api.module.KeybindSetting clearBind = add(new autismclient.api.module.KeybindSetting(
+            "clear-bind", "Clear key", -1)
+        .description("Key that clears the record (same as the Clear button). -1 = unbound.")
+        .group("Record"));
+    private boolean clearWasDown = false;
 
     /** Recorded storage: packed BlockPos -> block kind ordinal (for color only; kind is cosmetic). */
     private final Map<Long, Byte> record = new ConcurrentHashMap<>();
@@ -197,6 +202,13 @@ public final class StorageRecorderModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
+
+        // Clear keybind (edge-triggered, so one press = one clear).
+        // GLFW directly: the client's AutismBindUtil exists on 5.0 but is obfuscated away on 5.1,
+        // and GLFW is always on the classpath (Minecraft ships LWJGL), so this works on every client.
+        boolean down = isClearPressed(mc, clearBind.get());
+        if (down && !clearWasDown) clearRecord();
+        clearWasDown = down;
 
         // Dimension/server switch: swap the record file.
         String key = recordKey(mc);
@@ -381,6 +393,16 @@ public final class StorageRecorderModule extends Module {
             for (Map.Entry<Long, Byte> e : record.entrySet()) lines.add(e.getKey() + "," + e.getValue());
             java.nio.file.Files.write(f, lines);
         } catch (Throwable ignored) {}
+    }
+
+    /** Same encoding as the client's keybinds: mouse buttons are -1000-button, keys are GLFW codes, -1 = unbound. */
+    private static boolean isClearPressed(Minecraft mc, int bind) {
+        if (bind == -1 || mc.getWindow() == null) return false;
+        long handle = mc.getWindow().handle();
+        if (bind <= -1000) {
+            return org.lwjgl.glfw.GLFW.glfwGetMouseButton(handle, -1000 - bind) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+        }
+        return org.lwjgl.glfw.GLFW.glfwGetKey(handle, bind) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 
     private void clearRecord() {
