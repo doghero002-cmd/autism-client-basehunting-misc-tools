@@ -17,3 +17,5 @@ bedrock-gpu-cracker/build/
 bedrock-gpu-cracker/bin/
 bedrock-gpu-cracker/.gradle/
 
+
+logs/
