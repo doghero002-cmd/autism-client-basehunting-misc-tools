@@ -77,9 +77,12 @@ public final class RegionMapModule extends Module {
         .group("Image")
         .visibleWhen(() -> useCustomImage.get()));
 
-    /** Built-in region-map texture (correct DonutSMP layout, baked into the mod). */
+    /** Built-in region-map texture (correct DonutSMP layout, baked into the mod).
+     * The asset lives in the autismclient assets dir (the shared pack), not the mod's own
+     * namespace - resolving via SeedcrackerAddon.ID misses the file entirely. */
     private static final net.minecraft.resources.Identifier DEFAULT_MAP =
-        net.minecraft.resources.Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, "textures/gui/region_map.png");
+        net.minecraft.resources.Identifier.fromNamespaceAndPath("autismclient", "textures/gui/region_map.png");
+    private static final org.slf4j.Logger MAP_LOG = org.slf4j.LoggerFactory.getLogger("region-map");
 
     private static RegionMapModule instance;
 
@@ -210,7 +213,9 @@ public final class RegionMapModule extends Module {
             try {
                 ctx.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
                     mapTex, ox, oy, 0f, 0f, sz, sz, sz, sz);
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                MAP_LOG.warn("map blit failed for {}", mapTex, t);
+            }
         }
 
         // Base-find heatmap overlay (green -> yellow -> red by find density), on top of the cells.
