@@ -1,80 +1,104 @@
 package com.autism.seedcracker.compat;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-
-import autismclient.api.AutismAddons;
-import autismclient.modules.Module;
+import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
- * Obfuscation-proof per-tab category assignment. The category TYPE is ModuleCategory in the
- * unobfuscated client and a renamed class (e.g. KeyHolder) in obfuscated builds, so the addon can't
- * reference it at compile time. This shim resolves the client's category factory + the Module's
- * category-assign method BY REFLECTION at runtime, so the same jar restores per-tab categories on
- * every client version. If the reflective lookup ever fails (a future rename), it degrades to the
- * auto-category (one tab) instead of crashing - the modules still load.
+ * Puts modules into their own GUI tabs.
+ *
+ * The client's public registerCategory(label) dedups by addon id (the custom
+ * label never reaches the category registry), so every label an addon passes
+ * collapses into one tab. Workaround: call the category class's static
+ * find-or-create factory (String key, String label) directly with distinct
+ * keys - distinct key = distinct tab - and write the result into the module's
+ * category field BEFORE registration (the client only stamps its default
+ * category when the field is still null).
+ *
+ * Everything is shape-probed reflection, zero client names (they differ across
+ * 4.4/5.0/obfuscated 5.1): the category is the Module field whose type lives in
+ * Module's package and owns a static (String,String) factory returning itself
+ * with find-or-create semantics (same key twice = same instance, verified at
+ * probe time). Any probe miss = silent no-op: modules stay in the default
+ * addon tab, the old behavior.
  */
 public final class CategoryAssigner {
+    private static final Map<String, Object> TABS = new HashMap<>();
+    private static Method factory; // static category factory(key, label)
+    private static Field catField; // Module's category field
+    private static boolean broken;
+
     private CategoryAssigner() {}
 
-    private static volatile boolean probed = false;
-    private static Method registerCategoryMethod; // AutismAddons$Modules.registerCategory(String)
-    private static Method assignCategoryMethod;   // Module.assignCategory(<categoryType>)
-    private static boolean usable = false;
-
-    /** Assign a module to a named tab (e.g. "Finders"). No-ops to the auto-category if the
-     * reflective category lookup is unavailable on this client. */
-    public static void assign(Module module, String tabLabel) {
-        if (module == null || tabLabel == null || tabLabel.isBlank()) return;
-        if (!probe()) return;
+    public static void assign(Object module, String label) {
+        if (broken) return;
         try {
-            Object category = registerCategoryMethod.invoke(AutismAddons.modules(), tabLabel);
-            if (category != null) {
-                assignCategoryMethod.invoke(module, category);
+            if (factory == null && !resolve(module.getClass(), label)) {
+                broken = true;
+                org.slf4j.LoggerFactory.getLogger("dogs-tabs")
+                        .warn("category probe found no match; modules stay in one tab");
+                return;
             }
+            Object tab = TABS.get(label);
+            if (tab == null) {
+                tab = factory.invoke(null, key(label), "Dogs " + label);
+                TABS.put(label, tab);
+            }
+            catField.set(module, tab);
         } catch (Throwable t) {
-            usable = false; // stop trying after the first failure (avoid log spam)
+            broken = true;
+            org.slf4j.LoggerFactory.getLogger("dogs-tabs").warn("category assign failed", t);
         }
     }
 
-    /** True if per-tab categories are available on this client (for an info line / debugging). */
-    public static boolean available() {
-        return probe();
+    private static String key(String label) {
+        return "dogs-" + label.toLowerCase(Locale.ROOT).replace(' ', '-');
     }
 
-    private static synchronized boolean probe() {
-        if (probed) return usable;
-        probed = true;
-        try {
-            // 1) The category factory: AutismAddons.modules().registerCategory(String) -> <categoryType>
-            Class<?> modulesClass = AutismAddons.modules().getClass();
-            Method regCat = null;
-            for (Method m : modulesClass.getMethods()) {
-                if (m.getName().equals("registerCategory") && m.getParameterCount() == 1
-                    && m.getParameterTypes()[0] == String.class) {
-                    regCat = m;
-                    break;
+    private static boolean resolve(Class<?> moduleClass, String label) {
+        for (Class<?> c = moduleClass; c != null; c = c.getSuperclass()) {
+            for (Field fd : c.getDeclaredFields()) {
+                if (Modifier.isStatic(fd.getModifiers())) continue;
+                Method f = categoryFactory(fd.getType(), c, label);
+                if (f != null) {
+                    fd.setAccessible(true);
+                    catField = fd;
+                    factory = f;
+                    org.slf4j.LoggerFactory.getLogger("dogs-tabs").info("category probe: {}.{} via {}.{}",
+                            c.getSimpleName(), fd.getName(), fd.getType().getSimpleName(), f.getName());
+                    return true;
                 }
             }
-            if (regCat == null) { usable = false; return false; }
-            Class<?> categoryType = regCat.getReturnType();
-
-            // 2) The Module method that takes that category type (assignCategory, package-private).
-            Method assign = null;
-            for (Method m : Module.class.getDeclaredMethods()) {
-                if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(categoryType)) {
-                    assign = m;
-                    break;
-                }
-            }
-            if (assign == null) { usable = false; return false; }
-            assign.setAccessible(true);
-
-            registerCategoryMethod = regCat;
-            assignCategoryMethod = assign;
-            usable = true;
-        } catch (Throwable t) {
-            usable = false;
         }
-        return usable;
+        return false;
+    }
+
+    /**
+     * The category type lives beside Module and owns a static (String,String)
+     * find-or-create: calling it twice with the same key must return the SAME
+     * instance (filters out look-alike factories that merely construct).
+     */
+    private static Method categoryFactory(Class<?> cat, Class<?> moduleClass, String label) {
+        if (cat == moduleClass || cat.isPrimitive() || cat.getPackage() == null
+                || !cat.getPackageName().equals(moduleClass.getPackageName())) return null;
+        for (Method f : cat.getDeclaredMethods()) {
+            if (Modifier.isStatic(f.getModifiers())
+                    && f.getReturnType() == cat
+                    && f.getParameterCount() == 2
+                    && f.getParameterTypes()[0] == String.class
+                    && f.getParameterTypes()[1] == String.class) {
+                try {
+                    f.setAccessible(true);
+                    Object a = f.invoke(null, key(label), "Dogs " + label);
+                    Object b = f.invoke(null, key(label), "Dogs " + label);
+                    if (a != null && a == b) return f;
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return null;
     }
 }
