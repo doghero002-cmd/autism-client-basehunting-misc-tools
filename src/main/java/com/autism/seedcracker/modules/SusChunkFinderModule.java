@@ -1296,6 +1296,7 @@ public final class SusChunkFinderModule extends Module {
     private static int ckz(long k) { return (int) k; }
 
     private int geodeMaintTicks = 0;
+    private int persistTicks = 0; // 60s cadence inside the 1s housekeeping block
     private int geodeVisibleTicks = 0;
     private boolean geodeDirty = false;
 
@@ -1319,6 +1320,12 @@ public final class SusChunkFinderModule extends Module {
         // Housekeeping once a second; four removeIf sweeps every tick were pure overhead.
         if (++geodeMaintTicks >= 20) {
             geodeMaintTicks = 0;
+            // Crash safety: flags otherwise only persist on disable/game-leave, so a JVM kill
+            // could lose a whole session of scans (A14 only covered the graceful paths).
+            if (persistFlags.get() && ++persistTicks >= 60) {
+                persistTicks = 0;
+                saveFlags();
+            }
             int pr = scanRadius.get() + 4;
             geodeHeat.keySet().removeIf(k -> Math.max(Math.abs(ckx(k) - center.x()), Math.abs(ckz(k) - center.z())) > pr);
             geodeSelf.keySet().removeIf(k -> Math.max(Math.abs(ckx(k) - center.x()), Math.abs(ckz(k) - center.z())) > pr);
