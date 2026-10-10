@@ -588,14 +588,28 @@ public final class AHSniperModule extends Module {
         int slots = AhGui.containerSlots(mc, menu);
         if (!AhGui.isConfirmDialog(slots, AhGui.screenTitle(mc))) return;
         int previewSlot = -1;
+        double previewPrice = -1;
         for (int i = 0; i < slots; i++) {
-            Listing preview = GuiListingReader.read(menu.slots.get(i).getItem(), System.currentTimeMillis());
-            if (AhGui.sameListing(pendingListing, preview)) {
-                previewSlot = i;
-                break;
+            ItemStack stack = menu.slots.get(i).getItem();
+            if (stack.isEmpty() || stack.getCount() != pendingListing.count()
+                || !pendingListing.itemKey().equals(GuiListingReader.itemKey(stack))) continue;
+            double shownPrice = com.autism.seedcracker.market.ListingPriceParser.parse(stack);
+            if (shownPrice > 0 && Math.round(shownPrice) != pendingListing.totalPrice()) {
+                failPurchase("Confirmation price changed; not buying.");
+                return;
             }
+            previewSlot = i;
+            previewPrice = shownPrice;
+            break;
         }
-        if (previewSlot < 0) return; // Unknown price/seller or an unrelated chest is not a confirmation.
+        if (previewSlot < 0) return; // No matching stack visible = not our confirmation dialog.
+        if (previewPrice < 0) {
+            // ponytail: DonutSMP confirm GUIs omit lore from the preview item (price lives on the
+            // button). Waiting forever makes every buy time out, so accept only when the dialog
+            // title confirms it's the purchase confirm; a wrong chest with our stack + no price
+            // would still need a "Confirm Purchase"-titled screen.
+            if (!AhGui.isConfirmTitle(AhGui.screenTitle(mc))) return;
+        }
         int confirm = AhGui.findConfirmSlot(menu, slots, previewSlot);
         if (confirm < 0) return;
         double shownPrice = com.autism.seedcracker.market.ListingPriceParser.parse(menu.slots.get(confirm).getItem());
