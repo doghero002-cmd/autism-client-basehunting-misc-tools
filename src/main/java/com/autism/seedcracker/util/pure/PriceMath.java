@@ -30,8 +30,8 @@ public final class PriceMath {
             if (!m.find()) return -1;
         }
         try {
-            double v = Double.parseDouble(m.group(1).replace(",", ""));
-            return v * suffixMultiplier(m.group(2));
+            double v = Double.parseDouble(m.group(1).replace(",", "")) * suffixMultiplier(m.group(2));
+            return Double.isFinite(v) ? v : -1;
         } catch (NumberFormatException e) {
             return -1;
         }
@@ -42,15 +42,17 @@ public final class PriceMath {
         if (raw == null) return -1;
         String s = raw.replace(",", "").trim().toLowerCase(java.util.Locale.ROOT);
         if (s.isEmpty()) return -1;
-        double mult = 1.0;
+        long mult = 1;
         char last = s.charAt(s.length() - 1);
-        if (last == 't') { mult = 1_000_000_000_000.0; s = s.substring(0, s.length() - 1); }
-        else if (last == 'b') { mult = 1_000_000_000.0; s = s.substring(0, s.length() - 1); }
-        else if (last == 'm') { mult = 1_000_000.0; s = s.substring(0, s.length() - 1); }
-        else if (last == 'k') { mult = 1_000.0; s = s.substring(0, s.length() - 1); }
+        if (last == 't') { mult = 1_000_000_000_000L; s = s.substring(0, s.length() - 1); }
+        else if (last == 'b') { mult = 1_000_000_000L; s = s.substring(0, s.length() - 1); }
+        else if (last == 'm') { mult = 1_000_000L; s = s.substring(0, s.length() - 1); }
+        else if (last == 'k') { mult = 1_000L; s = s.substring(0, s.length() - 1); }
         try {
-            return (long) (Double.parseDouble(s) * mult);
-        } catch (NumberFormatException e) {
+            var amount = new java.math.BigDecimal(s).multiply(java.math.BigDecimal.valueOf(mult));
+            if (amount.signum() < 0) return -1;
+            return amount.setScale(0, java.math.RoundingMode.DOWN).longValueExact();
+        } catch (NumberFormatException | ArithmeticException e) {
             return -1;
         }
     }

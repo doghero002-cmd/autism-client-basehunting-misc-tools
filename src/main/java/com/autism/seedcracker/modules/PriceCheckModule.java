@@ -91,7 +91,7 @@ public final class PriceCheckModule extends Module {
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
+        if (mc.player == null || mc.level == null || com.autism.seedcracker.market.AhGui.purchasing()) return;
         if (pageCooldown > 0) pageCooldown--;
         if (scanCooldown > 0) { scanCooldown--; return; }
         scanCooldown = 10; // scan twice a second; listings don't change faster
@@ -112,7 +112,7 @@ public final class PriceCheckModule extends Module {
         }
 
         int containerSlots = com.autism.seedcracker.market.AhGui.containerSlots(mc, menu);
-        if (!com.autism.seedcracker.market.AhGui.isListingPage(containerSlots)) return;
+        if (!com.autism.seedcracker.market.AhGui.isAuctionPage(mc, menu)) return;
 
         String trackOnly = scanMode.get() == ScanMode.TRACK_ITEM && !trackItem.get().isBlank()
             ? PriceTracker.normalize(trackItem.get()) : null;

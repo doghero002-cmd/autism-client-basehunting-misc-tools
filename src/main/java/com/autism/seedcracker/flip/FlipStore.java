@@ -58,8 +58,6 @@ public final class FlipStore {
     public synchronized void save(boolean force) {
         long now = System.currentTimeMillis();
         if (!dirty || (!force && now - lastSaveMs < SAVE_DEBOUNCE_MS)) return;
-        lastSaveMs = now;
-        dirty = false;
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
@@ -70,6 +68,8 @@ public final class FlipStore {
             } catch (java.nio.file.AtomicMoveNotSupportedException e) {
                 Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
+            dirty = false;
+            lastSaveMs = now;
         } catch (Throwable ignored) {}
     }
 
@@ -127,6 +127,10 @@ public final class FlipStore {
         if (m == null) return List.of();
         m.values().removeIf(l -> now - l.observedAt() > BOOK_TTL_MS);
         return List.copyOf(m.values());
+    }
+
+    public synchronized void clearBook() {
+        book.clear();
     }
 
     public synchronized List<String> bookItems() {

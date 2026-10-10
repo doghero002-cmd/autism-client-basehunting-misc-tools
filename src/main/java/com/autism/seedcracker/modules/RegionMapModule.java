@@ -1,10 +1,15 @@
 package com.autism.seedcracker.modules;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.hud.RegionMapHud;
+import com.autism.seedcracker.util.pure.RegionMapImageState;
+import com.mojang.blaze3d.platform.NativeImage;
 
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.IntSetting;
@@ -15,6 +20,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -69,7 +75,7 @@ public final class RegionMapModule extends Module {
         .description("Optional: a URL (e.g. a GitHub raw JSON) with a shared base-find heatmap, fetched + merged into the overlay.")
         .group("Heatmap"));
     private final BoolSetting useCustomImage = add(new BoolSetting("use-custom-image", "Custom map image", false)
-        .description("Override the built-in region map with your own PNG (set the path below).")
+        .description("Override the built-in map with your PNG. Toggle off/on to reload; unreadable files use the built-in map.")
         .group("Image"));
     private final autismclient.api.module.StringSetting imagePath = add(new autismclient.api.module.StringSetting(
             "image-path", "Image path", "regionmap.png")
@@ -77,11 +83,11 @@ public final class RegionMapModule extends Module {
         .group("Image")
         .visibleWhen(() -> useCustomImage.get()));
 
-    /** Built-in region-map texture (correct DonutSMP layout, baked into the mod).
-     * The asset lives in the autismclient assets dir (the shared pack), not the mod's own
-     * namespace - resolving via SeedcrackerAddon.ID misses the file entirely. */
-    private static final net.minecraft.resources.Identifier DEFAULT_MAP =
-        net.minecraft.resources.Identifier.fromNamespaceAndPath("autismclient", "textures/gui/region_map.png");
+    /** The bundled asset uses the addon's namespace, independent of the host client's pack. */
+    private static final Identifier DEFAULT_MAP =
+        Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, RegionMapImageState.BUILTIN_TEXTURE);
+    private static final Identifier CUSTOM_MAP =
+        Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, "regionmap_custom");
     private static final org.slf4j.Logger MAP_LOG = org.slf4j.LoggerFactory.getLogger("region-map");
 
     private static RegionMapModule instance;
@@ -116,6 +122,7 @@ public final class RegionMapModule extends Module {
     @Override
     public void onEnable() {
         instance = this;
+        resetMapImage();
         registerLayer();
         lastX = Double.NaN;
         lastZ = Double.NaN;
@@ -124,6 +131,7 @@ public final class RegionMapModule extends Module {
     @Override
     public void onDisable() {
         instance = null;
+        resetMapImage();
         HudElementRegistry.removeElement(LAYER_ID);
         layerRegistered = false; // allow re-registration on next enable
     }
@@ -135,6 +143,7 @@ public final class RegionMapModule extends Module {
         lastX = Double.NaN;
         lastZ = Double.NaN;
         lastDim = null;
+        resetMapImage();
         if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
@@ -208,14 +217,10 @@ public final class RegionMapModule extends Module {
         ctx.fill(ox, oy, ox + sz, oy + sz, 0xFF14161C);
 
         // Map background: built-in region_map.png by default, or a custom PNG when overridden.
-        net.minecraft.resources.Identifier mapTex = resolveMapTexture(mc);
-        if (mapTex != null) {
-            try {
-                ctx.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    mapTex, ox, oy, 0f, 0f, sz, sz, sz, sz);
-            } catch (Throwable t) {
-                MAP_LOG.warn("map blit failed for {}", mapTex, t);
-            }
+        Identifier mapTex = resolveMapTexture(mc);
+        if (!blitMap(ctx, mapTex, ox, oy, sz) && !mapTex.equals(DEFAULT_MAP)) {
+            releaseCustomImage(mc);
+            blitMap(ctx, DEFAULT_MAP, ox, oy, sz);
         }
 
         // Base-find heatmap overlay (green -> yellow -> red by find density), on top of the cells.
@@ -462,45 +467,66 @@ public final class RegionMapModule extends Module {
     };
 
     // ---- map image ----
-    private net.minecraft.resources.Identifier customImageId = null;
-    private String loadedImagePath = null;
-    private net.minecraft.client.renderer.texture.DynamicTexture customImage = null;
+    private final RegionMapImageState mapImageState = new RegionMapImageState();
+    private Identifier customImageId;
+    private boolean builtinBlitFailed;
 
-    /**
-     * The map texture to draw: the custom PNG when the user enabled + supplied a valid one,
-     * otherwise the built-in region_map.png baked into the mod.
-     */
-    private net.minecraft.resources.Identifier resolveMapTexture(Minecraft mc) {
-        if (useCustomImage.get()) {
-            String path = imagePath.get() == null ? "" : imagePath.get().trim();
-            if (!path.isEmpty()) {
-                if (!path.equals(loadedImagePath)) loadCustomImage(mc, path);
-                if (customImageId != null) return customImageId;
-            }
+    private boolean blitMap(GuiGraphicsExtractor ctx, Identifier mapTex, int ox, int oy, int sz) {
+        boolean builtin = mapTex.equals(DEFAULT_MAP);
+        if (builtin && builtinBlitFailed) return false;
+        try {
+            // This overload takes destination corners and normalized UVs, not source PNG dimensions.
+            ctx.blit(mapTex, ox, oy, ox + sz, oy + sz, 0f, 1f, 0f, 1f);
+            return true;
+        } catch (RuntimeException error) {
+            if (builtin) builtinBlitFailed = true;
+            MAP_LOG.warn("Could not draw Region Map texture {}", mapTex, error);
+            return false;
         }
-        return DEFAULT_MAP;
+    }
+
+    /** Custom-image failures remain cached until an explicit selection or lifecycle change. */
+    private Identifier resolveMapTexture(Minecraft mc) {
+        if (mapImageState.select(useCustomImage.get(), imagePath.get())) {
+            releaseCustomImage(mc);
+            builtinBlitFailed = false;
+            if (!mapImageState.path().isEmpty()) loadCustomImage(mc, mapImageState.path());
+        }
+        return customImageId == null ? DEFAULT_MAP : customImageId;
     }
 
     private void loadCustomImage(Minecraft mc, String path) {
-        loadedImagePath = path;
-        customImageId = null;
-        if (customImage != null) { try { customImage.close(); } catch (Throwable ignored) {} customImage = null; }
+        NativeImage image = null;
+        DynamicTexture texture = null;
         try {
-            java.nio.file.Path file = java.nio.file.Path.of(path);
-            if (!file.isAbsolute()) {
-                file = autismclient.AutismClientAddon.FOLDER.toPath().resolve(path);
+            Path file = Path.of(path);
+            if (!file.isAbsolute()) file = autismclient.AutismClientAddon.FOLDER.toPath().resolve(file);
+            try (var in = Files.newInputStream(file)) {
+                image = NativeImage.read(in);
             }
-            if (!java.nio.file.Files.exists(file)) { loadedImagePath = null; return; }
-            com.mojang.blaze3d.platform.NativeImage img;
-            try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
-                img = com.mojang.blaze3d.platform.NativeImage.read(in);
-            }
-            customImage = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "regionmap_custom", img);
-            customImageId = net.minecraft.resources.Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, "regionmap_custom");
-            mc.getTextureManager().register(customImageId, customImage);
-        } catch (Throwable t) {
-            customImage = null;
+            texture = new DynamicTexture(() -> "regionmap_custom", image);
+            image = null; // DynamicTexture now owns the decoded image.
+            mc.getTextureManager().register(CUSTOM_MAP, texture);
+            customImageId = CUSTOM_MAP;
+            texture = null; // TextureManager now owns the registered texture.
+        } catch (IOException | RuntimeException error) {
+            MAP_LOG.warn("Could not load custom Region Map '{}'; using the built-in map. Toggle Custom map image off/on to retry.", path, error);
+        } finally {
+            if (texture != null) texture.close();
+            if (image != null) image.close();
+        }
+    }
+
+    private void releaseCustomImage(Minecraft mc) {
+        if (customImageId != null) {
+            mc.getTextureManager().release(customImageId);
             customImageId = null;
         }
+    }
+
+    private void resetMapImage() {
+        releaseCustomImage(Minecraft.getInstance());
+        mapImageState.reset();
+        builtinBlitFailed = false;
     }
 }

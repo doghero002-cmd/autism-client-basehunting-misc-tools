@@ -1,6 +1,5 @@
 package com.autism.seedcracker.flip;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -9,14 +8,10 @@ import com.autism.seedcracker.flip.core.FlipModel.Listing;
 import com.autism.seedcracker.flip.core.SaleInference;
 import com.autism.seedcracker.market.ListingPriceParser;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 /** Turns one AH GUI slot into a {@link Listing}: item key, count, lore price and seller. */
@@ -46,7 +41,8 @@ public final class GuiListingReader {
         Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (id == null) return null;
         StringBuilder sb = new StringBuilder(id.getPath());
-        ItemEnchantments ench = stack.get(DataComponents.ENCHANTMENTS);
+        ItemEnchantments ench = stack.get(DataComponents.STORED_ENCHANTMENTS);
+        if (ench == null || ench.isEmpty()) ench = stack.get(DataComponents.ENCHANTMENTS);
         if (ench != null && !ench.isEmpty()) {
             java.util.TreeMap<String, Integer> sorted = new java.util.TreeMap<>();
             for (var e : ench.entrySet()) {
@@ -59,9 +55,9 @@ public final class GuiListingReader {
 
     static String seller(ItemStack stack) {
         try {
-            List<Component> tooltip = stack.getTooltipLines(Item.TooltipContext.EMPTY,
-                Minecraft.getInstance().player, TooltipFlag.Default.NORMAL);
-            for (Component c : tooltip) {
+            var lore = stack.get(DataComponents.LORE);
+            if (lore == null) return "?";
+            for (var c : lore.lines()) {
                 Matcher m = SELLER.matcher(c.getString());
                 if (m.find()) return m.group(1).toLowerCase(Locale.ROOT);
             }
