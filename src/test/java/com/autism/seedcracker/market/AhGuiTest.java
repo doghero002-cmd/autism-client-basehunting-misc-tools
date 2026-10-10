@@ -34,6 +34,9 @@ class AhGuiTest {
         assertTrue(AhGui.isAuctionTitle("§6Auction House - Page 1"));
         assertFalse(AhGui.isAuctionTitle("Storage Chest"));
         assertTrue(AhGui.isConfirmTitle("Auction House - Confirm Purchase"));
+        assertTrue(AhGui.isConfirmTitle("Confirm Purchase"));
+        assertTrue(AhGui.isConfirmTitle("Buy Item"));
+        assertFalse(AhGui.isConfirmTitle("Large Chest"));
     }
 
     @Test
