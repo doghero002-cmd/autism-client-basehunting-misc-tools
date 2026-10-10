@@ -509,7 +509,7 @@ public final class Motion {
             MotionDebug.planDone(s, path, plan.expanded(), plan.error());
             if (s == Status.FAILED || path.size() < 2) {
                 finish(mc, plan.error() != null ? "planner error: " + plan.error().getClass().getSimpleName()
-                    : config.allowBreak() ? "no path" : "no path (try .goto mine)");
+                    : config.allowBreak() ? "no path" : "no path (try .goto mine x y z)");
                 return;
             }
             // The plan started where we stood when it was requested; a shove since then makes it someone else's route.
