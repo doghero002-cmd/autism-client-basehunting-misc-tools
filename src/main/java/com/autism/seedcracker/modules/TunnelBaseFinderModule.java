@@ -1264,7 +1264,9 @@ public final class TunnelBaseFinderModule extends Module {
             }
             case WAIT6 -> { if (++buyWait >= waitTarget) buyStage = BuyStage.CLOSE; }
             case CLOSE -> {
-                if (mc.gui.screen() != null) mc.gui.setScreen(null);
+                // closeContainer() sends ServerboundContainerClosePacket; a bare setScreen(null) leaves the
+                // server-side shop menu open and desyncs every later inventory click (totem/XP/food moves).
+                if (mc.gui.screen() != null) mc.player.closeContainer();
                 buyWait = 0; waitTarget = randomDelay(7); buyStage = BuyStage.WAIT7;
             }
             case WAIT7 -> { if (++buyWait >= waitTarget) buyStage = BuyStage.RESET; }
@@ -1438,7 +1440,7 @@ public final class TunnelBaseFinderModule extends Module {
             ItemStack s = mc.player.getInventory().getItem(i);
             if (!s.isEmpty() && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).toString().endsWith("_pickaxe")) return i;
         }
-        return 0;
+        return -1; // callers check != -1; returning 0 silently selected slot 0 and skipped the no-pickaxe disconnect
     }
 
     private boolean isHoldingTool(Minecraft mc) {

@@ -12,6 +12,10 @@ loom {
     accessWidenerPath.set(file("src/main/resources/seedcrackerx.aw"))
 }
 
+// True when the optional AI-update client jar is present; gates both its compileOnly classpath entry
+// and the AiBridge source inclusion (see dependencies{} and the compileJava task below).
+val aiJarPresent = layout.projectDirectory.file("libs/autism-5.1-26.2-ai.jar").asFile.exists()
+
 repositories {
     // The AUTISM Client API is vendored into libs/ so the build is self-contained (works on a
     // fresh CI runner with an empty ~/.m2). flatDir resolves com.autismclient:autism:<ver> from
@@ -39,6 +43,13 @@ dependencies {
 
     // The AUTISM Client API (published to mavenLocal from the AUTISM project).
     implementation(libs.autism)
+
+    // Optional AI-update client jar: adds autismclient.api.ai.* for the AiBridge. Kept compileOnly and
+    // out of flatDir (which would clash with the stock `autism` module). The jar is NOT shipped; the
+    // bridge self-skips via reflection on hosts without the AI API. Absent = bridge sources excluded below.
+    if (aiJarPresent) {
+        compileOnly(files("libs/autism-5.1-26.2-ai.jar"))
+    }
 
     // ---- SeedcrackerX dependencies (bundled jar-in-jar so the addon is self-contained) ----
     // Each library is both an `implementation` (compile classpath) and `include` (jar-in-jar).
@@ -128,5 +139,10 @@ tasks {
     withType<JavaCompile> {
         options.encoding = "UTF-8"
         options.release.set(25)
+        // The AI bridge only compiles when the optional AI-update client jar is present; otherwise drop
+        // its sources so the stock build stays warning-free on 5.0 / V4 / 5.1 without that jar.
+        if (name == "compileJava" && !aiJarPresent) {
+            exclude("com/autism/seedcracker/ai/**")
+        }
     }
 }

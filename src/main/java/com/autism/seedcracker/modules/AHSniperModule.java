@@ -105,12 +105,13 @@ public final class AHSniperModule extends Module {
     private String currentSeller = "";
     private long lastApiCall;
     private long nextApiGap = 500; // jittered per-poll
-    private boolean warnedUnparseable; // once per enable, not per scan
+    private String warnedUnparseableItem; // item id last warned for; reset per enable and re-armed on item change
     private Listing preparedListing;
     private AbstractContainerMenu preparedMenu;
     private int preparedSlot = -1;
     private Listing pendingListing;
     private int preBuyCount = -1;
+    private int postConfirmCount = -1; // count baseline at the confirm click; only growth after this counts as delivery
     private long verifyDeadline;
     private boolean confirmSent;
     private int confirmedBuys;
@@ -148,7 +149,7 @@ public final class AHSniperModule extends Module {
         auctionPageCounter = -1;
         currentSeller = "";
         lastApiCall = 0;
-        warnedUnparseable = false;
+        warnedUnparseableItem = null;
         confirmedBuys = 0;
     }
 
@@ -253,6 +254,7 @@ public final class AHSniperModule extends Module {
         preparedSlot = -1;
         pendingListing = null;
         preBuyCount = -1;
+        postConfirmCount = -1;
         verifyDeadline = 0;
         confirmSent = false;
         isProcessing = false;
@@ -288,7 +290,11 @@ public final class AHSniperModule extends Module {
     }
 
     private void verifyPurchase(Minecraft mc, long now) {
-        if (AhGui.delivered(preBuyCount, countOf(mc, pendingListing.itemKey()), pendingListing.count())) {
+        // Accept delivery only after the confirm click, and only for inventory growth since that click.
+        // A bare pre-listing-click delta can be satisfied by an unrelated pickup/shift-click/auto-refill of the
+        // same item during the window, which would falsely confirm (or flipper-mark) a purchase that never paid.
+        if (confirmSent && postConfirmCount >= 0
+            && AhGui.delivered(postConfirmCount, countOf(mc, pendingListing.itemKey()), pendingListing.count())) {
             long paid = pendingListing.totalPrice();
             if (flipTarget != null) {
                 finishFlip(true);
@@ -444,8 +450,8 @@ public final class AHSniperModule extends Module {
             if (stack.isEmpty() || (target != null && !stack.is(target))) continue;
             Listing listing = GuiListingReader.read(stack, now);
             if (listing == null) {
-                if (target != null && !warnedUnparseable) {
-                    warnedUnparseable = true;
+                if (target != null && !itemId.get().equals(warnedUnparseableItem)) {
+                    warnedUnparseableItem = itemId.get();
                     send("§e[AH Sniper] Skipping " + itemName(stack) + " - price not readable from the lore.");
                 }
                 continue;
@@ -617,7 +623,10 @@ public final class AHSniperModule extends Module {
             failPurchase("Confirmation price changed; not buying.");
             return;
         }
-        if (click(mc, menu, confirm)) confirmSent = true; // Reset per purchase, even if the server reuses its menu id.
+        if (click(mc, menu, confirm)) {
+            confirmSent = true; // Reset per purchase, even if the server reuses its menu id.
+            postConfirmCount = countOf(mc, pendingListing.itemKey()); // baseline: delivery = growth past this
+        }
     }
 
     private void closeScreen(Minecraft mc) {

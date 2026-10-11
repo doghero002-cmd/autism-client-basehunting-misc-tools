@@ -28,7 +28,9 @@ public final class SimulatedPlayer {
     private static final Minecraft mc = Minecraft.getInstance();
 
     private static final double GRAVITY = 0.08;
-    private static final double DRAG = 0.98;
+    private static final double AIR_DRAG = 0.98;   // vertical always; horizontal only in air per vanilla is 0.91
+    private static final double AIR_HORIZONTAL_DRAG = 0.91;
+    private static final double GROUND_HORIZONTAL_DRAG = 0.546; // vanilla f*0.91 with default slipperiness f=0.6
     private static final double PLAYER_WIDTH = 0.6;
     private static final double PLAYER_HEIGHT = 1.8;
 
@@ -66,8 +68,9 @@ public final class SimulatedPlayer {
         double iz = Math.cos(moveYawRad) * accel;
         vel = new Vec3(vel.x + ix, vel.y, vel.z + iz);
 
-        // Gravity + drag.
-        vel = new Vec3(vel.x * (onGround ? 0.91 : DRAG), (vel.y - GRAVITY) * DRAG, vel.z * (onGround ? 0.91 : DRAG));
+        // Gravity + drag: horizontal is ground 0.546 / air 0.91; vertical always (vy - g) * 0.98.
+        double hDrag = onGround ? GROUND_HORIZONTAL_DRAG : AIR_HORIZONTAL_DRAG;
+        vel = new Vec3(vel.x * hDrag, (vel.y - GRAVITY) * AIR_DRAG, vel.z * hDrag);
         if (jump && onGround) vel = new Vec3(vel.x, 0.42, vel.z);
 
         // Swept collision.

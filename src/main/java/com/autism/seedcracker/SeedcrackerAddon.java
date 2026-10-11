@@ -275,6 +275,16 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Local QA bridge (127.0.0.1 only): lets an external driver run commands and read state without
         // window focus. No-op if the port is taken.
         com.autism.seedcracker.bridge.GameBridge.start();
+
+        // AI subsystem bridge (API v4+ AI-update client): reflective so it compiles and loads whether or
+        // not the optional AI jar / host AI API is present (class is excluded from the build when the jar
+        // is absent, and registerIfPresent self-skips on hosts without AutismAddons.ai()).
+        try {
+            Class.forName("com.autism.seedcracker.ai.AiBridge")
+                .getMethod("registerIfPresent").invoke(null);
+        } catch (Throwable t) {
+            System.out.println("[autism-seedcracker] AI bridge not present in this build (" + t.getClass().getSimpleName() + ").");
+        }
     }
 
     @Override
