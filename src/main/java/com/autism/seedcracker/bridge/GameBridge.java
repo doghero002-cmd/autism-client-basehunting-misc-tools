@@ -22,15 +22,19 @@ import java.util.concurrent.atomic.AtomicReference;
  * Local two-way bridge so an external QA driver can talk to the live client without window focus or
  * simulated keystrokes. Binds 127.0.0.1 only. Endpoints:
  *   GET  /state            -> JSON snapshot (pos, health, gm, dim, ground, sneak, block under/ahead, goto busy)
- *   GET|POST /cmd?c=TEXT   -> run TEXT as a chat message or /command on the client thread; returns after dispatch
+ *   POST /cmd?c=TEXT       -> run TEXT as a chat message or /command on the client thread; returns after dispatch
  *   GET  /healthz          -> "ok" (liveness)
  * Started once from SeedcrackerAddon.onInitialize; stops on client stop.
  */
 public final class GameBridge {
-    private static final int PORT = 25660;
+    private static final int PORT = configuredPort(Integer.getInteger("autism.seedcracker.bridge.port", 25660));
     private static HttpServer server;
+    private static java.util.concurrent.ExecutorService executor;
 
     private GameBridge() {}
+
+    public static int port() { return PORT; }
+    static int configuredPort(int requested) { return requested >= 1024 && requested <= 65535 ? requested : 25660; }
 
     public static synchronized void start() {
         if (server != null) return;
@@ -46,23 +50,40 @@ public final class GameBridge {
         server.createContext("/cmd", GameBridge::cmd);
         server.createContext("/closescreen", GameBridge::closeScreen);
         server.createContext("/respawn", GameBridge::respawn);
-        server.setExecutor(java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        ClientAiControl.register(server);
+        ScoutControl.register(server);
+        executor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "GameBridge");
             t.setDaemon(true);
             return t;
-        }));
+        });
+        server.setExecutor(executor);
         server.start();
         System.out.println("[GameBridge] listening on 127.0.0.1:" + PORT);
     }
 
     public static synchronized void stop() {
+        ScoutControl.shutdown();
+        ClientAiControl.shutdown();
         if (server != null) { server.stop(0); server = null; }
+        if (executor != null) { executor.shutdownNow(); executor = null; }
     }
 
     private static void healthz(HttpExchange ex) throws IOException { reply(ex, 200, "ok"); }
 
+    static boolean nativeMutation(HttpExchange ex) throws IOException {
+        if (!ex.getRequestMethod().equals("POST")) {
+            reply(ex, 405, "{\"error\":\"Use POST for mutations\"}"); return false;
+        }
+        if (ex.getRequestHeaders().getFirst("Origin") != null || !ClientAiControl.allowedHost(ex.getRequestHeaders().getFirst("Host"))) {
+            reply(ex, 403, "{\"error\":\"Native loopback clients only\"}"); return false;
+        }
+        return true;
+    }
+
     /** Respawn a dead player (clicks the DeathScreen's respawn button), or no-op if alive. */
     private static void respawn(HttpExchange ex) throws IOException {
+        if (!nativeMutation(ex)) return;
         Minecraft mc = Minecraft.getInstance();
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<String> out = new AtomicReference<>("alive");
@@ -92,6 +113,7 @@ public final class GameBridge {
     }
 
     private static void closeScreen(HttpExchange ex) throws IOException {
+        if (!nativeMutation(ex)) return;
         Minecraft mc = Minecraft.getInstance();
         CountDownLatch done = new CountDownLatch(1);
         AtomicReference<String> had = new AtomicReference<>("");
@@ -120,6 +142,7 @@ public final class GameBridge {
     }
 
     private static void cmd(HttpExchange ex) throws IOException {
+        if (!nativeMutation(ex)) return;
         Map<String, String> q = query(ex);
         String c = q.get("c");
         if (c == null || c.isBlank()) { reply(ex, 400, "{\"error\":\"missing c\"}"); return; }
@@ -174,6 +197,17 @@ public final class GameBridge {
             sb.append(",\"blockAt\":").append(json(mc.level.getBlockState(bp).getBlock().toString()));
             sb.append(",\"dead\":").append(p.isDeadOrDying());
             sb.append(",\"gotoBusy\":").append(com.autism.seedcracker.motion.Motion.isBusy());
+            sb.append(",\"gotoStatus\":").append(json(com.autism.seedcracker.motion.Motion.status()));
+            sb.append(",\"following\":").append(json(com.autism.seedcracker.motion.Motion.following()));
+            var nearby = new com.google.gson.JsonArray();
+            mc.level.players().stream().filter(player -> player != p)
+                .sorted(java.util.Comparator.comparingDouble(player -> player.distanceToSqr(p))).limit(16).forEach(player -> {
+                    var entry = new com.google.gson.JsonObject();
+                    entry.addProperty("name", player.getGameProfile().name());
+                    entry.addProperty("distance", Math.sqrt(player.distanceToSqr(p)));
+                    nearby.add(entry);
+                });
+            sb.append(",\"nearbyPlayers\":").append(nearby);
             var scr = mc.gui.screen();
             sb.append(",\"screen\":").append(json(scr == null ? "" : scr.getClass().getSimpleName()));
         }

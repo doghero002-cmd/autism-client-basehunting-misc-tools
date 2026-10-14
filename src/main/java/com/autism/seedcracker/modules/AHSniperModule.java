@@ -70,6 +70,9 @@ public final class AHSniperModule extends Module {
             "notify", "Notifications", true)
         .description("Chat notifications for finds / errors.")
         .group("General"));
+    private final StringSetting targetName = add(new StringSetting("target-name", "Name contains", "").group("Target"));
+    private final StringSetting targetExclude = add(new StringSetting("target-exclude", "Name excludes", "").group("Target"));
+    private final IntSetting targetCount = add(new IntSetting("target-count", "Minimum stack", 1, 1, 64, 1).group("Target"));
 
     // API mode only: the key + poll rate are hidden in MANUAL mode so the panel isn't confusing.
     private final StringSetting apiKey = add(new StringSetting(
@@ -174,7 +177,7 @@ public final class AHSniperModule extends Module {
     @Override
     protected void onOptionValueChanged(String name) {
         if (name.equals("mode") || name.equals("item") || name.equals("price")
-            || name.equals("api-key") || name.equals("max-buys")) cancelWork();
+            || name.equals("api-key") || name.equals("max-buys") || name.startsWith("target-")) cancelWork();
     }
 
     @Override
@@ -448,6 +451,8 @@ public final class AHSniperModule extends Module {
         for (int i = 0; i < limit; i++) {
             ItemStack stack = menu.slots.get(i).getItem();
             if (stack.isEmpty() || (target != null && !stack.is(target))) continue;
+            if (flipTarget == null && !AhGui.targetMatches(stack.getHoverName().getString(), stack.getCount(),
+                targetName.get(), targetExclude.get(), targetCount.get())) continue;
             Listing listing = GuiListingReader.read(stack, now);
             if (listing == null) {
                 if (target != null && !itemId.get().equals(warnedUnparseableItem)) {
@@ -599,6 +604,11 @@ public final class AHSniperModule extends Module {
             ItemStack stack = menu.slots.get(i).getItem();
             if (stack.isEmpty() || stack.getCount() != pendingListing.count()
                 || !pendingListing.itemKey().equals(GuiListingReader.itemKey(stack))) continue;
+            if (flipTarget == null && !AhGui.targetMatches(stack.getHoverName().getString(), stack.getCount(),
+                targetName.get(), targetExclude.get(), targetCount.get())) {
+                failPurchase("Confirmation target no longer matches; not buying.");
+                return;
+            }
             double shownPrice = com.autism.seedcracker.market.ListingPriceParser.parse(stack);
             if (shownPrice > 0 && Math.round(shownPrice) != pendingListing.totalPrice()) {
                 failPurchase("Confirmation price changed; not buying.");

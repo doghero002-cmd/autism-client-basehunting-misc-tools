@@ -17,7 +17,7 @@ import net.minecraft.core.BlockPos;
  */
 public final class GotoCommand extends Command {
     public GotoCommand() {
-        super("goto", "Built-in pathfinder: .goto [mine] x [y] z | y <level> | away <blocks> | explore <radius> | ore <block,...> [count] | structure <type> | follow <player> | base | death | debug | stop", "path");
+        super("goto", "Built-in pathfinder: .goto <player> | [mine] x [y] z | y <level> | away <blocks> | explore <radius> | ore <block,...> [count] | structure <type> | follow <player> | base | death | debug | stop", "path");
     }
 
     @Override
@@ -95,12 +95,8 @@ public final class GotoCommand extends Command {
                     return SUCCESS;
                 })));
         root.then(LiteralArgumentBuilder.<AutismCommandSource>literal("follow")
-            .then(RequiredArgumentBuilder.<AutismCommandSource, String>argument("player", com.mojang.brigadier.arguments.StringArgumentType.word())
-                .executes(ctx -> {
-                    String name = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "player");
-                    run(mc -> Motion.follow(mc, name), name, false);
-                    return SUCCESS;
-                })));
+            .then(player(true)));
+        root.then(player(false));
         root.then(LiteralArgumentBuilder.<AutismCommandSource>literal("death").executes(ctx -> {
             Minecraft mc = Minecraft.getInstance();
             String dim = mc.level == null ? "" : mc.level.dimension().identifier().toString();
@@ -154,6 +150,24 @@ public final class GotoCommand extends Command {
                 : "\u00a7e[GoTo] no exposed " + list + " in the loaded chunks nearby.");
         });
         return SUCCESS;
+    }
+
+    private RequiredArgumentBuilder<AutismCommandSource, String> player(boolean follow) {
+        return RequiredArgumentBuilder.<AutismCommandSource, String>argument("player", com.mojang.brigadier.arguments.StringArgumentType.word())
+            .suggests((ctx, builder) -> {
+                var connection = Minecraft.getInstance().getConnection();
+                if (connection != null) for (var info : connection.getOnlinePlayers()) builder.suggest(info.getProfile().name());
+                return builder.buildFuture();
+            })
+            .executes(ctx -> {
+                String name = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "player");
+                if (!name.matches("[A-Za-z0-9_]{1,16}")) {
+                    AutismClientMessaging.sendPrefixed("§c[GoTo] Invalid player name.");
+                    return SUCCESS;
+                }
+                run(mc -> follow ? Motion.follow(mc, name) : Motion.goToPlayer(mc, name), name, false);
+                return SUCCESS;
+            });
     }
 
     private RequiredArgumentBuilder<AutismCommandSource, Integer> coords(boolean mine) {

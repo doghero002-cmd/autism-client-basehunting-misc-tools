@@ -41,11 +41,9 @@ public final class BaseAlerts {
             if (!f.sources().contains("+")) continue; // single-finder clusters stay per-module
             long cell = (((long) Math.floorDiv(f.blockX(), CELL_BLOCKS)) << 32)
                 ^ (Math.floorDiv(f.blockZ(), CELL_BLOCKS) & 0xffffffffL);
-            if (announcedCells.putIfAbsent(cell, Boolean.TRUE) != null) continue;
-            if (now - lastAnnounceMs < MIN_GAP_MS) return; // keep the cell marked, skip the ping
-            lastAnnounceMs = now;
+            if (!claim(cell, now)) continue;
             int dist = (int) Math.sqrt(f.distSq());
-            String msg = "BASE (" + f.confidence() + "%): " + f.sources()
+            String msg = "Base candidate (score " + f.confidence() + "/100): " + f.sources()
                 + " agree at X:" + f.blockX() + " Z:" + f.blockZ() + " (" + dist + "m)";
             mc.execute(() -> {
                 AutismClientMessaging.sendPrefixed("§6§l[Base] §f" + msg);
@@ -55,9 +53,17 @@ public final class BaseAlerts {
         }
     }
 
+    static boolean claim(long cell, long now) {
+        if (lastAnnounceMs != 0 && now >= lastAnnounceMs && now - lastAnnounceMs < MIN_GAP_MS) return false;
+        if (announcedCells.putIfAbsent(cell, Boolean.TRUE) != null) return false;
+        lastAnnounceMs = now;
+        return true;
+    }
+
     /** Clear per-world state (server change). */
     public static void reset() {
         announcedCells.clear();
         lastAnnounceMs = 0;
+        lastCheckMs = 0;
     }
 }

@@ -56,15 +56,17 @@ public final class MathSolver {
         String[] toks = s.split("[^a-z0-9.]+");
         StringBuilder expr = new StringBuilder();
         boolean any = false;
+        boolean operation = false;
         for (String t : toks) {
             if (t.isEmpty()) continue;
             String mapped = mapToken(t);
             if (mapped != null) {
                 expr.append(mapped).append(' ');
                 any = true;
+                if (mapped.matches("[+\\-*/%^]")) operation = true;
             }
         }
-        if (!any) return null;
+        if (!any || !operation) return null;
         return solve(expr.toString());
     }
 

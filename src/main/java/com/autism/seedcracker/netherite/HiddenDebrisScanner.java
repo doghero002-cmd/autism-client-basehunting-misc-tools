@@ -50,32 +50,17 @@ public final class HiddenDebrisScanner {
      * @param targetStateId the block-state id to hunt (ANCIENT_STATE_ID)
      * @return list of section indices (0-based from the chunk's bottom) that hide the target
      */
-    private static int dbgScan = 0;
-
     public static List<Integer> findHiddenSections(FriendlyByteBuf data, int sectionCount, int minY, int targetStateId) {
         Objects.requireNonNull(data, "data");
         if (targetStateId < 0) throw new IllegalArgumentException("targetStateId must be non-negative");
         if (data.readableBytes() <= 0) return List.of();
         try {
             List<Integer> out = scanSections(data, sectionCount, minY, targetStateId);
-            if (dbgScan < 4) {
-                dbgScan++;
-                com.autism.seedcracker.compat.ClientNotify.warning(
-                    "[NetheriteFinder-scan] chunk scanned sec=" + sectionCount + " target=" + targetStateId
-                    + " found=" + out + " dbgBits=" + dbgLastBits);
-            }
-            return out;
-        } catch (Throwable t) {
-            if (dbgScan < 8) {
-                dbgScan++;
-                com.autism.seedcracker.compat.ClientNotify.error(
-                    "[NetheriteFinder-scan] threw " + t.getClass().getSimpleName() + ": " + t.getMessage());
-            }
+            return data.readableBytes() == 0 ? out : List.of();
+        } catch (RuntimeException malformed) {
             return List.of();
         }
     }
-
-    private static String dbgLastBits = "";
 
     private static List<Integer> scanSections(FriendlyByteBuf buf, int sectionCount, int minY, int targetStateId) {
         Objects.requireNonNull(buf, "buf");
@@ -113,9 +98,6 @@ public final class HiddenDebrisScanner {
     private static PaletteRead readPalette(FriendlyByteBuf buf, int entriesPerSection, int maxLocalBits,
                                            int globalFloorBits, int targetStateId) {
         int bitsPerEntry = buf.readUnsignedByte();
-        if (entriesPerSection == 4096 && dbgScan <= 4) {
-            dbgLastBits = (dbgLastBits.length() > 40 ? "" : dbgLastBits) + bitsPerEntry + ",";
-        }
         int[] palette;
         int bits;
         if (bitsPerEntry == 0) {

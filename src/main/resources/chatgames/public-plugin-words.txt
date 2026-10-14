@@ -1,0 +1,72 @@
+# Selected public-plugin words; attribution is in public-plugin-NOTICES.txt.
+SMARTPHONE
+COMPUTER
+GAMING
+KEYBOARD
+MINECRAFT
+DIAMOND
+ADVENTURE
+TREE
+GOLD
+LOG
+Ender eye
+Cod bucket
+Pufferfish bucket
+Salmon bucket
+Tropical fish bucket
+Hay block
+Lapis ore
+Lapis block
+Rabbit foot
+Dragon breath
+Experience bottle
+Grass path
+Grass
+Turtle helmet
+Scute
+Slime ball
+Redstone wire
+Chest minecart
+Furnace minecart
+Hopper minecart
+Tnt minecart
+Command block minecart
+Jack o lantern
+Moving piston
+Zombie pigman spawn egg
+# Selected SimpleChatGames targets, including shorthand not found in registries.
+digging
+steve
+farming
+brewing
+crafting
+wood
+planks
+rail
+armor
+biome
+cave
+dragon
+dungeon
+enchanting
+ender
+farm
+fishing
+food
+ghost
+guardians
+mob
+monster
+ores
+player
+portal
+thunder
+tools
+treasure
+weapons
+totem
+berry
+cartography
+diamond armor
+diamond tools
+enchantment table

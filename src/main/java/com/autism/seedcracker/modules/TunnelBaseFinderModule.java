@@ -64,9 +64,9 @@ public final class TunnelBaseFinderModule extends Module {
         .group("General"));
     private final BoolSetting spawnerCritical = add(new BoolSetting("spawner-critical", "Spawner critical", false)
         .description("Disconnect the moment any spawner is detected (else only on chest/shulker/piston counts).")
-        .group("General"));
+        .group("Base Detection"));
     private final BoolSetting requireSpawner = add(new BoolSetting("require-spawner", "Require spawner", true)
-        .description("Only flag a BASE when a spawner is ALSO loaded. Chest/shulker/piston counts alone (kelp farms, shops, lush caves) won't trigger.")
+        .description("Require an underground spawner in the same 3x3-chunk area as the storage or pistons.")
         .group("Base Detection"));
     // Expert tuning hidden behind one switch - the defaults are the recommended run.
     private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
@@ -82,13 +82,13 @@ public final class TunnelBaseFinderModule extends Module {
         .group("General").visibleWhen(() -> showAdvanced.get() && humanize.get()));
     private final BoolSetting kickOnNoTotem = add(new BoolSetting("kick-on-no-totem", "Kick on no totem", true)
         .description("Disconnect when you have no totem (startup + when it pops). OFF = just warn and keep tunneling (risky).")
-        .group("Totem"));
+        .group("Safety"));
     private final BoolSetting autoBuyTotem = add(new BoolSetting("auto-buy-totem", "Auto buy totem", false)
         .description("When you have no totem, open /shop and buy one automatically instead of stopping.")
-        .group("Totem"));
+        .group("Supplies"));
     private final autismclient.api.module.StringSetting totemPrice = add(new autismclient.api.module.StringSetting("totem-price", "Totem price", "50000")
         .description("The /shop totem price (for reference - the buy flow clicks the totem slot; the price is informational / for your tracking).")
-        .group("Totem").visibleWhen(() -> showAdvanced.get() && autoBuyTotem.get()));
+        .group("Supplies").visibleWhen(() -> showAdvanced.get() && autoBuyTotem.get()));
     private final IntSetting turnSpeed = add(new IntSetting("turn-speed", "Turn speed", 12, 2, 40, 1)
         .description("Degrees per tick the view turns toward a new direction (higher = snappier, lower = slower/smoother).")
         .group("Movement").visibleWhen(showAdvanced::get));
@@ -102,30 +102,30 @@ public final class TunnelBaseFinderModule extends Module {
         .description("DEFAULT: the tunnel continuously follows where you look. The heading tracks the nearest cardinal to your camera and the movement rotation matches your exact view, so the tunnel bends as you turn. Off = only manual-steer on deliberate turns.")
         .group("Movement"));
     private final IntSetting followDeadband = add(new IntSetting("follow-deadband", "Follow deadband", 6, 0, 30, 1)
-        .description("Degrees your camera must drift from the current heading before the tunnel re-centres on it (stops jitter; 0 = track every tiny movement).")
+        .description("Extra degrees beyond the 45-degree cardinal boundary before the tunnel changes heading; prevents boundary jitter.")
         .group("Movement").visibleWhen(() -> showAdvanced.get() && followCamera.get()));
     private final BoolSetting backgroundRun = add(new BoolSetting("background-run", "Run while tabbed out", true)
         .description("Keep tunneling while the window is unfocused: blocks the pause menu on alt-tab and auto-closes it if it slipped in.")
         .group("General"));
     private final BoolSetting kickOnFind = add(new BoolSetting("kick-on-find", "Kick on base find", true)
         .description("Disconnect when a base is found. OFF = play a sound + keep going (you loot it yourself).")
-        .group("Find"));
+        .group("Base Detection"));
     private final autismclient.api.module.StringSetting findSound = add(new autismclient.api.module.StringSetting("find-sound", "Found sound", "entity.player.levelup")
         .description("Sound event to play when a base is found (only when kick-on-find is off).")
-        .group("Find").visibleWhen(() -> !kickOnFind.get()));
+        .group("Base Detection").visibleWhen(() -> !kickOnFind.get()));
 
     // ---- Base-detection thresholds (separate settings group) ----
     private final IntSetting chestThreshold = add(new IntSetting("chest-threshold", "Chest/barrel count", 35, 1, 200, 1)
-        .description("Chests/barrels below Y0 in loaded chunks needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
+        .description("Chests/barrels at Y0 or below within one 3x3-chunk area needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
     private final IntSetting shulkerThreshold = add(new IntSetting("shulker-threshold", "Shulker count", 35, 1, 200, 1)
-        .description("Shulker boxes below Y0 needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
+        .description("Shulker boxes at Y0 or below within one 3x3-chunk area needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
     private final IntSetting pistonThreshold = add(new IntSetting("piston-threshold", "Moving piston count", 10, 1, 100, 1)
-        .description("Moving pistons below Y0 needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
+        .description("Moving pistons at Y0 or below within one 3x3-chunk area needed to count as a BASE.").group("Base Detection").visibleWhen(showAdvanced::get));
 
     // ---- Buying (master toggle for all /shop restock) ----
     private final BoolSetting buying = add(new BoolSetting("buying", "Enable buying", true)
         .description("Allow the module to /shop-restock XP / pearls / obsidian / carrots / totems. OFF = never opens the shop (you supply everything).")
-        .group("Buying"));
+        .group("Supplies"));
     private final BoolSetting debug = add(new BoolSetting("debug", "Debug tracing", false)
         .description("Trace state/phase/buy transitions to chat + /flaglog, and every tick into motion-trace.log (problems + their lead-up in motion-errors.log).")
         .group("General").visibleWhen(showAdvanced::get));
@@ -141,6 +141,7 @@ public final class TunnelBaseFinderModule extends Module {
     private Direction currentDirection = null;
     private final LegitMovement look = new LegitMovement();
     private boolean isRotating = false;
+    private boolean recoveryTurning;
     private Runnable rotCallback = null;
     /** Manual-steer state: yaw last tick (to detect ACTIVE turning) + sustained-turn counter. */
     private float lastSteerYaw = 0f;
@@ -160,7 +161,8 @@ public final class TunnelBaseFinderModule extends Module {
     private State buyReturnState = State.NONE;
 
     private int stuckTicks = 0;
-    private BlockPos lastCoords = null;
+    private net.minecraft.world.phys.Vec3 lastCoords = null;
+    private final java.util.Set<net.minecraft.world.level.ChunkPos> announcedBases = new java.util.HashSet<>();
     private boolean isBackup = false;
     private Direction backupDirection = null;
     private int mendingGraceTicks = 0;
@@ -169,7 +171,10 @@ public final class TunnelBaseFinderModule extends Module {
     private boolean shouldCloseInventory = false;
     private int resetMiningTick = 0, resetUseTick = 0;
     private boolean wasScreenOpen = false;
-    private int gravelRetreatTicks = 0; // back away from a falling gravel/sand column before mining it
+    private final com.autism.seedcracker.util.pure.GravelRecovery gravelRecovery =
+        new com.autism.seedcracker.util.pure.GravelRecovery(6, 300);
+    private BlockPos gravelTarget;
+    private Direction gravelHeading;
     private final com.autism.seedcracker.util.StuckDetector stuck = new com.autism.seedcracker.util.StuckDetector("TunnelBaseFinderModule",
         com.autism.seedcracker.util.Tuning.STUCK_TICKS_TUNNEL, com.autism.seedcracker.util.Tuning.STUCK_EPSILON);
 
@@ -191,6 +196,7 @@ public final class TunnelBaseFinderModule extends Module {
         phase = Phase.DIG; phaseStartTime = 0; towerRotationDone = false; towerBasePos = null;
         yRecoveryRotationDone = false; yRecoveryBasePos = null; mendStage = MendStage.ENSURE;
         buyStage = BuyStage.NONE; buyWait = 0; stuckTicks = 0; lastCoords = null;
+        announcedBases.clear();
         isBackup = false; mendingGraceTicks = 0; pearlReset = true; shouldCloseInventory = false;
         preferredSide = 0; detourStartPos = null; hazardCommitTicks = 0; noFoodCooldown = 0;
         diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0; scanTicks = 0;
@@ -198,6 +204,7 @@ public final class TunnelBaseFinderModule extends Module {
         resetMiningTick = 0; resetUseTick = 0; wasScreenOpen = false; jumped = false;
         look.reset();
         stuck.reset();
+        resetGravel();
 
         if (!isHoldingTool(mc)) {
             int pick = findPickaxe(mc);
@@ -223,6 +230,7 @@ public final class TunnelBaseFinderModule extends Module {
     public void onDisable() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) stopMovement(mc);
+        com.autism.seedcracker.motion.RotationEngine.release(id());
         if (savedPauseOnLostFocus != null && mc.options != null) {
             mc.options.pauseOnLostFocus = savedPauseOnLostFocus;
             savedPauseOnLostFocus = null;
@@ -231,6 +239,8 @@ public final class TunnelBaseFinderModule extends Module {
         isBackup = false; backupDirection = null; preferredSide = 0; detourStartPos = null;
         hazardCommitTicks = 0; diagonalDetour = false; diagSide = null; lavaEscapeTicks = 0;
         stuck.reset();
+        recoveryTurning = false;
+        resetGravel();
     }
 
     private Boolean savedPauseOnLostFocus = null;
@@ -240,6 +250,8 @@ public final class TunnelBaseFinderModule extends Module {
 
     // ---- rotation (Water RotateCharacter via LegitMovement) ----
     private void rotateTo(float yaw, float pitch, Runnable cb) {
+        rotationTicks = 0;
+        recoveryTurning = false;
         isRotating = true;
         rotCallback = cb;
         Minecraft mc = Minecraft.getInstance();
@@ -247,19 +259,26 @@ public final class TunnelBaseFinderModule extends Module {
         pendingYaw = yaw; pendingPitch = pitch;
     }
     private float pendingYaw, pendingPitch;
+    private int rotationTicks;
 
-    /** Steering rotation for hazard/stuck recovery. While FOLLOWING, your camera is authoritative
-     * (you're looking where you want to go), so this NEVER drives the view - it only updates the
-     * movement direction that was already changed by the caller. In manual mode it behaves like
-     * rotateTo. This is the fix for "it keeps aiming back at the block / I can't move my camera":
-     * the hazard router was rotating to the cardinal lane every time you steered off it. */
+    /** Hazard recovery turns are bounded and hold movement until the new lane is facing forward. */
     private void steerTo(float yaw, float pitch, Runnable cb) {
-        if (followCamera.get()) { if (cb != null) cb.run(); return; }
-        rotateTo(yaw, pitch, cb);
+        rotateTo(yaw, pitch, () -> {
+            recoveryTurning = false;
+            if (cb != null) cb.run();
+        });
+        recoveryTurning = true;
     }
 
     private void tickRotation(Minecraft mc) {
         if (!isRotating) return;
+        if (++rotationTicks > 200) {
+            setEnabled(false);
+            AutismClientMessaging.sendPrefixed("[Tunnel Base] Stopped: recovery turn could not complete.");
+            return;
+        }
+        currentSmoothedYaw = mc.player.getYRot();
+        currentSmoothedPitch = mc.player.getXRot();
         // Ease-out profile: step proportional to remaining angle (35%), clamped to [1.5, turnSpeed].
         // Real mouse turns decelerate into the target; a constant-rate sweep with a hard stop is a
         // machine signature. Still lands on the GCD grid below.
@@ -309,6 +328,11 @@ public final class TunnelBaseFinderModule extends Module {
 
         if (jumped) { jumped = false; mc.options.keyJump.setDown(false); }
         tickRotation(mc);
+        if (state != State.MINING) {
+            stuckTicks = 0;
+            lastCoords = null;
+            resetGravel();
+        }
 
         // Tabbed out: keep the vanilla option pinned off while running and dismiss a pause menu
         // that opened before enable (single-player esc pause still freezes the integrated server,
@@ -330,6 +354,10 @@ public final class TunnelBaseFinderModule extends Module {
         if (shouldCloseInventory) {
             if (mc.gui.screen() instanceof InventoryScreen) mc.gui.setScreen(null);
             shouldCloseInventory = false;
+        }
+        if (state == State.MINING && mc.gui.screen() != null) {
+            stopMovement(mc);
+            return;
         }
 
         // Base scan every 10 ticks, not every tick: a full render-distance block-entity sweep is
@@ -401,7 +429,7 @@ public final class TunnelBaseFinderModule extends Module {
 
         boolean busy = state == State.AUTOMEND || state == State.AUTOEAT
             || state == State.BUYXP || state == State.BUYPEARL
-            || state == State.BUYCARROT || state == State.BUYOBI;
+            || state == State.BUYCARROT || state == State.BUYOBI || state == State.BUYTOTEM;
         if (!busy) {
             if (mendingGraceTicks <= 0 && !hasTotemOffhand(mc)) {
                 int t = findInInventory(mc, Items.TOTEM_OF_UNDYING);
@@ -464,37 +492,46 @@ public final class TunnelBaseFinderModule extends Module {
 
     // ---- base detection (Water thresholds) ----
     private void scanForBase(Minecraft mc) {
-        int chests = 0, shulkers = 0, movingPiston = 0;
-        boolean foundSpawner = false;
         // Cap the scan radius: a full (2*vd+1)^2 chunk x all-block-entities sweep every 10 ticks
         // was a real frame hit at high render distance (625+ chunks, thousands of map reads).
         int vd = Math.min(mc.options.getEffectiveRenderDistance(), 8);
+        int side = vd * 2 + 1;
+        int[] chests = new int[side * side], shulkers = new int[side * side], movingPiston = new int[side * side];
+        boolean[] spawners = new boolean[side * side];
+        net.minecraft.world.level.ChunkPos criticalSpawner = null;
         net.minecraft.world.level.ChunkPos center = mc.player.chunkPosition();
         for (int dx = -vd; dx <= vd; dx++) {
             for (int dz = -vd; dz <= vd; dz++) {
                 int cx = center.x() + dx, cz = center.z() + dz;
                 if (!mc.level.hasChunk(cx, cz)) continue;
                 net.minecraft.world.level.chunk.LevelChunk chunk = mc.level.getChunk(cx, cz);
+                int index = (dx + vd) * side + dz + vd;
                 for (BlockEntity be : chunk.getBlockEntities().values()) {
                     if (be == null) continue;
-                    if (be instanceof SpawnerBlockEntity) foundSpawner = true;
+                    if (be instanceof SpawnerBlockEntity && criticalSpawner == null) criticalSpawner = chunk.getPos();
                     BlockPos pos = be.getBlockPos();
                     if (pos.getY() > 0) continue;
+                    if (be instanceof SpawnerBlockEntity) spawners[index] = true;
                     Block b = be.getBlockState().getBlock();
-                    if (b == Blocks.CHEST || b == Blocks.TRAPPED_CHEST || b == Blocks.BARREL) chests++;
-                    else if (isShulker(b)) shulkers++;
-                    else if (b == Blocks.MOVING_PISTON) movingPiston++;
+                    if (b == Blocks.CHEST || b == Blocks.TRAPPED_CHEST || b == Blocks.BARREL) chests[index]++;
+                    else if (isShulker(b)) shulkers[index]++;
+                    else if (b == Blocks.MOVING_PISTON) movingPiston[index]++;
                 }
             }
         }
-        boolean found = false; String reason = "";
-        if (chests >= chestThreshold.get()) { found = true; reason = "BASE"; }
-        else if (shulkers >= shulkerThreshold.get()) { found = true; reason = "BASE"; }
-        else if (movingPiston >= pistonThreshold.get()) { found = true; reason = "BASE"; }
-        // Storage counts alone can be a kelp farm / shop chunk: require a loaded spawner too.
-        if (found && requireSpawner.get() && !foundSpawner) { found = false; reason = ""; }
-        if (!found && foundSpawner && spawnerCritical.get()) { found = true; reason = "SPAWNER"; }
-        if (found) onBaseFound(mc, reason);
+        int cluster = com.autism.seedcracker.util.pure.SusScore.findBaseCluster(chests, spawners, side, chestThreshold.get(), requireSpawner.get());
+        if (cluster < 0) cluster = com.autism.seedcracker.util.pure.SusScore.findBaseCluster(shulkers, spawners, side, shulkerThreshold.get(), requireSpawner.get());
+        if (cluster < 0) cluster = com.autism.seedcracker.util.pure.SusScore.findBaseCluster(movingPiston, spawners, side, pistonThreshold.get(), requireSpawner.get());
+        net.minecraft.world.level.ChunkPos found = cluster < 0 ? null
+            : new net.minecraft.world.level.ChunkPos(center.x() + cluster / side - vd, center.z() + cluster % side - vd);
+        String reason = "BASE";
+        if (found == null && spawnerCritical.get()) { found = criticalSpawner; reason = "SPAWNER"; }
+        if (found == null) return;
+        for (net.minecraft.world.level.ChunkPos previous : announcedBases) {
+            if (Math.abs(previous.x() - found.x()) <= 2 && Math.abs(previous.z() - found.z()) <= 2) return;
+        }
+        announcedBases.add(found);
+        onBaseFound(mc, reason);
     }
 
     /** Kick or play a sound on base find, per the kick-on-find setting. */
@@ -519,6 +556,7 @@ public final class TunnelBaseFinderModule extends Module {
 
     // ---- MINING ----
     private void handleMining(Minecraft mc) {
+        if (recoveryTurning && isRotating) { stopMovement(mc); return; }
         // Master mining guard: never swing while these hold, or the bot fights itself.
         //  - FALLING: mining on the way DOWN (off a ledge / into a gap) lags back and jams the bot.
         //    A step-hop's UPWARD arc is fine and must keep mining, or every hop stalls the tunnel.
@@ -546,11 +584,10 @@ public final class TunnelBaseFinderModule extends Module {
         // steering applies (deliberate sustained turn past 35 degrees adopts that direction).
         if (followCamera.get() && !diagonalDetour && currentDirection != null) {
             Direction lookDir = mc.player.getDirection();
-            float dev = Math.abs(net.minecraft.util.Mth.wrapDegrees(
-                mc.player.getYRot() - dirValues(currentDirection)[0]));
             // Re-centre the heading when you've moved off the current lane. The deadband only
             // stops wobble; it does NOT delay following (a clear turn re-centres immediately).
-            if (lookDir != currentDirection && dev > followDeadband.get()) {
+                if (lookDir != currentDirection && com.autism.seedcracker.util.pure.GcdMath.cardinalHeadingChanged(
+                    dirValues(currentDirection)[0], mc.player.getYRot(), followDeadband.get())) {
                 currentDirection = lookDir;
                 isBackup = false; backupDirection = null; detourStartPos = null;
                 preferredSide = 0; hazardCommitTicks = 0; stuckTicks = 0;
@@ -586,12 +623,22 @@ public final class TunnelBaseFinderModule extends Module {
         com.autism.seedcracker.util.InvSync.select(mc, findPickaxe(mc));
         if (mode.get() == MiningMode.CRAWL && mc.player.getPose() != Pose.SWIMMING) state = State.PEARL;
 
+        if (handleGravel(mc)) {
+            stuckTicks = 0;
+            lastCoords = mc.player.position();
+            return;
+        }
+
         // Stuck ladder: position-based (not hitResult-based) so "aiming at a block but not
         // progressing" (lag-back, wrong face, unbreakable) is caught too.
         // Escalates: hop -> exact re-aim + attack retrigger -> sidestep -> tower out.
         BlockPos cur = mc.player.blockPosition();
-        if (cur.equals(lastCoords)) {
-            stuckTicks++;
+        net.minecraft.world.phys.Vec3 position = mc.player.position();
+        double progress = lastCoords == null ? 0
+            : Math.hypot(position.x - lastCoords.x, position.z - lastCoords.z);
+        stuckTicks = com.autism.seedcracker.util.pure.StuckLogic.update(stuckTicks, lastCoords != null, progress, 0.05);
+        if (stuckTicks == 0) lastCoords = position;
+        if (stuckTicks > 0) {
             if (stuckTicks == 20 || stuckTicks == 40 || stuckTicks == 60 || stuckTicks >= 90) {
                 com.autism.seedcracker.motion.MotionDebug.event("UNSTICK", "tunnel stuck " + stuckTicks + " ticks at " + cur.toShortString()
                     + " dir=" + currentDirection + " -> " + (stuckTicks == 20 ? "hop" : stuckTicks == 40 ? "re-aim"
@@ -612,7 +659,7 @@ public final class TunnelBaseFinderModule extends Module {
                 // steering movement. Manual mode still climbs out of the pocket.
                 if (!followCamera.get()) { state = State.GOABOVEHAZARD; return; }
             }
-        } else { stuckTicks = 0; lastCoords = cur; }
+        }
 
         // Jump-step restores the quick hop over 1-block lips. Safe in follow mode now: it only
         // fires when grounded (the airborne mining guard keeps it from fighting the mine latch),
@@ -666,21 +713,6 @@ public final class TunnelBaseFinderModule extends Module {
             mc.level.getBlockState(feetFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
             || mc.level.getBlockState(headFront).getBlock() instanceof net.minecraft.world.level.block.FallingBlock;
 
-        if (fallingAhead && gravelRetreatTicks == 0) gravelRetreatTicks = 6; // start backing out
-        if (gravelRetreatTicks > 0) {
-            gravelRetreatTicks--;
-            updateMining(mc, false);
-            mc.options.keyLeft.setDown(false); mc.options.keyRight.setDown(false);
-            // Back AWAY from the column (reverse of the heading). In follow mode steer the view back
-            // so forward-key actually retreats; manual mode walks backward via the reverse heading.
-            Direction away = currentDirection == null ? null : currentDirection.getOpposite();
-            // Raw set (audited): panic retreat from falling gravel - a human flicks here too.
-            if (followCamera.get() && away != null) mc.player.setYRot(dirValues(away)[0]);
-            mc.options.keyUp.setDown(true);
-            if (gravelRetreatTicks == 0) mc.options.keyUp.setDown(false);
-            return;
-        }
-
         mc.options.keyUp.setDown(!fallingAhead);
         // Lane-centering assumes a cardinal lane; follow mode walks your exact camera (possibly
         // diagonal), so strafing to a cardinal lane fights the follow. Disable it while following.
@@ -700,6 +732,64 @@ public final class TunnelBaseFinderModule extends Module {
             ? checkHazardDiagonal(mc, currentDirection, diagSide, 0)
             : checkHazardDirection(mc, currentDirection, 0);
         if (laneHot) avoidHazard(mc, true);
+    }
+
+    private void resetGravel() {
+        gravelRecovery.reset();
+        gravelTarget = null;
+        gravelHeading = null;
+    }
+
+    private boolean handleGravel(Minecraft mc) {
+        if (currentDirection == null) return false;
+        if (gravelTarget != null && gravelHeading != currentDirection) resetGravel();
+        BlockPos front = mc.player.blockPosition().relative(currentDirection);
+        if (gravelTarget == null) {
+            if (mc.level.getBlockState(front).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) gravelTarget = front;
+            else if (mc.level.getBlockState(front.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) gravelTarget = front.above();
+            if (gravelTarget == null) return false;
+            gravelHeading = currentDirection;
+        }
+        int columnX = gravelTarget.getX(), columnZ = gravelTarget.getZ();
+        BlockPos columnFeet = new BlockPos(columnX, mc.player.getBlockY(), columnZ);
+        boolean threat = mc.level.getBlockState(gravelTarget).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+            || mc.level.getBlockState(columnFeet).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+            || mc.level.getBlockState(columnFeet.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+            || !mc.level.getEntitiesOfClass(net.minecraft.world.entity.item.FallingBlockEntity.class,
+                new net.minecraft.world.phys.AABB(columnX - 0.1, mc.player.getY() - 1, columnZ - 0.1,
+                    columnX + 1.1, mc.player.getY() + 8, columnZ + 1.1)).isEmpty();
+        BlockPos behind = mc.player.blockPosition().relative(currentDirection.getOpposite());
+        boolean retreatSafe = false;
+        if (mc.level.hasChunk(behind.getX() >> 4, behind.getZ() >> 4)) {
+            var backState = mc.level.getBlockState(behind);
+            var head = mc.level.getBlockState(behind.above());
+            var floor = mc.level.getBlockState(behind.below());
+            retreatSafe = backState.getCollisionShape(mc.level, behind).isEmpty() && !isFluid(backState)
+                && !isContactHazard(backState.getBlock()) && !isFluid(head) && !isContactHazard(head.getBlock())
+                && (mc.player.getPose() == Pose.SWIMMING || head.getCollisionShape(mc.level, behind.above()).isEmpty())
+                && !floor.getCollisionShape(mc.level, behind.below()).isEmpty()
+                && !isFluid(floor) && !isContactHazard(floor.getBlock());
+        }
+        var step = gravelRecovery.tick(threat, retreatSafe);
+        if (step == com.autism.seedcracker.util.pure.GravelRecovery.Step.IDLE) {
+            resetGravel();
+            mc.options.keyDown.setDown(false);
+            return false;
+        }
+        com.autism.seedcracker.util.tunnel.MovementInput.setKeys(
+            new com.autism.seedcracker.util.tunnel.MovementInput.Keys(false,
+                step == com.autism.seedcracker.util.pure.GravelRecovery.Step.RETREAT, false, false), false);
+        mc.options.keyJump.setDown(false);
+        boolean clear = step == com.autism.seedcracker.util.pure.GravelRecovery.Step.CLEAR
+            && mc.hitResult instanceof BlockHitResult hit && hit.getBlockPos().getX() == columnX
+            && hit.getBlockPos().getZ() == columnZ
+            && mc.level.getBlockState(hit.getBlockPos()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock;
+        updateMining(mc, clear);
+        if (step == com.autism.seedcracker.util.pure.GravelRecovery.Step.STOP) {
+            setEnabled(false);
+            AutismClientMessaging.sendPrefixed("[Tunnel Base] Gravel recovery stopped: unsafe retreat or column did not clear.");
+        }
+        return true;
     }
 
     /** True when lava is in the 2-block column directly ahead (feet or head level): stop mining
@@ -1640,6 +1730,8 @@ public final class TunnelBaseFinderModule extends Module {
     }
 
     private void stopMovement(Minecraft mc) {
+        stuckTicks = 0;
+        lastCoords = null;
         mc.options.keyUp.setDown(false);
         mc.options.keyDown.setDown(false);
         mc.options.keyLeft.setDown(false);

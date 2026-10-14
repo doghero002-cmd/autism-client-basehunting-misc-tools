@@ -31,8 +31,9 @@ public final class WeatherNotifierModule extends Module {
         .description("Print a chat message.")
         .group("Notifications"));
 
-    private Boolean raining = null;
-    private Boolean thundering = null;
+    private final com.autism.seedcracker.util.pure.WeatherStability raining = new com.autism.seedcracker.util.pure.WeatherStability();
+    private final com.autism.seedcracker.util.pure.WeatherStability thundering = new com.autism.seedcracker.util.pure.WeatherStability();
+    private net.minecraft.client.multiplayer.ClientLevel trackedWorld;
 
     public WeatherNotifierModule() {
         super(SeedcrackerAddon.ID + ":z-weather-notifier", "Weather Notifier",
@@ -41,41 +42,32 @@ public final class WeatherNotifierModule extends Module {
 
     @Override
     public void onEnable() {
-        raining = null;
-        thundering = null;
+        resetWeather();
     }
 
     @Override
     public void onDisable() {
-        raining = null;
-        thundering = null;
+        resetWeather();
+    }
+
+    private void resetWeather() {
+        raining.reset();
+        thundering.reset();
+        trackedWorld = null;
+    }
+
+    @Override public void onGameLeft() {
+        resetWeather();
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
-
-        boolean nowRaining = mc.level.isRaining();
-        boolean nowThundering = mc.level.isThundering();
-
-        if (raining == null) {
-            raining = nowRaining;
-            thundering = nowThundering;
-            return;
-        }
-
-        if (notifyRain.get()) {
-            if (nowRaining && !raining) notify("The rain started.");
-            else if (!nowRaining && raining) notify("The rain stopped.");
-        }
-        if (notifyThunder.get()) {
-            if (nowThundering && !thundering) notify("A thunderstorm started.");
-            else if (!nowThundering && thundering) notify("The thunderstorm ended.");
-        }
-
-        raining = nowRaining;
-        thundering = nowThundering;
+        if (trackedWorld != mc.level) { resetWeather(); trackedWorld = mc.level; }
+        if (raining.update(mc.level.isRaining()) && notifyRain.get()) notify(raining.value() ? "The rain started." : "The rain stopped.");
+        if (thundering.update(mc.level.isThundering()) && notifyThunder.get()) notify(thundering.value() ? "A thunderstorm started." : "The thunderstorm ended.");
     }
 
     private void notify(String message) {

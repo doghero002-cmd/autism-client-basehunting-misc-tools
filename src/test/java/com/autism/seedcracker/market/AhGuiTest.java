@@ -10,6 +10,34 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AhGuiTest {
+    @Test void sellingRequiresExplicitItemsUnlessAllHotbarSalesWereOptedIn() {
+        assertFalse(AhGui.saleItemAllowed("minecraft:diamond", "", false));
+        assertTrue(AhGui.saleItemAllowed("minecraft:diamond", "", true));
+        assertTrue(AhGui.saleItemAllowed("minecraft:cobblestone", "cobblestone, stone", false));
+        assertFalse(AhGui.saleItemAllowed("minecraft:diamond", "cobblestone, stone", false));
+        assertFalse(AhGui.saleItemAllowed("minecraft:diamond", "diamond, bad command", false));
+    }
+
+    @Test void saleConfirmationCannotBeAnOrdinaryChestOrPurchaseDialog() {
+        assertTrue(AhGui.saleConfirmation(27, "Confirm Sell"));
+        assertTrue(AhGui.saleConfirmation(54, "Confirm Listing"));
+        assertFalse(AhGui.saleConfirmation(27, "Chest"));
+        assertFalse(AhGui.saleConfirmation(54, "Auction House"));
+        assertFalse(AhGui.saleConfirmation(27, "Confirm Purchase"));
+        assertFalse(AhGui.saleConfirmation(63, "Confirm Sell"));
+    }
+
+    @Test
+    void sniperTargetFiltersDistinguishNamedVariantsAndStackSizes() {
+        assertTrue(AhGui.targetMatches("\u00a7bShard Netherite Helmet", 1, "shard", "expired", 1));
+        assertFalse(AhGui.targetMatches("Netherite Helmet", 1, "shard", "", 1));
+        assertFalse(AhGui.targetMatches("Expired Shard Helmet", 1, "shard", "expired", 1));
+        assertFalse(AhGui.targetMatches("Netherite Ingot", 3, "", "", 4));
+        assertTrue(AhGui.targetMatches("Netherite Ingot", 4, "", "", 4));
+        assertTrue(AhGui.targetMatches("Shard Helmet", 1, " SHARD ", "", 1));
+        assertFalse(AhGui.targetMatches(null, 64, "", "", 1));
+    }
+
     private static final long NOW = 1_800_000_000_000L;
 
     private static Listing listing(long time, String seller, String item, int count, long price) {

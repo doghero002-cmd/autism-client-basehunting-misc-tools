@@ -108,10 +108,13 @@ public final class SpawnerProtectModule extends Module {
     public void onDisable() {
         stopMining(Minecraft.getInstance());
         target = null;
+        resetStorage();
+        rotInit = false;
     }
 
     @Override
     public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+        onDisable();
     }
 
     @Override
@@ -123,6 +126,10 @@ public final class SpawnerProtectModule extends Module {
 
         // Storage phase (shulker -> echest) takes priority once spawners are collected.
         if (tickStorage(mc)) return;
+        if (mc.gui.screen() != null || mc.player.isUsingItem()) {
+            stopMining(mc);
+            return;
+        }
 
         int pickSlot = findSilkTouchSlot(mc);
         if (pickSlot == -1) {

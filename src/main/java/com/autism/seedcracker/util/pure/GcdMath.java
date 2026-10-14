@@ -25,6 +25,12 @@ public final class GcdMath {
         return (float) (Math.round(angleDeg / gcdStep) * gcdStep);
     }
 
+    public static boolean cardinalHeadingChanged(float headingYaw, float cameraYaw, float deadband) {
+        double delta = (double) cameraYaw - headingYaw;
+        delta = ((delta % 360.0) + 540.0) % 360.0 - 180.0;
+        return Math.abs(delta) > 45.0 + Math.max(0, deadband);
+    }
+
     /**
      * Result of a delta quantization: the new angle and the remainder to carry into the next call.
      */

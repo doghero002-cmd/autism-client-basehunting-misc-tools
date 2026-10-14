@@ -171,6 +171,7 @@ public final class SchematicBuilderModule extends Module {
     @Override
     public void onEnable() {
         look.reset();
+        driving = false;
         placeCooldown = 0;
         stuck.reset();
     }
@@ -217,7 +218,11 @@ public final class SchematicBuilderModule extends Module {
 
         if (renderGhost.get() && loaded && origin != null) renderGhost(mc);
 
-        if (!build.get() || !loaded || origin == null) return;
+        if (!build.get() || !loaded || origin == null) {
+            pauseDriving();
+            stuck.reset();
+            return;
+        }
 
         com.autism.seedcracker.util.DebugProbe.setEnabled(id(), debug.get());
         com.autism.seedcracker.util.DebugProbe.traceChange(id(), "state",
@@ -231,12 +236,17 @@ public final class SchematicBuilderModule extends Module {
             tickRestock(mc);
             return;
         }
-        if (mc.gui.screen() != null) return; // don't build while a GUI is open
+        if (mc.gui.screen() != null) {
+            pauseDriving();
+            stuck.reset();
+            return;
+        }
         // No place/dig packets within the container grace window.
         if (com.autism.seedcracker.util.ContainerMutex.containerBusy(mc)) {
             com.autism.seedcracker.util.tunnel.HumanMotionSim.releaseAll();
             return;
         }
+        driving = true;
         tickBuild(mc);
 
         // Stuck detector: only meaningful while walking to a target (building in place is fine).
@@ -247,6 +257,14 @@ public final class SchematicBuilderModule extends Module {
         } else {
             stuck.reset();
         }
+    }
+
+    private boolean driving;
+
+    private void pauseDriving() {
+        if (!driving) return;
+        driving = false;
+        com.autism.seedcracker.util.tunnel.HumanMotionSim.releaseAll();
     }
 
     // ---- origin ----

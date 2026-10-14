@@ -45,8 +45,6 @@ public final class NameProtectModule extends Module {
         if (mc.player == null) return original;
         String real = mc.player.getGameProfile().name();
         if (real == null || real.isBlank()) return original;
-        String text = original.getString();
-        if (!text.contains(real)) return original;
-        return Component.literal(text.replace(real, fakeName()));
+        return com.autism.seedcracker.util.pure.NameMask.mask(original, real, fakeName());
     }
 }

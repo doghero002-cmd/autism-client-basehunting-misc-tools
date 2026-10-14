@@ -1228,4 +1228,11 @@ final class PathFollower {
         stopBreaking(mc);
         RotationEngine.release(ROT_OWNER);
     }
+
+    void pause(Minecraft mc) {
+        release(mc);
+        lastPos = null;
+        stillTicks = 0;
+        nodeTicks = 0;
+    }
 }

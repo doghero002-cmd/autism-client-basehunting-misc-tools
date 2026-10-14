@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,17 +32,29 @@ public final class ChatGameSolver {
     public record Answer(Kind kind, String text) {}
 
     private static final Pattern QUOTED = Pattern.compile("[\"'\u201C\u2018`]([^\"'\u201D\u2019`]{1,64})[\"'\u201D\u2019`]");
-    private static final Pattern AFTER_COLON = Pattern.compile(":\\s*([^:]{1,64})$");
+    private static final Pattern AFTER_COLON = Pattern.compile(":\\s*((?:/[^\\s:]+:)?[^:\\r\\n]{1,64})$");
     private static final Pattern UNSCRAMBLE = Pattern.compile("(?i)\\b(unscramble|scrambled|unjumble|jumbled|anagram)\\b");
     private static final Pattern TYPE = Pattern.compile("(?i)\\b(type|write|say|copy)\\b");
     private static final Pattern REVERSE = Pattern.compile("(?i)\\b(reverse|reversed|backwards?)\\b");
     private static final Pattern FILL = Pattern.compile("(?i)\\b(fill in|fill the|missing letters?|complete the word)\\b");
     private static final Pattern MATH_CUE = Pattern.compile("(?i)\\b(solve|calculate|math|what is|what's|equals?|compute)\\b|=\\s*\\?");
     private static final Pattern DATE_OR_TIME = Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}[/:]\\d{1,2}(?:[/:]\\d{2,4})?\\b");
+    private static final Pattern MATH_RUN = Pattern.compile("[-+*/%^()\\d.\\s]+");
+    private static final Pattern MATH_OPERATION = Pattern.compile("\\d\\s*[-+*/%^]\\s*[-(\\d]");
+    private static final Pattern LEADING_PUNCTUATION = Pattern.compile("^\\.+\\s+");
+    private static final Pattern MULTIPLICATION = Pattern.compile("(?<=\\d)\\s*[xX\u00D7]\\s*(?=[\\d(])");
+    private static final Pattern EXPLICIT_TYPE = Pattern.compile("(?i)\\b(?:type|write|say|copy)\\s*:\\s*([^\\r\\n]{1,64})$");
+    private static final Pattern FIRST_TYPE = Pattern.compile("(?i)\\bfirst\\s+to\\s+(?:type|write|say|copy)\\s+(.{1,64}?)\\s+wins\\b.*$");
+    private static final Pattern FALLBACK_WORD = Pattern.compile("[a-z]+(?:[ '-][a-z]+)*");
 
     private final Map<String, List<String>> anagrams = new HashMap<>();
+    private final Map<String, List<String>> fallbackAnagrams = new HashMap<>();
+    private final Map<String, List<String>> commandAnagrams = new HashMap<>();
+    private final Set<String> commands = new HashSet<>();
     private final Map<Integer, List<String>> byLength = new HashMap<>();
+    private final Map<Integer, List<String>> fallbackByLength = new HashMap<>();
     private final Map<String, String> trivia = new HashMap<>();
+    private final Map<String, String> answerKey = new HashMap<>();
 
     public ChatGameSolver(Collection<String> dictionary) {
         for (String w : dictionary) addWord(w);
@@ -50,22 +64,51 @@ public final class ChatGameSolver {
     public void addWord(String raw) {
         if (raw == null) return;
         String w = raw.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
-        String letters = w.replaceAll("[^a-z]", "");
-        if (letters.length() < 3 || w.length() > 40) return;
+        String letters = w.replaceAll("[^a-z0-9]", "");
+        if (w.replaceAll("[^a-z]", "").length() < 3 || w.length() > 40) return;
         List<String> group = anagrams.computeIfAbsent(sortedLetters(letters), k -> new ArrayList<>());
-        if (group.contains(w)) return;
+        if (group.stream().anyMatch(existing -> existing.replaceAll("[^a-z0-9]", "").equals(letters))) return;
         group.add(w);
         if (w.equals(letters)) byLength.computeIfAbsent(w.length(), k -> new ArrayList<>()).add(w);
     }
 
     public int dictionarySize() {
         int n = 0;
-        for (List<String> l : byLength.values()) n += l.size();
+        for (List<String> l : anagrams.values()) n += l.size();
+        for (List<String> l : fallbackAnagrams.values()) n += l.size();
         return n;
+    }
+
+    public void addFallbackWord(String raw) {
+        if (raw == null) return;
+        String word = raw.trim().toLowerCase(Locale.ROOT);
+        if (word.length() > 40 || !FALLBACK_WORD.matcher(word).matches()) return;
+        String letters = word.replace(" ", "").replace("'", "").replace("-", "");
+        if (letters.length() < 3) return;
+        String signature = sortedLetters(letters);
+        List<String> primary = anagrams.get(signature);
+        if (primary != null && primary.stream().anyMatch(existing -> existing.replaceAll("[^a-z0-9]", "").equals(letters))) return;
+        List<String> group = fallbackAnagrams.computeIfAbsent(signature, key -> new ArrayList<>());
+        if (group.stream().anyMatch(existing -> existing.replace(" ", "").replace("'", "").replace("-", "").equals(letters))) return;
+        group.add(word);
+        if (word.equals(letters)) fallbackByLength.computeIfAbsent(word.length(), key -> new ArrayList<>()).add(word);
+    }
+
+    public void setCommands(Collection<String> names) {
+        commandAnagrams.clear();
+        commands.clear();
+        for (String name : names) {
+            if (name == null || !name.matches("[A-Za-z0-9_:-]{1,64}")) continue;
+            String command = "/" + name;
+            commands.add(name.toLowerCase(Locale.ROOT));
+            List<String> group = commandAnagrams.computeIfAbsent(commandSignature(command), key -> new ArrayList<>());
+            if (!group.contains(command)) group.add(command);
+        }
     }
 
     /** Remember the answer the server announced for a question (trivia memory). */
     public void learn(String question, String answer) {
+        if (ChatLine.isGenericHeader(question)) return;
         String q = normalizeQuestion(question);
         if (q.length() < 8 || answer == null || answer.isBlank() || answer.length() > 64) return;
         trivia.put(q, answer.trim());
@@ -75,18 +118,54 @@ public final class ChatGameSolver {
         return Map.copyOf(trivia);
     }
 
+    public void setAnswerKey(Map<String, String> answers) {
+        answerKey.clear();
+        answers.forEach((question, answer) -> answerKey.put(normalizeQuestion(question), answer));
+    }
+
+    public int answerKeySize() {
+        return answerKey.size();
+    }
+
+    public int defaultAnswerCount() {
+        return ChatGameAnswerKey.defaults().size();
+    }
+
     /** Best answer for a prompt, or null when it isn't a format we can solve with confidence. */
+    public Answer solve(String prompt, boolean allowWordProblems, boolean genericPayload) {
+        Answer answer = solve(prompt, allowWordProblems);
+        if (answer == null && genericPayload && prompt != null && prompt.matches("[A-Za-z0-9_/.-]{1,64}")) {
+            String letters = prompt.toLowerCase(Locale.ROOT).replaceAll("[^a-z]", "");
+            List<String> candidates = anagrams.get(sortedLetters(letters));
+            if (candidates == null) candidates = fallbackAnagrams.get(sortedLetters(letters));
+            if (candidates != null && candidates.stream().noneMatch(word -> word.replaceAll("[^a-z]", "").equals(letters))) {
+                return solve("Unscramble: " + prompt, allowWordProblems);
+            }
+            return new Answer(Kind.TYPE, prompt);
+        }
+        return answer;
+    }
+
     public Answer solve(String prompt, boolean allowWordProblems) {
         if (prompt == null || prompt.isBlank()) return null;
-        String p = prompt.trim();
-
-        String known = trivia.get(normalizeQuestion(p));
-        if (known != null) return new Answer(Kind.TRIVIA, known);
+        String p = ChatLine.questionText(prompt);
+        if (ChatLine.isGenericHeader(p)) return null;
 
         if (UNSCRAMBLE.matcher(p).find()) {
             String target = payload(p);
             String word = target == null ? null : unscramble(target);
-            return word == null ? null : new Answer(Kind.UNSCRAMBLE, matchCase(word, target));
+            String remembered = trivia.get(normalizeQuestion(p));
+            if (target != null && remembered != null) {
+                if (target.startsWith("/")) {
+                    List<String> commands = commandAnagrams.get(commandSignature(target));
+                    if (commands != null && commands.contains(remembered)) word = remembered;
+                } else if (sortedLetters(target.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", ""))
+                    .equals(sortedLetters(remembered.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "")))) {
+                    word = remembered;
+                }
+            }
+            return word == null ? null : new Answer(Kind.UNSCRAMBLE,
+                target.startsWith("/") ? word : matchCase(word, target));
         }
         if (REVERSE.matcher(p).find()) {
             String target = payload(p);
@@ -112,36 +191,123 @@ public final class ChatGameSolver {
         if (TYPE.matcher(p).find()) {
             Matcher q = QUOTED.matcher(p);
             if (q.find()) return new Answer(Kind.TYPE, q.group(1).trim());
+            Matcher explicit = EXPLICIT_TYPE.matcher(p);
+            if (explicit.find()) return new Answer(Kind.TYPE, explicit.group(1).trim());
+            Matcher first = FIRST_TYPE.matcher(p);
+            if (first.find()) return new Answer(Kind.TYPE, first.group(1).trim());
+        }
+        String known = answerKey.get(normalizeQuestion(p));
+        if (known == null) known = trivia.get(normalizeQuestion(p));
+        if (known == null) known = ChatGameAnswerKey.defaults().get(normalizeQuestion(p));
+        if (known != null) return new Answer(Kind.TRIVIA, known);
+        return minecraftQuestion(p);
+    }
+
+    private Answer minecraftQuestion(String prompt) {
+        if (!ChatLine.isQuestion(prompt)) return null;
+        String question = normalizeQuestion(prompt);
+        if (question.matches(".*\\b(?:not|never|cannot|can t|doesn t|don t|isn t|aren t|except|without|besides)\\b.*")) return null;
+        if (question.matches(".*\\b(?:mob|mobs|creature|creatures|monster|monsters|enemy|enemies)\\b.*")
+            && question.matches(".*\\b(?:explode|explodes|exploding|blows? up|detonate|detonates)\\b.*")
+            && question.matches(".*\\b(?:close|near|nearby|approach|approaches|approaching|proximity|next to)\\b.*")
+            && !question.matches(".*\\b(?:shoot|shoots|projectile|fireball|arrow|arrows)\\b.*")) {
+            return new Answer(Kind.TRIVIA, "creeper");
+        }
+        if (question.contains("nether portal") && question.matches(".*\\b(?:block|blocks|material|materials)\\b.*")
+            && question.matches(".*\\b(?:build|builds|building|built|make|makes|making|made|construct|constructs|frame|use|uses|used)\\b.*")
+            && !question.matches(".*\\b(?:light|ignite|activate|end)\\b.*")) {
+            return new Answer(Kind.TRIVIA, "obsidian");
+        }
+        if (question.contains("ender dragon") && (question.contains("dimension")
+            || question.startsWith("where ") && question.matches(".*\\b(?:live|lives|spawn|spawns|found)\\b.*"))) {
+            return new Answer(Kind.TRIVIA, "the end");
+        }
+        if (question.contains("elytra") && question.matches(".*\\b(?:repair|repairs|repairing)\\b.*")
+            && question.matches(".*\\b(?:item|items|material|materials)\\b.*")) {
+            return new Answer(Kind.TRIVIA, "phantom membrane");
+        }
+        if (question.contains("command") && question.matches(".*\\b(?:sell|sells|selling)\\b.*")
+            && question.contains("all") && question.matches(".*\\b(?:drops|loot|items)\\b.*")
+            && commands.contains("sellall")) {
+            return new Answer(Kind.TRIVIA, "sellall");
+        }
+        if (question.contains("command") && question.contains("spawn")
+            && question.matches(".*\\b(?:teleport|teleports|return|returns)\\b.*") && commands.contains("spawn")) {
+            return new Answer(Kind.TRIVIA, "spawn");
         }
         return null;
     }
 
-    /** All dictionary words that are anagrams of {@code scrambled}; the first is returned. */
+    public boolean validatesAiAnswer(String prompt, String answer) {
+        if (answer == null || answer.isBlank()) return false;
+        Answer known = solve(prompt, true);
+        if (known != null) return ChatLine.sameAnswer(ChatLine.answerText(known.text()), ChatLine.answerText(answer));
+        String question = ChatLine.questionText(prompt);
+        if (UNSCRAMBLE.matcher(question).find()) {
+            String target = payload(question);
+            if (target == null) return false;
+            if (target.startsWith("/")) {
+                String command = "/" + ChatLine.answerText(answer);
+                return commands.contains(ChatLine.answerText(answer).toLowerCase(Locale.ROOT))
+                    && commandSignature(target).equals(commandSignature(command));
+            }
+            return sortedLetters(target.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", ""))
+                .equals(sortedLetters(answer.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "")));
+        }
+        return true;
+    }
+
+    /** Unique alternative anagram; ambiguous matches stay unanswered. */
     public String unscramble(String scrambled) {
-        String letters = scrambled.toLowerCase(Locale.ROOT).replaceAll("[^a-z]", "");
+        if (scrambled == null || scrambled.isBlank()) return null;
+        if (scrambled.trim().startsWith("/")) {
+            String signature = commandSignature(scrambled);
+            List<String> commands = commandAnagrams.get(signature);
+            if (commands == null) return null;
+            String found = null;
+            for (String command : commands) {
+                if (command.equalsIgnoreCase(scrambled.trim())) continue;
+                if (found != null) return null;
+                found = command;
+            }
+            return found != null ? found : commands.size() == 1 ? commands.get(0) : null;
+        }
+        String letters = scrambled.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
         List<String> hits = anagrams.get(sortedLetters(letters));
+        if (hits == null) hits = fallbackAnagrams.get(sortedLetters(letters));
         if (hits == null) return null;
         // A scramble that happens to spell a real word is never the answer itself.
-        for (String h : hits) if (!h.replaceAll("[^a-z]", "").equals(letters)) return h;
-        return hits.get(0);
+        String found = null;
+        for (String hit : hits) {
+            if (hit.replaceAll("[^a-z0-9]", "").equals(letters)) continue;
+            if (found != null) return null;
+            found = hit;
+        }
+        return found != null ? found : hits.size() == 1 ? hits.get(0) : null;
+    }
+
+    private static String commandSignature(String command) {
+        return sortedLetters(command.trim().toLowerCase(Locale.ROOT).replaceFirst("^/", "").replaceAll("\\s+", ""));
     }
 
     /** Unique dictionary word matching an underscore pattern ("d_am_nd"); null when ambiguous. */
     public String fill(String pattern) {
         String pat = pattern.toLowerCase(Locale.ROOT);
-        List<String> candidates = byLength.get(pat.length());
-        if (candidates == null) return null;
-        String found = null;
-        outer:
-        for (String w : candidates) {
-            for (int i = 0; i < pat.length(); i++) {
-                char c = pat.charAt(i);
-                if (c != '_' && c != w.charAt(i)) continue outer;
+        for (List<String> candidates : List.of(byLength.getOrDefault(pat.length(), List.of()),
+            fallbackByLength.getOrDefault(pat.length(), List.of()))) {
+            String found = null;
+            outer:
+            for (String w : candidates) {
+                for (int i = 0; i < pat.length(); i++) {
+                    char c = pat.charAt(i);
+                    if (c != '_' && c != w.charAt(i)) continue outer;
+                }
+                if (found != null) return null;
+                found = w;
             }
-            if (found != null) return null;
-            found = w;
+            if (found != null) return found;
         }
-        return found;
+        return null;
     }
 
     /**
@@ -150,13 +316,16 @@ public final class ChatGameSolver {
      * 12/4 or 10:30 are skipped.
      */
     public static String extractMath(String text) {
-        String t = DATE_OR_TIME.matcher(text).replaceAll(" ");
-        t = t.replaceAll("(?<=\\d)\\s*[xX\u00D7]\\s*(?=[\\d(])", "*").replace('\u00F7', '/');
-        Matcher m = Pattern.compile("[-+*/%^()\\d.\\s]+").matcher(t);
+        String normalized = text.replace('\u00A0', ' ').replace('\u202F', ' ').replace('\u2212', '-');
+        boolean explicitMath = MATH_CUE.matcher(normalized).find();
+        String t = DATE_OR_TIME.matcher(normalized).replaceAll(match ->
+            explicitMath && match.group().indexOf('/') >= 0 ? match.group() : " ");
+        t = MULTIPLICATION.matcher(t).replaceAll("*").replace('\u00F7', '/');
+        Matcher m = MATH_RUN.matcher(t);
         String best = null;
         while (m.find()) {
-            String run = m.group().trim();
-            if (!run.matches(".*\\d.*") || !run.matches(".*\\d\\s*[-+*/%^]\\s*[-(\\d].*")) continue;
+            String run = LEADING_PUNCTUATION.matcher(m.group().trim()).replaceFirst("").trim();
+            if (!MATH_OPERATION.matcher(run).find()) continue;
             if (best == null || run.length() > best.length()) best = run;
         }
         return best;
@@ -169,7 +338,7 @@ public final class ChatGameSolver {
         Matcher c = AFTER_COLON.matcher(prompt.trim());
         if (c.find()) {
             String s = c.group(1).trim().replaceAll("[.!?]+$", "");
-            if (!s.isEmpty() && !s.contains(" ")) return s;
+            if (!s.isEmpty()) return s;
         }
         String[] words = prompt.trim().replaceAll("[.!?]+$", "").split("\\s+");
         String last = words[words.length - 1];
@@ -193,7 +362,8 @@ public final class ChatGameSolver {
     }
 
     static String normalizeQuestion(String q) {
-        return q == null ? "" : q.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+        return q == null ? "" : ChatLine.questionText(q).toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
     }
 
     private static String sortedLetters(String w) {

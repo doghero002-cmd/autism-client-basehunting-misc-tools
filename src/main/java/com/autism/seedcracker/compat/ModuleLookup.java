@@ -17,6 +17,17 @@ public final class ModuleLookup {
     private ModuleLookup() {}
 
     private static final Map<String, Module> BY_ID = new ConcurrentHashMap<>();
+    private static final Map<String, Module> HOST_MODULES = new ConcurrentHashMap<>();
+
+    public static void trackHost(Module module) {
+        if (module != null && module.id() != null) HOST_MODULES.put(module.id(), module);
+    }
+
+    public static Collection<Module> includingHost() {
+        Map<String, Module> modules = new java.util.HashMap<>(HOST_MODULES);
+        modules.putAll(BY_ID);
+        return java.util.List.copyOf(modules.values());
+    }
 
     /** Register a module instance (called by the addon entrypoint for every module). */
     public static void track(Module module) {

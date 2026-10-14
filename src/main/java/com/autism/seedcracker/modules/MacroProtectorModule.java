@@ -49,6 +49,7 @@ public final class MacroProtectorModule extends Module {
     /** Modules that must be shut down on a control check (automation that would expose a macro). */
     private static final java.util.Set<String> AUTOMATION_IDS = java.util.Set.of(
         "TunnelBaseFinderModule", "SchematicBuilderModule",
+        "GoToModule", "GatherModule", "ElytraTravelModule",
         "AutoMineModule", "AutoEatModule", "AutoToolModule",
         "BoneDropperModule", "NetherTunnelFinderModule", "ShopBuyerModule",
         "AHSniperModule", "AHFlipperModule", "AhSellModule", "TPASpammerModule",
@@ -106,6 +107,9 @@ public final class MacroProtectorModule extends Module {
             }
         }
         if (stopped.isEmpty()) return; // nothing was running - no need to alert
+        com.autism.seedcracker.motion.MineTask.stop(mc);
+        com.autism.seedcracker.motion.Motion.stop(mc);
+        com.autism.seedcracker.modules.ElytraTravelModule.stopFlight();
 
         lastTripMs = now;
         FlagLog.flag("MACRO", "MacroProtector", reason + " -> stopped " + String.join(",", stopped));

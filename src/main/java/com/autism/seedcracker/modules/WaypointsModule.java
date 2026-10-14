@@ -43,9 +43,6 @@ public final class WaypointsModule extends Module {
     private final BoolSetting logoutEnabled = add(new BoolSetting("logout", "Logout spots", false)
         .description("Mark where players disconnect; repeated logout spots = their base.")
         .group("Features"));
-    private final BoolSetting markerYEnabled = add(new BoolSetting("marker-y", "Pin finder markers at Y", false)
-        .description("Draw all finder chunk markers at a fixed Y level instead of your camera height.")
-        .group("Features"));
 
     // --- Death waypoints -----------------------------------------------------------------------
     private final IntSetting deathKeep = add(new IntSetting("death-keep", "Deaths kept", 3, 1, 10, 1)
@@ -71,8 +68,8 @@ public final class WaypointsModule extends Module {
 
     // --- Finder marker Y -----------------------------------------------------------------------
     private final IntSetting markerY = add(new IntSetting("marker-y-level", "Marker Y level", 16, -64, 320, 1)
-        .description("World Y where all finder chunk markers are drawn when pinning is on.")
-        .group("Finder markers").visibleWhen(markerYEnabled::get));
+        .description("Fixed world Y for finder chunk markers and beam endpoints. Markers never follow camera height.")
+        .group("Finder markers"));
 
     // --- Death state ---------------------------------------------------------------------------
     private record Death(double x, double y, double z, String dim, long atMs) {}
@@ -108,7 +105,7 @@ public final class WaypointsModule extends Module {
     @Override
     public void onEnable() {
         instance = this;
-        if (markerYEnabled.get()) ChunkFlagRenderer.configureDisplayY(true, markerY.get());
+        ChunkFlagRenderer.configureDisplayY(true, markerY.get());
     }
 
     @Override
@@ -130,10 +127,7 @@ public final class WaypointsModule extends Module {
 
     @Override
     protected void onOptionValueChanged(String settingId) {
-        if (!isEnabled()) return;
-        // Keep the finder marker renderer in sync whenever its toggle or Y changes.
-        if (markerYEnabled.get()) ChunkFlagRenderer.configureDisplayY(true, markerY.get());
-        else ChunkFlagRenderer.configureDisplayY(false, 0);
+        ChunkFlagRenderer.configureDisplayY(true, markerY.get());
     }
 
     @Override
@@ -141,10 +135,7 @@ public final class WaypointsModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        if (markerYEnabled.get()) {
-            // Re-assert every tick so nothing can flip it back to camera-follow.
-            ChunkFlagRenderer.configureDisplayY(true, markerY.get());
-        }
+        ChunkFlagRenderer.configureDisplayY(true, markerY.get());
 
         if (deathEnabled.get()) tickDeath(mc);
         else BlockEspRenderer.clearBox(DEATH_BOX_ID);
@@ -219,7 +210,7 @@ public final class WaypointsModule extends Module {
         List<String> parts = new ArrayList<>();
         if (deathEnabled.get() && !deaths.isEmpty()) parts.add(deaths.size() + " deaths");
         if (logoutEnabled.get() && !spots.isEmpty()) parts.add(spots.size() + " spots");
-        if (markerYEnabled.get()) parts.add("Y=" + markerY.get());
+        parts.add("Y=" + markerY.get());
         return String.join(" ", parts);
     }
 }

@@ -82,6 +82,7 @@ public final class Motion {
     private static TripPolicy policy;
     private static BlockPos goalPos;
     private static boolean active;
+    private static java.util.function.BooleanSupplier movementGuard;
     private static boolean usingBaritone;
     private static boolean renderPath = true;
     private static boolean allowParkour;
@@ -164,6 +165,20 @@ public final class Motion {
      * {@code radiusBlocks} is covered or it's stopped. Built-in engine, never breaks blocks.
      */
     public static boolean explore(Minecraft mc, int radiusBlocks) {
+        return explore(mc, radiusBlocks, null);
+    }
+
+    public static boolean exploreGuarded(Minecraft mc, int radiusBlocks, java.util.function.BooleanSupplier guard) {
+        if (guard == null || isBusy()) return false;
+        return explore(mc, radiusBlocks, guard);
+    }
+
+    public static boolean guardedBy(java.util.function.BooleanSupplier guard) { return guard != null && movementGuard == guard; }
+    public static void stopGuarded(Minecraft mc, java.util.function.BooleanSupplier guard) { if (guardedBy(guard)) stop(mc); }
+    public static boolean physicalInput(Minecraft mc) { return UserInput.pressed(mc); }
+    public static BlockPos nextStep() { Step step = FOLLOWER.current(); return step == null ? null : new BlockPos(step.x(),step.y(),step.z()); }
+
+    private static boolean explore(Minecraft mc, int radiusBlocks, java.util.function.BooleanSupplier guard) {
         if (mc.player == null) return false;
         int view = Math.max(2, mc.options.getEffectiveRenderDistance() - 2);
         int spacing = Math.max(2, view * 2 - 2);
@@ -174,7 +189,8 @@ public final class Motion {
         int[] t = planner.next(cx, cz, exploreRings);
         if (t == null) return false;
         // start() calls stop(), which clears explore state: set it after the trip has started.
-        if (!goToXZ(mc, (t[0] << 4) + 8, (t[1] << 4) + 8, Backend.BUILT_IN, false)) return false;
+        int targetX = (t[0] << 4) + 8, targetZ = (t[1] << 4) + 8;
+        if (!start(mc, new BlockPos(targetX,mc.player.getBlockY(),targetZ), GridPathfinder.xz(targetX,targetZ), Backend.BUILT_IN, false, guard)) return false;
         explore = planner;
         exploreTarget = t;
         status = "exploring";
@@ -229,19 +245,46 @@ public final class Motion {
         onFinish = r;
     }
 
+    public record SuspendedTrip(BlockPos target, GridPathfinder.Goal goal, Backend backend, boolean allowBreak,
+            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension, Runnable completion) {}
+
+    public static SuspendedTrip suspend(Minecraft mc) {
+        if (!isBusy() || mc.level == null || following() != null || exploring()) return null;
+        SuspendedTrip trip = new SuspendedTrip(goalPos, goal, usingBaritone ? Backend.BARITONE : Backend.BUILT_IN,
+            config.allowBreak(), mc.level.dimension(), onFinish);
+        onFinish = null;
+        stop(mc);
+        return trip;
+    }
+
+    public static boolean resume(Minecraft mc, SuspendedTrip trip) {
+        if (trip == null || isBusy() || mc.player == null || !mc.player.isAlive() || mc.level == null
+                || !trip.dimension().equals(mc.level.dimension())) return false;
+        if (!start(mc, trip.target(), trip.goal(), trip.backend(), trip.allowBreak())) return false;
+        onFinish = trip.completion();
+        return true;
+    }
+
     private static boolean start(Minecraft mc, BlockPos target, GridPathfinder.Goal g, Backend backend, boolean allowBreak) {
+        return start(mc,target,g,backend,allowBreak,null);
+        }
+
+        private static boolean start(Minecraft mc, BlockPos target, GridPathfinder.Goal g, Backend backend, boolean allowBreak,
+            java.util.function.BooleanSupplier guard) {
         if (mc.player == null || mc.level == null) return false;
         stop(mc);
+        movementGuard = guard;
         goalPos = target;
+        goal = g;
         usingBaritone = backend == Backend.BARITONE || backend == Backend.AUTO && BaritoneCompat.isBaritoneAvailable();
         if (usingBaritone) {
             active = BaritoneCompat.startBaritoneGoTo(mc, target.getX(), target.getY(), target.getZ());
             status = active ? "baritone" : "baritone failed";
             return active;
         }
-        goal = g;
         config = GridPathfinder.Config.defaults().withBreaking(allowBreak || cfgAllowBreak)
             .withMaxDrop(cfgMaxDrop).withHazardPenalty(cfgHazardPenalty);
+        if (movementGuard != null) config = com.autism.seedcracker.motion.pure.ScoutSafety.walkingConfig(config);
         policy = new TripPolicy(MAX_FAILURES, MIN_PROGRESS);
         active = true;
         MotionDebug.tripStart(target.toShortString() + (allowBreak ? " (mining)" : ""), mc.player.blockPosition());
@@ -250,6 +293,7 @@ public final class Motion {
     }
 
     public static void stop(Minecraft mc) {
+        movementGuard = null;
         if (usingBaritone && active) BaritoneCompat.stopBaritone(mc);
         followName = null;
         explore = null;
@@ -366,6 +410,12 @@ public final class Motion {
      * Keep within a few blocks of an online player (must be within render distance). Re-plans as
      * they move; stops when they leave render distance.
      */
+    public static boolean goToPlayer(Minecraft mc, String name) {
+        var target = findPlayer(mc, name);
+        return target != null && start(mc, target.blockPosition(),
+            GridPathfinder.near(target.getBlockX(), target.getBlockY(), target.getBlockZ(), 2), Backend.BUILT_IN, false);
+    }
+
     public static boolean follow(Minecraft mc, String name) {
         var target = findPlayer(mc, name);
         if (target == null) return false;
@@ -461,6 +511,20 @@ public final class Motion {
             stop(mc);
             return;
         }
+        if (movementGuard != null) {
+            try {
+                if (!movementGuard.getAsBoolean()) { if (active) stop(mc); return; }
+            } catch (RuntimeException failure) {
+                stop(mc); status = "scout guard failed: " + failure.getClass().getSimpleName(); return;
+            }
+            FOLLOWER.sprint = false;
+        }
+        if (!usingBaritone && (mc.gui.screen() != null
+                || com.autism.seedcracker.util.ContainerMutex.containerBusy(mc))) {
+            FOLLOWER.pause(mc);
+            status = "paused: menu open";
+            return;
+        }
         if (usingBaritone) {
             if (!BaritoneCompat.isBaritoneBusy()) finish(mc, "arrived");
             return;
@@ -496,7 +560,7 @@ public final class Motion {
         tickFollowSplice(mc);
         if (search != null) {
             // While the planner works we're standing still anyway: stock the hotbar for bridging/clutching.
-            if (FOLLOWER.remaining() == 0 && autoInventory) MotionInventory.tick(mc, allowBridge, waterBucket);
+            if (FOLLOWER.remaining() == 0 && autoInventory && movementGuard == null) MotionInventory.tick(mc, allowBridge, waterBucket);
             if (!search.done()) {
                 FOLLOWER.release(mc);
                 status = "planning (" + search.expanded() + ")";
@@ -663,7 +727,7 @@ public final class Motion {
     }
 
     /** Snapshot of every loaded chunk the planner could reach (render distance), safe for the planner thread. */
-    private static LevelWalkability planWorld(Minecraft mc) {
+    private static GridPathfinder.World planWorld(Minecraft mc) {
         if (mc.level != failuresLevel) {
             FAILURES.clear();
             REFUSED_BREAKS.clear();
@@ -672,8 +736,18 @@ public final class Motion {
             failuresLevel = mc.level;
         }
         int radius = Math.max(2, mc.options.getEffectiveRenderDistance() + 1);
-        return LevelWalkability.snapshot(mc, avoidMobs, radius).withFailures(FAILURES, mc.level.getGameTime())
+        var snapshot = LevelWalkability.snapshot(mc, avoidMobs || movementGuard != null, radius).withFailures(FAILURES, mc.level.getGameTime())
             .withRefusedBreaks(REFUSED_BREAKS);
+        if (movementGuard == null) return snapshot;
+        return new GridPathfinder.World() {
+            public GridPathfinder.Kind kind(int x,int y,int z) { var kind=snapshot.kind(x,y,z); return kind==GridPathfinder.Kind.DOOR ? GridPathfinder.Kind.SOLID : kind; }
+            public double breakCost(int x,int y,int z) { return Double.POSITIVE_INFINITY; }
+            public double avoidCost(int x,int y,int z) { return snapshot.avoidCost(x,y,z); }
+            public double speedFactor(int x,int y,int z) { return snapshot.speedFactor(x,y,z); }
+            public double floorHeight(int x,int y,int z) { return snapshot.floorHeight(x,y,z); }
+            public double jumpFactor(int x,int y,int z) { return snapshot.jumpFactor(x,y,z); }
+            public double trampleCost(int x,int y,int z) { return snapshot.trampleCost(x,y,z); }
+        };
     }
 
     /** What a BLOCKED result tells us about the server: don't plan the same refused break / placement again. */
@@ -804,6 +878,7 @@ public final class Motion {
         GridPathfinder.Config c = config.withParkour(parkour).withPlaceBudget(placeBudget)
             .withLongParkour(parkour && longParkour).withWaterBucket(bucket).withCushionBlocks(cushion).withMaxNodes(MAX_NODES)
             .withHeuristicWeight(HEURISTIC_WEIGHT);
+        if (movementGuard != null) c = com.autism.seedcracker.motion.pure.ScoutSafety.walkingConfig(c);
         FOLLOWER.config = c;
         return c;
     }

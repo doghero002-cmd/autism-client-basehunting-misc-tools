@@ -110,6 +110,15 @@ public final class ChatBotPolicy {
         return new Decision(a, hit.reply(), "ok");
     }
 
+    public Decision converse(String sender, boolean verified, String self, long nowMs) {
+        if (!verified || sender == null || !sender.matches("[A-Za-z0-9_]{1,16}")) return Decision.deny("unverified");
+        if (sender.equalsIgnoreCase(self)) return Decision.deny("self");
+        Tier tier = tier(sender, true);
+        if (tier == Tier.STRANGER && !enabledActions.contains(Action.REPLY)) return Decision.deny("public replies off");
+        if (!rateOk(sender, nowMs, tier == Tier.OWNER)) return Decision.deny("rate limited");
+        return new Decision(Action.REPLY, "", "conversation");
+    }
+
     /** Commit a sent reply against the rate limits. */
     public void record(String sender, long nowMs) {
         lastAny = nowMs;
@@ -150,6 +159,19 @@ public final class ChatBotPolicy {
         if (s.isEmpty()) return null;
         if (DANGEROUS_OUT.matcher(s).find()) return null;
         return s.length() > 200 ? s.substring(0, 200) : s;
+    }
+
+    public static String sanitizeConversation(String reply) {
+        if (reply == null || reply.length() > 4096 || reply.contains("```")) return null;
+        String clean = COLOR_OR_CONTROL.matcher(reply).replaceAll(" ").replaceAll("\\s+", " ").trim();
+        if (clean.isEmpty() || clean.matches("^[ /!.#].*")) return null;
+        if (Pattern.compile("(?i)\\b(pass(word)?|api[_ -]?key|token|login)\\b|https?://|www\\.|discord\\.gg|run_command|open_url")
+            .matcher(clean).find()) return null;
+        if (clean.length() <= 220) return clean;
+        int end = clean.lastIndexOf(' ', 220);
+        if (end < 100) end = 220;
+        if (Character.isHighSurrogate(clean.charAt(end - 1))) end--;
+        return clean.substring(0, end).trim();
     }
 
     /** Placeholders that reveal where you are or how you're doing: only filled when the sender may use that action. */

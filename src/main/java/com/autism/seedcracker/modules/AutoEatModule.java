@@ -3,6 +3,7 @@ package com.autism.seedcracker.modules;
 import com.autism.seedcracker.SeedcrackerAddon;
 
 import autismclient.api.module.EnumSetting;
+import autismclient.api.module.BoolSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import net.minecraft.client.Minecraft;
@@ -23,6 +24,7 @@ import net.minecraft.world.item.ItemStack;
 public final class AutoEatModule extends Module {
 
     public enum Priority { COMBINED, HUNGER, SATURATION }
+    private final BoolSetting riskyFood = add(new BoolSetting("risky-food", "Allow risky or rare food", false).group("General"));
 
     private final IntSetting hunger = add(new IntSetting("hunger", "Hunger", 16, 1, 19, 1)
         .description("Eat when your food level is at or below this.")
@@ -77,6 +79,10 @@ public final class AutoEatModule extends Module {
         }
 
         if (eating) {
+            if (mc.player.getInventory().getSelectedSlot() != foodSlot) {
+                stopEating();
+                return;
+            }
             // Finished (well fed) - only stop once the swallow completes so the last bite counts.
             if (!isHungry() && !mc.player.isUsingItem()) {
                 stopEating();
@@ -136,7 +142,7 @@ public final class AutoEatModule extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             int selected = mc.player.getInventory().getSelectedSlot();
-            if (prevSlot >= 0 && prevSlot <= 8 && prevSlot != selected) {
+            if (com.autism.seedcracker.util.pure.InventoryPolicy.shouldRestoreSlot(prevSlot, foodSlot, selected)) {
                 com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
             }
         }
@@ -170,7 +176,9 @@ public final class AutoEatModule extends Module {
         return best;
     }
 
-    private static boolean isFood(ItemStack stack) {
-        return !stack.isEmpty() && stack.has(DataComponents.FOOD);
+    private boolean isFood(ItemStack stack) {
+        return !stack.isEmpty() && stack.has(DataComponents.FOOD) && (riskyFood.get()
+            || com.autism.seedcracker.util.pure.InventoryPolicy.safeFood(
+                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
     }
 }

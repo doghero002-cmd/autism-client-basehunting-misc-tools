@@ -28,7 +28,6 @@ public final class FindersModule extends Module {
     private static final Entry[] FINDERS = {
         new Entry("Sign Finder", ":sign-finder"),
         new Entry("Portal Finder", ":portal-finder"),
-        new Entry("Player Chunks", ":player-chunks"),
         new Entry("Structure Detector", ":structure-detector"),
         new Entry("Base Webhook", ":base-webhook"),
         new Entry("Finder Overlay", ":finder-overlay"),

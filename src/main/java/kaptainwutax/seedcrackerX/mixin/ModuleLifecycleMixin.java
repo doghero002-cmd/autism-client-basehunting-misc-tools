@@ -13,6 +13,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(value = autismclient.modules.Module.class, remap = false)
 public abstract class ModuleLifecycleMixin {
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void seedcracker$trackConstructedModule(CallbackInfo ci) {
+        com.autism.seedcracker.compat.ModuleLookup.trackHost((autismclient.modules.Module) (Object) this);
+    }
+
+    @Inject(method = {"setEnabled", "setEnabledSilently"}, at = @At("RETURN"))
+    private void seedcracker$trackFreeLook(CallbackInfo ci) {
+        com.autism.seedcracker.compat.FreeLookState.update((autismclient.modules.Module) (Object) this);
+    }
+
 
     @Inject(method = "onEnable", at = @At("HEAD"))
     private void seedcracker$trackEnable(CallbackInfo ci) {

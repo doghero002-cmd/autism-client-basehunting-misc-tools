@@ -30,6 +30,7 @@ public final class KeyPearlModule extends Module {
         .description("Ticks to wait after throwing before swapping back.").group("General"));
 
     private int prevSlot = -1;
+    private int pearlSlot = -1;
     private int stage = 0; // 0=swap+throw, 1=wait, 2=swapback
     private int counter = 0;
 
@@ -41,24 +42,46 @@ public final class KeyPearlModule extends Module {
     @Override
     public void onEnable() {
         prevSlot = -1;
+        pearlSlot = -1;
         stage = 0;
         counter = 0;
+    }
+
+    @Override public void onDisable() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null && switchBack.get() && com.autism.seedcracker.util.pure.InventoryPolicy.shouldRestoreSlot(
+            prevSlot, pearlSlot, mc.player.getInventory().getSelectedSlot())) com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
+        prevSlot = -1;
+        pearlSlot = -1;
+    }
+
+    @Override public void onGameLeft() {
+        prevSlot = -1;
+        pearlSlot = -1;
+        stage = 0;
+        setEnabledSilently(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.gameMode == null || mc.gui.screen() != null) { setEnabledSilently(false); return; }
+        if (mc.player == null || mc.gameMode == null || mc.gui.screen() != null) { setEnabled(false); return; }
 
         if (stage == 0) {
             prevSlot = mc.player.getInventory().getSelectedSlot();
             int pearl = findItem(mc, Items.ENDER_PEARL);
             if (pearl == -1) { setEnabledSilently(false); return; }
             com.autism.seedcracker.util.InvSync.select(mc, pearl);
+            pearlSlot = pearl;
             stage = 1;
             counter = 0;
         } else if (stage == 1) {
+            if (mc.player.getInventory().getSelectedSlot() != pearlSlot || !mc.player.getMainHandItem().is(Items.ENDER_PEARL)) {
+                setEnabled(false);
+                return;
+            }
             if (counter++ < throwDelay.get()) return;
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return;
             mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
             mc.player.swing(InteractionHand.MAIN_HAND);
             stage = 2;
@@ -66,8 +89,7 @@ public final class KeyPearlModule extends Module {
             if (!switchBack.get()) setEnabledSilently(false);
         } else if (stage == 2) {
             if (counter++ < switchDelay.get()) return;
-            if (prevSlot >= 0) com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
-            setEnabledSilently(false);
+            setEnabled(false);
         }
     }
 

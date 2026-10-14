@@ -15,6 +15,34 @@ import net.minecraft.world.item.ItemStack;
 public final class AhGui {
     private AhGui() {}
 
+    public static boolean saleItemAllowed(String itemId, String configured, boolean allowAll) {
+        if (itemId == null) return false;
+        if (configured == null || configured.isBlank()) return allowAll;
+        boolean found = false;
+        for (String entry : configured.split(",")) {
+            String id = entry.trim().toLowerCase(Locale.ROOT);
+            if (!id.contains(":")) id = "minecraft:" + id;
+            if (!id.matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) return false;
+            if (id.equals(itemId)) found = true;
+        }
+        return found;
+    }
+
+    public static boolean saleConfirmation(int containerSlots, String title) {
+        if (title == null || containerSlots <= 0 || containerSlots > 54) return false;
+        String text = title.replaceAll("(?i)\\u00a7[0-9a-fk-or]", "").toLowerCase(Locale.ROOT);
+        return text.contains("confirm") && (text.contains("sell") || text.contains("listing") || text.contains("auction"))
+            && !text.contains("purchase") && !text.contains("buy");
+    }
+
+    public static boolean targetMatches(String name, int count, String include, String exclude, int minimumCount) {
+        if (name == null || count < Math.max(1, minimumCount)) return false;
+        String cleanName = name.replaceAll("(?i)\\u00a7[0-9a-fk-or]", "").toLowerCase(Locale.ROOT);
+        String wanted = include == null ? "" : include.trim().toLowerCase(Locale.ROOT);
+        String unwanted = exclude == null ? "" : exclude.trim().toLowerCase(Locale.ROOT);
+        return (wanted.isEmpty() || cleanName.contains(wanted)) && (unwanted.isEmpty() || !cleanName.contains(unwanted));
+    }
+
     private static volatile long lastPageTurnMs;
     private static boolean purchasing;
 

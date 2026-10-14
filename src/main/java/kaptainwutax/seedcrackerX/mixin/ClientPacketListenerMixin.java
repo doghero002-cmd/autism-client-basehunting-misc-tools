@@ -103,6 +103,8 @@ public abstract class ClientPacketListenerMixin {
     @Inject(method = "handleRespawn", at = @At(value = "TAIL"))
     public void onPlayerRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
         newDimension(new HashedSeedData(packet.commonPlayerSpawnInfo().seed()), true);
+        com.autism.seedcracker.finder.BaseTracker.clear();
+        com.autism.seedcracker.finder.BaseAlerts.reset();
         tryDatabase();
     }
 

@@ -1,0 +1,71 @@
+Selected questions in public-plugin-answers.json and words in
+public-plugin-words.txt are adapted from:
+
+DragonHunt3r/ChatGames, src/main/resources/trivia.yml
+Word source: src/main/resources/scramble.yml (generated from Bukkit materials)
+Commit: e5ee5fc21b15e8f9a674288a4bef29c28cb5481f
+https://github.com/DragonHunt3r/ChatGames/blob/e5ee5fc21b15e8f9a674288a4bef29c28cb5481f/src/main/resources/trivia.yml
+Copyright (c) 2020 DragonHunt3r
+
+RareHyperIonYT/ChatGames, common/src/main/resources/games/multiple-choice.yml
+Word source: common/src/main/resources/games/unscramble.yml
+Commit: ac8aa1e4fa01305e87c327a461cde9487bd505d5
+https://github.com/RareHyperIonYT/ChatGames/blob/ac8aa1e4fa01305e87c327a461cde9487bd505d5/common/src/main/resources/games/multiple-choice.yml
+Copyright (c) 2025 RareHyperIonYT
+
+PlayerPicked/ChatGame (formerly MonGen-s-Cave/mc-ChatGame)
+Riddle source: src/main/resources/config.yml, who-am-i.words
+Commit: 2edfe38e425556e7be265e3bdd0c15a81f58dea3
+https://github.com/PlayerPicked/ChatGame/blob/2edfe38e425556e7be265e3bdd0c15a81f58dea3/src/main/resources/config.yml
+Copyright (c) 2025 MonGen's Cave
+Seven default riddle/answer pairs are adapted to JSON; typographic apostrophes
+are normalized to ASCII. These are plugin answer targets, not exhaustive mob
+behavior descriptions.
+
+The-Epic/SimpleChatGames (EpicEbic on Hangar)
+Question source: src/main/resources/games/trivia.yml
+Word source: src/main/resources/games/unscramble.yml
+Commit: f45eca102b36daf3357dd27a7a9795ac261ef1b1
+https://github.com/The-Epic/SimpleChatGames/blob/f45eca102b36daf3357dd27a7a9795ac261ef1b1/src/main/resources/games/trivia.yml
+Copyright (c) 2023 Epic
+Seventeen questions and 35 word targets are selected. One valid accepted answer
+is retained for multiple-answer questions. The hunger question uses steak, not
+the source's incorrect golden-carrot alternative. Bat leather, fixed spawn
+blocks, a chest made from a chest, and misleading block/tool questions are
+excluded. These selected targets are not a copy of the entire default pack.
+
+The RareHyperIonYT entries use named answers for free-text questions, not the
+upstream multiple-choice letters. The language question assumes Java Edition,
+as does this addon. Historical version answers preserve the upstream version
+family labels, not exact patch versions. Obsolete counts and ambiguous entries
+were omitted. Questions with multiple accepted answers use one accepted answer.
+
+The four question/word sources above are distributed under the MIT License:
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+public-country-words.txt is copied without modification from:
+funnyboy-roks/ChatGames, src/main/resources/lists/countries.txt
+Commit: 823f084c37ba94047b12fb4efa43b2ed4dba04fd
+https://github.com/funnyboy-roks/ChatGames/blob/823f084c37ba94047b12fb4efa43b2ed4dba04fd/src/main/resources/lists/countries.txt
+SHA256: 3af2520cfbc41709862d767403948a6496791293e2fdb60cf23e513bfe85e519
+This resource contains 197 plugin word targets, not a geopolitical authority.
+Upstream licenses the repository under Apache-2.0. The complete license is
+included in public-country-LICENSE.txt; its copyright appendix is unfilled.
+The timed-header recognizer is independently implemented from observed formats.

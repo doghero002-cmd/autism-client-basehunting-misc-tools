@@ -30,9 +30,9 @@ public final class AutoMineModule extends Module {
         .description("Lock your view to the yaw/pitch below so you dig in a fixed direction.")
         .group("General"));
     private final IntSetting yaw = add(new IntSetting("yaw", "Yaw", 0, -180, 180, 1)
-        .description("View yaw when Lock view is on.").group("General"));
+        .description("View yaw when Lock view is on.").group("Aim").visibleWhen(lockView::get));
     private final IntSetting pitch = add(new IntSetting("pitch", "Pitch", 0, -90, 90, 1)
-        .description("View pitch when Lock view is on.").group("General"));
+        .description("View pitch when Lock view is on.").group("Aim").visibleWhen(lockView::get));
     private final BoolSetting safeMine = add(new BoolSetting("safe-mine", "Safe mine (lava guard)", true)
         .description("Don't break a block that has lava adjacent to it (MeteorPlus SafeMine) - stops mining into lava and dying.")
         .group("General"));
@@ -72,7 +72,11 @@ public final class AutoMineModule extends Module {
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
-        if (mc.gui.screen() != null) return;
+        if (mc.gui.screen() != null || mc.player.isUsingItem()) {
+            mc.gameMode.stopDestroyBlock();
+            com.autism.seedcracker.motion.RotationEngine.release(id());
+            return;
+        }
         if (com.autism.seedcracker.util.ContainerMutex.containerBusy(mc)) { // no break packets near a container
             if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
             return;

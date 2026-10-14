@@ -11,12 +11,14 @@
     "ClientPacketListenerMixin",
     "ConnectionSendMixin",
     "FakeRolesChatMixin",
+    "FreeLookCameraMixin",
     "HomeSetterChatMixin",
     "HudFlagTelemetryMixin",
     "HudScoreboardMixin",
     "LocalPlayerMixin",
     "ModuleLifecycleMixin",
     "MouseHandlerAccessor",
+    "SusModeSettingMixin",
     "TranslateChatMixin"
   ],
   "injectors": {

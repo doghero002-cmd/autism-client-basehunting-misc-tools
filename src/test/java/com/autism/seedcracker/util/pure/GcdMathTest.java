@@ -80,4 +80,30 @@ class GcdMathTest {
         assertEquals(42f, q.angle());
         assertEquals(0.0, q.remainder());
     }
+
+    @Test
+    void cardinalDeadbandIsMeasuredBeyondTheDirectionBoundary() {
+        assertFalse(GcdMath.cardinalHeadingChanged(0f, 44f, 6f));
+        assertFalse(GcdMath.cardinalHeadingChanged(0f, 50.9f, 6f));
+        assertFalse(GcdMath.cardinalHeadingChanged(0f, 51f, 6f));
+        assertTrue(GcdMath.cardinalHeadingChanged(0f, 51.1f, 6f));
+        assertFalse(GcdMath.cardinalHeadingChanged(90f, 44.9f, 6f));
+        assertTrue(GcdMath.cardinalHeadingChanged(90f, 38.9f, 6f));
+    }
+
+    @Test
+    void headingBoundaryUsesShortestYawAcrossWraparound() {
+        assertFalse(GcdMath.cardinalHeadingChanged(180f, -179f, 6f));
+        assertFalse(GcdMath.cardinalHeadingChanged(180f, -129f, 6f));
+        assertTrue(GcdMath.cardinalHeadingChanged(180f, -128.9f, 6f));
+        assertTrue(GcdMath.cardinalHeadingChanged(-180f, 128.9f, 6f));
+    }
+
+    @Test
+    void clearTurnsStillChangeHeadingImmediately() {
+        assertTrue(GcdMath.cardinalHeadingChanged(0f, 90f, 30f));
+        assertTrue(GcdMath.cardinalHeadingChanged(0f, 180f, 30f));
+        assertFalse(GcdMath.cardinalHeadingChanged(0f, 45f, 0f));
+        assertTrue(GcdMath.cardinalHeadingChanged(0f, 45.1f, 0f));
+    }
 }

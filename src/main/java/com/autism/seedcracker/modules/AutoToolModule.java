@@ -54,6 +54,7 @@ public final class AutoToolModule extends Module {
     }
 
     private int prevSlot = -1;
+    private int ownedSlot = -1;
 
     @Override
     public void onDisable() {
@@ -62,18 +63,32 @@ public final class AutoToolModule extends Module {
 
     private void restoreSlot() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && prevSlot >= 0 && prevSlot <= 8) {
+        if (mc.player != null && com.autism.seedcracker.util.pure.InventoryPolicy.shouldRestoreSlot(
+            prevSlot, ownedSlot, mc.player.getInventory().getSelectedSlot())) {
             com.autism.seedcracker.util.InvSync.select(mc, prevSlot);
         }
         prevSlot = -1;
+        ownedSlot = -1;
+    }
+
+    @Override public void onGameLeft() {
+        prevSlot = -1;
+        ownedSlot = -1;
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null || mc.options == null) return;
+        if (ownedSlot >= 0 && mc.player.getInventory().getSelectedSlot() != ownedSlot) {
+            prevSlot = -1;
+            ownedSlot = -1;
+        }
+        if (mc.gui.screen() != null || mc.player.isUsingItem()) return;
         if (!mc.options.keyAttack.isDown()) {
             if (switchBack.get()) restoreSlot();
+            else { prevSlot = -1; ownedSlot = -1; }
             return;
         }
         HitResult hit = mc.hitResult;
@@ -108,6 +123,7 @@ public final class AutoToolModule extends Module {
             int sel = mc.player.getInventory().getSelectedSlot();
             if (prevSlot == -1 && sel != bestSlot) prevSlot = sel;
             com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
+            ownedSlot = bestSlot;
         }
     }
 
@@ -137,6 +153,7 @@ public final class AutoToolModule extends Module {
         if (bestDamage <= attackScore(mc.player.getMainHandItem())) return;
         if (prevSlot == -1) prevSlot = sel;
         com.autism.seedcracker.util.InvSync.select(mc, bestSlot);
+        ownedSlot = bestSlot;
     }
 
     /**

@@ -51,29 +51,39 @@ public final class AntiTrapModule extends Module {
 
     private int cooldownTicks = 0;
 
+    @Override public void onEnable() { cooldownTicks = 0; }
+    @Override public void onGameLeft() {
+        cooldownTicks = 0;
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null) return;
+        if (mc.gui.screen() != null || mc.player.isUsingItem()) return;
         if (cooldownTicks > 0) { cooldownTicks--; return; }
 
         List<Entity> targets = new ArrayList<>();
         // Clamp to vanilla survival reach: slider goes to 10, but attacking past ~4.5 blocks
         // is an instant reach flag on any anticheat (and the server rejects the hit anyway).
-        double reach = Math.min(range.get(), 4.5);
+        double reach = range.get();
         double rSq = reach * reach;
         for (Entity e : mc.level.entitiesForRendering()) {
             if (e == null || !e.isAlive()) continue;
             if (!isTarget(e)) continue;
+            if (e.hasPassenger(mc.player) || e == mc.player.getRootVehicle()
+                || !mc.player.isWithinEntityInteractionRange(e, 0) || !mc.player.hasLineOfSight(e)) continue;
             if (e.distanceToSqr(mc.player) > rSq) continue;
             targets.add(e);
         }
         for (Entity e : targets) {
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return;
             mc.gameMode.attack(mc.player, e);
             mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
             cooldownTicks = cooldown.get();
             if (notify.get()) {
-                String msg = "Removed trap entity (" + e.getName().getString() + ")";
+                String msg = "Attacked trap entity (" + e.getName().getString() + ")";
                 autismclient.util.AutismClientMessaging.sendPrefixed("§c[AntiTrap] §f" + msg);
                 ClientNotify.warning("AntiTrap: " + msg);
             }

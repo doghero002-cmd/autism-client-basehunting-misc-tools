@@ -138,24 +138,25 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new ChunkFinderModule(), "Finders");
         regTab(new SpawnerFinderModule(), "Finders");
         regTab(new SusChunkFinderModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.SeedRayModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.SeedMapModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.FinderOverlayModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.SeedRayModule(), "Maps");
+        regTab(new com.autism.seedcracker.modules.SeedMapModule(), "Maps");
+        regTab(new com.autism.seedcracker.modules.FinderOverlayModule(), "Finder Tools");
+        regTab(new com.autism.seedcracker.modules.AiRemoteControlModule(), "Automation");
         regTab(new com.autism.seedcracker.modules.PlayerChunksModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.LightSourceFinderModule(), "Finders");
         regTab(new PrimeChunkFinderModule(), "Finders");
         regTab(new ActivityFinderModule(), "Finders");
         regTab(new GrowthFinderModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.HeatMapRadarModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.RaidPlannerModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.BaseWebhookModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.ChunkKeeperModule(), "Finders");
-        regTab(new BaseLogBrowserModule(), "Finders");
-        regTab(new TunnelBaseFinderModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.HeatMapRadarModule(), "Maps");
+        regTab(new com.autism.seedcracker.modules.RaidPlannerModule(), "Maps");
+        regTab(new com.autism.seedcracker.modules.BaseWebhookModule(), "Finder Tools");
+        regTab(new com.autism.seedcracker.modules.ChunkKeeperModule(), "Finder Tools");
+        regTab(new BaseLogBrowserModule(), "Maps");
+        regTab(new TunnelBaseFinderModule(), "Navigation");
         regTab(new NetherTunnelFinderModule(), "Finders");
-        regTab(new StructureDetectorModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.PortalFinderModule(), "Finders");
-        regTab(new com.autism.seedcracker.modules.SignFinderModule(), "Finders");
+        regTab(new StructureDetectorModule(), "Finder Tools");
+        regTab(new com.autism.seedcracker.modules.PortalFinderModule(), "Finder Tools");
+        regTab(new com.autism.seedcracker.modules.SignFinderModule(), "Finder Tools");
 
         // The Finders hub bundles the simple set-and-forget finders (Sign/Portal/PlayerChunks/
         // Structure/BaseWebhook/FinderOverlay) into one menu entry. It must be registered AFTER the
@@ -187,20 +188,21 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         // Hands-off routines that act on the world or inventory for you.
         String automation = "Automation";
-        regTab(new com.autism.seedcracker.motion.GoToModule(), automation);
-        regTab(new AntiAFKModule(), automation);
-        regTab(new AutoEatModule(), automation);
+        regTab(new com.autism.seedcracker.motion.GoToModule(), "Navigation");
+        regTab(new com.autism.seedcracker.modules.BaseScoutModule(), "Navigation");
+        regTab(new AntiAFKModule(), "Navigation");
+        regTab(new AutoEatModule(), "Inventory");
         regTab(new AutoMineModule(), automation);
-        regTab(new AutoToolModule(), automation);
+        regTab(new AutoToolModule(), "Inventory");
         regTab(new com.autism.seedcracker.modules.AutoFishModule(), automation);
-        regTab(new com.autism.seedcracker.modules.InventoryCleanerModule(), automation);
-        regTab(new com.autism.seedcracker.modules.AutoStoreModule(), automation);
-        regTab(new com.autism.seedcracker.modules.AutoSmeltModule(), automation);
-        regTab(new com.autism.seedcracker.modules.ChestStealerModule(), automation);
-        regTab(new com.autism.seedcracker.modules.AutoReplenishModule(), automation);
+        regTab(new com.autism.seedcracker.modules.InventoryCleanerModule(), "Inventory");
+        regTab(new com.autism.seedcracker.modules.AutoStoreModule(), "Inventory");
+        regTab(new com.autism.seedcracker.modules.AutoSmeltModule(), "Inventory");
+        regTab(new com.autism.seedcracker.modules.ChestStealerModule(), "Inventory");
+        regTab(new com.autism.seedcracker.modules.AutoReplenishModule(), "Inventory");
         regTab(new SchematicBuilderModule(), automation);
         regTab(new com.autism.seedcracker.modules.GatherModule(), automation);
-        regTab(new com.autism.seedcracker.modules.ElytraTravelModule(), automation);
+        regTab(new com.autism.seedcracker.modules.ElytraTravelModule(), "Navigation");
 
         // Fighting and escaping fights.
         String combat = "Combat";
@@ -233,14 +235,14 @@ public final class SeedcrackerAddon extends AutismAddon {
 
         // Small quality-of-life helpers.
         String utility = "Utility";
-        regTab(new SprintModule(), utility);
+        regTab(new SprintModule(), "Navigation");
         regTab(new ParkourModule(), utility);
         regTab(new FastPlaceModule(), utility);
         regTab(new SwingSpeedModule(), utility);
         regTab(new CoordSnapperModule(), utility);
         regTab(new com.autism.seedcracker.modules.WaypointsModule(), utility);
-        regTab(new com.autism.seedcracker.modules.BreadcrumbModule(), utility);
-        regTab(new RegionMapModule(), utility);
+        regTab(new com.autism.seedcracker.modules.BreadcrumbModule(), "Maps");
+        regTab(new RegionMapModule(), "Maps");
         regTab(new WeatherNotifierModule(), utility);
         regTab(new SkinChangerModule(), utility);
         regTab(new com.autism.seedcracker.modules.TranslateModule(), utility);
@@ -257,6 +259,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new FakePlayerModule(), "Fake");
 
         AutismAddons.commands().register(new com.autism.seedcracker.commands.QqlCommand());
+        AutismAddons.commands().register(new com.autism.seedcracker.commands.ScoutCommand());
         AutismAddons.commands().register(new BedrockFinderCommand());
         AutismAddons.commands().register(new BaseLogCommand());
         AutismAddons.commands().register(new com.autism.seedcracker.commands.TextureCrackCommand());
@@ -275,6 +278,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         // Local QA bridge (127.0.0.1 only): lets an external driver run commands and read state without
         // window focus. No-op if the port is taken.
         com.autism.seedcracker.bridge.GameBridge.start();
+        AutismAddons.events().onGameLeft(com.autism.seedcracker.bridge.ScoutControl::disable);
 
         // AI subsystem bridge (API v4+ AI-update client): reflective so it compiles and loads whether or
         // not the optional AI jar / host AI API is present (class is excluded from the build when the jar

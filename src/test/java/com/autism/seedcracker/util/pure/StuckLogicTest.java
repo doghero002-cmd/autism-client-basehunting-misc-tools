@@ -39,4 +39,35 @@ class StuckLogicTest {
         assertFalse(StuckLogic.isStuck(79, 80));
         assertTrue(StuckLogic.isStuck(80, 80));
     }
+
+    @Test
+    void slowTunnelMovementAccumulatesUntilItResetsTheCounter() {
+        double anchor = 0;
+        int ticks = 0;
+        for (int sample = 1; sample <= 60; sample++) {
+            double position = sample * 0.02;
+            ticks = StuckLogic.update(ticks, true, Math.abs(position - anchor), 0.05);
+            if (ticks == 0) anchor = position;
+            assertTrue(ticks < 3);
+        }
+    }
+
+    @Test
+    void blockedTunnelStillReachesRecoveryThreshold() {
+        int ticks = 0;
+        for (int sample = 0; sample < 20; sample++) ticks = StuckLogic.update(ticks, true, 0, 0.05);
+        assertTrue(StuckLogic.isStuck(ticks, 20));
+    }
+
+    @Test
+    void walkingProgressAccumulatesAcrossSharedDetectorSamples() {
+        double anchor = 0;
+        int ticks = 0;
+        for (int sample = 1; sample <= 100; sample++) {
+            double position = sample * 0.1;
+            ticks = StuckLogic.update(ticks, true, position - anchor, EPS);
+            if (ticks == 0) anchor = position;
+            assertTrue(ticks < 4);
+        }
+    }
 }

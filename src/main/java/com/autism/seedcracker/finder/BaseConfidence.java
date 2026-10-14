@@ -2,12 +2,8 @@ package com.autism.seedcracker.finder;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-
-import java.util.Set;
 
 /**
  * Shared base-confidence scoring for the finder modules.
@@ -29,35 +25,28 @@ public final class BaseConfidence {
 
     public record Result(int score, String topReason) {}
 
-    /** Scores a chunk 0-100 for "is this a player base". */
+    /** Returns a heuristic evidence score, not a calibrated probability of a player base. */
     public static Result score(LevelChunk chunk) {
         if (chunk == null) return new Result(0, "");
+        return scoreSections(chunk.getSections());
+    }
 
+    static Result scoreSections(LevelChunkSection[] sections) {
         int storage = 0, lights = 0, workstations = 0, mechanisms = 0, artificial = 0, natural = 0;
-
-        // Block entities (chests/barrels/shulkers/hoppers/furnaces/...) are the strongest signal.
-        for (BlockEntity be : chunk.getBlockEntities().values()) {
-            Block b = be.getBlockState().getBlock();
-            if (isStorage(b)) storage++;
-            else if (isWorkstation(b)) workstations++;
-        }
-
-        // Block-level scan for lights / mechanisms / building blocks.
-        LevelChunkSection[] sections = chunk.getSections();
+        var counts = new java.util.HashMap<Block, Integer>();
         for (LevelChunkSection sec : sections) {
             if (sec == null || sec.hasOnlyAir()) continue;
-            for (int y = 0; y < 16; y++) {
-                for (int x = 0; x < 16; x++) {
-                    for (int z = 0; z < 16; z++) {
-                        BlockState st = sec.getBlockState(x, y, z);
-                        Block b = st.getBlock();
-                        if (isLight(b)) lights++;
-                        else if (isMechanism(b)) mechanisms++;
-                        else if (isArtificial(b)) artificial++;
-                        else if (isNatural(b)) natural++;
-                    }
-                }
-            }
+            sec.getStates().count((state, count) -> counts.merge(state.getBlock(), count, Integer::sum));
+        }
+        for (var entry : counts.entrySet()) {
+            Block block = entry.getKey();
+            int count = entry.getValue();
+            if (isStorage(block)) storage += count;
+            else if (isWorkstation(block)) workstations += count;
+            else if (isLight(block)) lights += count;
+            else if (isMechanism(block)) mechanisms += count;
+            else if (isArtificial(block)) artificial += count;
+            else if (isNatural(block)) natural += count;
         }
 
         int score = 0;
@@ -84,13 +73,13 @@ public final class BaseConfidence {
 
     private static boolean isStorage(Block b) {
         return b == Blocks.CHEST || b == Blocks.BARREL || b == Blocks.TRAPPED_CHEST
-            || b == Blocks.ENDER_CHEST || b == Blocks.HOPPER || b == Blocks.SHULKER_BOX
+            || b == Blocks.ENDER_CHEST || b == Blocks.HOPPER || b instanceof net.minecraft.world.level.block.ShulkerBoxBlock
             || b == Blocks.FURNACE || b == Blocks.BLAST_FURNACE || b == Blocks.SMOKER
             || b == Blocks.DISPENSER || b == Blocks.DROPPER;
     }
 
     private static boolean isWorkstation(Block b) {
-        return b == Blocks.CRAFTING_TABLE || b == Blocks.ENCHANTING_TABLE || b == Blocks.ANVIL
+        return b == Blocks.CRAFTING_TABLE || b == Blocks.ENCHANTING_TABLE || b instanceof net.minecraft.world.level.block.AnvilBlock
             || b == Blocks.BREWING_STAND || b == Blocks.GRINDSTONE || b == Blocks.SMITHING_TABLE
             || b == Blocks.LOOM || b == Blocks.CARTOGRAPHY_TABLE || b == Blocks.STONECUTTER
             || b == Blocks.FLETCHING_TABLE;

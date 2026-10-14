@@ -85,6 +85,9 @@ public final class ElytraTravelModule extends Module {
 
     public static void stopFlight() {
         if (instance == null) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.options != null) mc.options.keyJump.setDown(false);
+        MovementInput.release();
         instance.phase = Phase.DONE;
         instance.status = "stopped";
     }
@@ -105,12 +108,14 @@ public final class ElytraTravelModule extends Module {
 
     @Override
     public void onDisable() {
-        phase = Phase.DONE;
+        stopFlight();
         status = "idle";
-        if (mc().player != null) {
-            mc().options.keyJump.setDown(false);
-            MovementInput.release();
-        }
+    }
+
+    @Override
+    public void onGameLeft() {
+        stopFlight();
+        setEnabledSilently(false);
     }
 
     private Minecraft mc() { return Minecraft.getInstance(); }
@@ -119,7 +124,11 @@ public final class ElytraTravelModule extends Module {
     public void tick() {
         Minecraft mc = mc();
         if (mc.player == null || mc.level == null || phase == Phase.IDLE || phase == Phase.DONE) return;
-        if (mc.gui.screen() != null) return; // let menus open; flight resumes after
+        if (mc.gui.screen() != null) {
+            mc.options.keyJump.setDown(false);
+            MovementInput.release();
+            return;
+        }
 
         phaseTicks++;
         // Safety: bail on low health or a lost elytra.

@@ -3,12 +3,14 @@ package kaptainwutax.seedcrackerX.mixin;
 import kaptainwutax.seedcrackerX.SeedCracker;
 import kaptainwutax.seedcrackerX.config.StructureSave;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.dimension.DimensionType;
@@ -30,6 +32,14 @@ public abstract class ClientLevelMixin extends Level {
     private void disconnect(Component reason, CallbackInfo ci) {
         StructureSave.saveStructures(SeedCracker.get().getDataStorage().baseSeedData);
         SeedCracker.get().reset();
+    }
+
+    @Inject(method = "setServerVerifiedBlockState", at = @At("HEAD"))
+    private void seedcracker$primeBlockChange(BlockPos pos, BlockState incoming, int flags, CallbackInfo ci) {
+        var module = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":prime-chunk-finder");
+        if (module instanceof com.autism.seedcracker.modules.PrimeChunkFinderModule finder && finder.isEnabled()) {
+            finder.onBlockChange((ClientLevel) (Object) this, pos, getBlockState(pos), incoming);
+        }
     }
 
     @Inject(method = "getUncachedNoiseBiome", at = @At("HEAD"), cancellable = true)

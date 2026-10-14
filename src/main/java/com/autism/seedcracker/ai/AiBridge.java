@@ -45,8 +45,11 @@ public final class AiBridge implements AiCapabilityProvider {
             Class.forName("autismclient.api.ai.AiCapabilityProvider"); // linkage probe; throws on old hosts
             Object provider = Class.forName("com.autism.seedcracker.ai.AiBridge")
                 .getDeclaredConstructor().newInstance();
-            boolean ok = AutismAddons.ai().register((AiCapabilityProvider) provider);
-            if (!ok) System.out.println("[autism-seedcracker] AI bridge registration returned false");
+            // registerDetailed (not register) so a rejection logs the client's actual reason, not a bare false.
+            autismclient.api.AddonRegistrationResult res =
+                AutismAddons.ai().registerDetailed((AiCapabilityProvider) provider);
+            if (res.accepted()) System.out.println("[autism-seedcracker] AI bridge registered: " + res.id());
+            else System.out.println("[autism-seedcracker] AI bridge rejected: " + res.reason());
         } catch (Throwable t) {
             System.out.println("[autism-seedcracker] AI bridge unavailable on this client (" + t.getClass().getSimpleName() + "); skipping.");
         }
@@ -54,6 +57,8 @@ public final class AiBridge implements AiCapabilityProvider {
 
     @Override
     public List<AiCapabilityDescriptor> capabilities() {
+        // Contract (AiCapabilities.registerDetailed): each descriptor's owner must equal the registering
+        // addon's id AND each id must be namespaced with it ("<owner>:<name>"), else registration is rejected.
         return List.of(
             desc("module-state", "state", "Snapshot of every addon module's id, name and enabled flag.",
                 "{\"type\":\"object\",\"properties\":{}}"),
@@ -63,18 +68,21 @@ public final class AiBridge implements AiCapabilityProvider {
                 "{\"type\":\"object\",\"properties\":{\"limit\":{\"type\":\"integer\"}}}"));
     }
 
-    private static AiCapabilityDescriptor desc(String id, String family, String purpose, String inputSchema) {
+    private static AiCapabilityDescriptor desc(String name, String family, String purpose, String inputSchema) {
+        String owner = com.autism.seedcracker.SeedcrackerAddon.ID; // the addon's registered id
         return new AiCapabilityDescriptor(
-            id, "autism-seedcracker", 1, family, purpose,
+            owner + ":" + name, owner, 1, family, purpose,
             List.of(), inputSchema, "", "", List.of(),
             "", "", "", AiCapabilityDescriptor.Classification.OBSERVE);
     }
 
     @Override
     public AiOperation start(String id, String input, AiObservation observation) {
+        // The client invokes with the full namespaced id ("<owner>:<name>"); dispatch on the short name.
+        String name = id != null && id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
         final String data;
         try {
-            data = switch (id) {
+            data = switch (name) {
                 case "module-state" -> moduleState();
                 case "market-stats" -> marketStats(parseItem(input));
                 case "base-report" -> baseReport(parseLimit(input));

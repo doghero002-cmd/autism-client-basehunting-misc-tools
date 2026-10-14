@@ -55,7 +55,7 @@ public final class StuckDetector {
         Vec3 pos = mc.player.position();
         stillTicks = com.autism.seedcracker.util.pure.StuckLogic.update(
             stillTicks, lastPos != null, lastPos != null ? pos.distanceTo(lastPos) : 0.0, threshold);
-        lastPos = pos;
+        if (lastPos == null || stillTicks == 0) lastPos = pos;
 
         if (com.autism.seedcracker.util.pure.StuckLogic.isStuck(stillTicks, maxTicks)) {
             long now = System.currentTimeMillis();

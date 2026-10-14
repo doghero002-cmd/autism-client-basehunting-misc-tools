@@ -47,51 +47,51 @@ public final class GoToModule extends Module {
     }).buttonLabel("Stop").description("Stop the current trip / flight.").group("Travel"));
 
     private final BoolSetting renderPath = add(new BoolSetting("render-path", "Show path", true)
-        .description("Outline the planned route's floor blocks."));
+        .description("Outline the planned route's floor blocks.").group("Display"));
     private final BoolSetting sprint = add(new BoolSetting("sprint", "Sprint", true)
-        .description("Sprint on straight, dry stretches."));
+        .description("Sprint on straight, dry stretches.").group("Movement"));
     private final BoolSetting avoidMobs = add(new BoolSetting("avoid-mobs", "Avoid hostile mobs", true)
-        .description("Route around hostile mobs (creepers get extra room). Checked each time a route is planned."));
+        .description("Route around hostile mobs (creepers get extra room). Checked each time a route is planned.").group("Safety"));
 
     // Movement abilities and risk tuning - defaults are the safe walk; reveal to turn the agent
     // into a parkouring, bridging, bucket-dropping maniac.
     private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
-        .description("Reveal gap-jumping, bridging, fall tricks, restock and risk tuning."));
+        .description("Reveal movement tuning, supplies, performance and diagnostics.").group("General"));
     private final BoolSetting parkour = add(new BoolSetting("parkour", "Jump gaps", false)
         .description("Sprint-jump 1-2 block gaps. Only commits when lined up; still a fall risk on lag.")
-        .visibleWhen(showAdvanced::get));
+        .group("Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting bridge = add(new BoolSetting("bridge", "Bridge gaps", false)
         .description("Place cobble/dirt/netherrack/planks from your hotbar to cross holes (sneaks at the edge).")
-        .visibleWhen(showAdvanced::get));
+        .group("Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting sprintJump = add(new BoolSetting("sprint-jump", "Sprint-jump straights", false)
         .description("Bunny-hop on long straight flat stretches (faster, costs more hunger, more noticeable).")
-        .visibleWhen(showAdvanced::get));
+        .group("Movement").visibleWhen(showAdvanced::get));
     private final BoolSetting longJumps = add(new BoolSetting("long-jumps", "3-block jumps", false)
         .description("With Jump gaps on: also jump 3-wide gaps after a 2-block straight run-up. Lag makes these fail.")
-        .visibleWhen(() -> showAdvanced.get() && parkour.get()));
+        .group("Movement").visibleWhen(() -> showAdvanced.get() && parkour.get()));
     private final BoolSetting bucket = add(new BoolSetting("water-bucket", "Water-bucket falls", false)
         .description("Allow drops up to 20 blocks by placing water just before landing (needs a water bucket in the hotbar).")
-        .visibleWhen(showAdvanced::get));
+        .group("Safety").visibleWhen(showAdvanced::get));
     private final BoolSetting cushionBlocks = add(new BoolSetting("cushion-blocks", "Cushion-block falls", false)
         .description("Allow drops up to 30 blocks by placing a hay bale / slime / cobweb / powder snow at the landing (needs one in the hotbar).")
-        .visibleWhen(showAdvanced::get));
+        .group("Safety").visibleWhen(showAdvanced::get));
     private final BoolSetting autoInventory = add(new BoolSetting("auto-inventory", "Restock hotbar", true)
         .description("While standing still to plan, move bridge blocks / a water bucket from your inventory into a free hotbar slot.")
-        .visibleWhen(showAdvanced::get));
+        .group("Supplies").visibleWhen(showAdvanced::get));
     private final BoolSetting collectDrops = add(new BoolSetting("collect-drops", "Collect mined drops", true)
         .description(".goto ore: walk over each ore's drops before heading to the next one.")
-        .visibleWhen(showAdvanced::get));
+        .group("Mining").visibleWhen(showAdvanced::get));
     private final IntSetting maxDrop = add(new IntSetting("max-drop", "Max drop (blocks)", 3, 0, 20, 1)
         .description("How far it may drop straight down. Vanilla hurts from 4, so 3 is safe with no feather falling.")
-        .visibleWhen(showAdvanced::get));
+        .group("Safety").visibleWhen(showAdvanced::get));
     private final IntSetting hazardPenalty = add(new IntSetting("hazard-penalty", "Hazard avoidance", 6, 0, 50, 1)
         .description("How hard it avoids pathing next to lava/magma/fire. Higher = keeps more distance. 0 = no extra cost.")
-        .visibleWhen(showAdvanced::get));
+        .group("Safety").visibleWhen(showAdvanced::get));
     private final BoolSetting breakBlocks = add(new BoolSetting("break-blocks", "Break blocks", false)
-        .description("Let every .goto trip break blocks in the way (like always using '.goto mine'). Off = walk around."));
+        .description("Let every .goto trip break blocks in the way (like always using '.goto mine'). Off = walk around.").group("Mining"));
     private final IntSetting planMs = add(new IntSetting("plan-ms", "Reaction time (ms)", 250, 50, 2000, 10)
         .description("How long the planner may run before the first partial route starts the walk. Lower = reacts faster (may take a slightly less optimal first hop on very long trips).")
-        .visibleWhen(showAdvanced::get));
+        .group("Performance").visibleWhen(showAdvanced::get));
     private final BoolSetting smoothRotation = add(new BoolSetting("smooth-rotation", "Smooth rotation", true)
         .description("Ease the camera toward the path like a real mouse instead of snapping. Off = instant (fastest, most bot-like).").group("Rotation").visibleWhen(showAdvanced::get));
     private final IntSetting rotationSpeed = add(new IntSetting("rotation-speed", "Turn speed", 22, 4, 60, 1)
@@ -105,13 +105,14 @@ public final class GoToModule extends Module {
     private final BoolSetting silentRotation = add(new BoolSetting("silent-rotation", "Silent rotation (bypass)", false)
         .description("EXPERIMENTAL (needs in-game tuning): send the facing to the server but DON'T move your camera (strongest anti-cheat bypass). Currently the bot steers by the silent facing; your own view stays free.").group("Rotation").visibleWhen(showAdvanced::get));
     private final BoolSetting debug = add(new BoolSetting("debug", "Debug mode", false)
-        .description("On-screen panel with what the bot is doing, each plan's stats and why it failed.").group("Debug"));
+        .description("On-screen panel with what the bot is doing, each plan's stats and why it failed.")
+        .group("Diagnostics").visibleWhen(showAdvanced::get));
     private final BoolSetting debugMarkers = add(new BoolSetting("debug-markers", "Colour-coded path", true)
         .description("Green walk, yellow jump, red break, blue place, purple fall, cyan climb/swim/door, bright red = spots it's avoiding.")
-        .group("Debug").visibleWhen(debug::get));
+        .group("Diagnostics").visibleWhen(() -> showAdvanced.get() && debug.get()));
     private final BoolSetting debugLog = add(new BoolSetting("debug-log", "Write debug logs", true)
         .description("motion-errors.log (just problems, each with the 3s before it) and motion-trace.log (every tick: angles, keys, jumps). Send these when reporting a problem.")
-        .group("Debug").visibleWhen(debug::get));
+        .group("Diagnostics").visibleWhen(() -> showAdvanced.get() && debug.get()));
 
     private static final net.minecraft.resources.Identifier HUD_ID =
         net.minecraft.resources.Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, "motion_debug");

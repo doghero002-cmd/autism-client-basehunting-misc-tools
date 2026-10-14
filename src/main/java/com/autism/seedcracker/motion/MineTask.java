@@ -45,7 +45,8 @@ public final class MineTask {
     }
 
     public static boolean start(Minecraft mc, Set<Block> blocks, int count) {
-        if (mc.player == null || blocks.isEmpty()) return false;
+        if (mc == null || mc.player == null || mc.level == null || mc.gameMode == null
+            || blocks == null || blocks.isEmpty()) return false;
         stop(mc);
         targets = Set.copyOf(blocks);
         remaining = Math.max(1, count);
@@ -55,7 +56,10 @@ public final class MineTask {
         dimension = mc.level == null ? null : mc.level.dimension();
         blacklist.clear();
         collectFailed.clear();
-        return next(mc);
+        if (next(mc)) return true;
+        stop(mc);
+        status = "no reachable blocks";
+        return false;
     }
 
     public static boolean active() {
@@ -67,15 +71,20 @@ public final class MineTask {
     }
 
     public static void stop(Minecraft mc) {
-        if (targets != null && current != null && mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+        if (mc != null && targets != null && current != null && mc.gameMode != null) mc.gameMode.stopDestroyBlock();
         boolean was = targets != null;
         targets = null;
         current = null;
         walking = false;
         collectAt = null;
+        tripTarget = null;
+        dimension = null;
+        breakTicks = 0;
+        collectTicks = 0;
         collectFailed.clear();
         RotationEngine.release(ROT);
-        if (was && Motion.isBusy()) Motion.stop(mc);
+        if (was && mc != null && Motion.isBusy()) Motion.stop(mc);
+        if (was) status = "stopped";
     }
 
     /** Drive from the GoTo module tick, after Motion.tick. */
@@ -91,6 +100,11 @@ public final class MineTask {
             return;
         }
         dimension = mc.level.dimension();
+        if (mc.gui.screen() != null || com.autism.seedcracker.util.ContainerMutex.containerBusy(mc)) {
+            if (mc.gameMode != null) mc.gameMode.stopDestroyBlock();
+            RotationEngine.release(ROT);
+            return;
+        }
         if (collectAt != null) {
             tickCollect(mc);
             return;
@@ -283,9 +297,9 @@ public final class MineTask {
     }
 
     private static void finish(String why) {
-        status = why;
         Minecraft mc = Minecraft.getInstance();
         stop(mc);
+        status = why;
         com.autism.seedcracker.compat.ClientNotify.success("[Mine] " + why);
     }
 

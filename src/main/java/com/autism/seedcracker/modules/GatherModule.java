@@ -41,8 +41,7 @@ public final class GatherModule extends Module {
     private int ticksUntilNext;
     private int emptyCycles;
     private boolean gathering;
-    private boolean pausedTrip;
-    private net.minecraft.core.BlockPos savedGoal;
+    private Motion.SuspendedTrip pausedTrip;
     private String status = "idle";
 
     public GatherModule() {
@@ -55,29 +54,38 @@ public final class GatherModule extends Module {
         ticksUntilNext = 20; // first cycle ~1s in
         emptyCycles = 0;
         gathering = false;
-        pausedTrip = false;
-        savedGoal = null;
+        pausedTrip = null;
         status = "idle";
     }
 
     @Override
     public void onDisable() {
+        Minecraft mc = Minecraft.getInstance();
+        if (gathering) MineTask.stop(mc);
+        gathering = false;
+        resumeTrip(mc);
+        status = "idle";
+    }
+
+    @Override
+    public void onGameLeft() {
+        pausedTrip = null;
         if (gathering) MineTask.stop(Minecraft.getInstance());
         gathering = false;
-        pausedTrip = false;
-        savedGoal = null;
-        status = "idle";
+        setEnabledSilently(false);
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) { status = "idle"; return; }
+        if (mc.gui.screen() != null) { status = "paused: menu open"; return; }
 
         // A gather cycle is running: watch it finish.
         if (gathering) {
             if (!MineTask.active()) {
                 gathering = false;
+                if (MineTask.status().equals("stopped")) pausedTrip = null;
                 emptyCycles = MineTask.status().startsWith("done") ? 0 : emptyCycles + 1;
                 // Back off exponentially after empty/unreachable cycles (cap 8x) so we don't hot-loop a doomed mine.
                 ticksUntilNext = interval.get() * 20 * Math.min(8, 1 + emptyCycles);
@@ -89,6 +97,13 @@ public final class GatherModule extends Module {
             return;
         }
 
+        if (MineTask.active() || ElytraTravelModule.active()
+                || Motion.following() != null || Motion.exploring()
+                || (Motion.isBusy() && !pauseGoto.get())) {
+            status = "waiting: other automation";
+            return;
+        }
+
         // Count down to the next cycle.
         if (--ticksUntilNext > 0) { status = "waiting"; return; }
 
@@ -97,9 +112,8 @@ public final class GatherModule extends Module {
 
         // Optionally pause an active trip so the gather can run, then resume it after.
         if (pauseGoto.get() && Motion.isBusy()) {
-            savedGoal = Motion.goal();
-            Motion.stop(mc);
-            pausedTrip = true;
+            pausedTrip = Motion.suspend(mc);
+            if (pausedTrip == null) { status = "waiting: active route"; return; }
         }
 
         if (!MineTask.start(mc, targets, amount.get())) {
@@ -114,12 +128,9 @@ public final class GatherModule extends Module {
     }
 
     private void resumeTrip(Minecraft mc) {
-        if (!pausedTrip) return;
-        pausedTrip = false;
-        if (savedGoal != null && pauseGoto.get()) {
-            Motion.goToXZ(mc, savedGoal.getX(), savedGoal.getZ(), Motion.Backend.BUILT_IN, false);
-            savedGoal = null;
-        }
+        Motion.SuspendedTrip trip = pausedTrip;
+        pausedTrip = null;
+        Motion.resume(mc, trip);
     }
 
     private Set<Block> parseBlocks() {
