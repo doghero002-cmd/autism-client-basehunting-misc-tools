@@ -17,12 +17,7 @@ A client-side addon for the AUTISM Client that bundles base-finding tools for Do
 seed cracking, coordinate finding, RTP stash hunting, an auction-house flipper, and a broader set of
 utility modules. It loads as its own jar alongside the AUTISM client.
 
-## v3.0.0 — Spectre DonutSMP ports
 
-Version 3.0.0 adapts the Donut and Base Raid modules from
-[cody-raves/Spectre](https://github.com/cody-raves/Spectre/tree/d5a7dd3de0be67bea273d4ed74d2c76c11e0f6da),
-plus its Donut region map and spawner nametags. They use the native AUTISM addon
-settings, rendering and lifecycle; Spectre itself is **not** required.
 
 Install **one** jar alongside its matching client:
 
@@ -31,97 +26,6 @@ Install **one** jar alongside its matching client:
 | [3.0.0](dist/autism-base-finding-tools-3.0.0.jar) | V4 / `5.1-26.2` | v4 |
 | [3.0.0+client5.0](dist/autism-base-finding-tools-3.0.0+client5.0.jar) | `5.0-26.2` | v3 |
 
-Both variants pass 643 automated checks. Isolated startup checks verified all
-27 port registrations, all 11 new/modified mixins and clean shutdown on both
-clients. Release packaging differs from those runtime-tested binaries only in
-mod-version metadata. Active module gameplay was not authenticated or live-server
-tested; server-specific behavior remains unverified.
-
-| Spectre module | Addon destination |
-| --- | --- |
-| Anti Vanish | Replaces Spectator Detector |
-| Player Detection | Replaces Visual Range |
-| Staff List | New staff list and alerts |
-| Anti Trap | Replaces Anti Trap |
-| Spawner Protect | Replaces Spawner Protect |
-| Netherite Finder | Replaces Netherite Finder |
-| Spawner Notifier | Replaces Spawner Finder |
-| Amethyst Bypass | Replaces Amethyst ESP |
-| Block Entity Debug | New leaked-block-entity overlay |
-| Spawner Nametags | New spawner labels |
-| Chunk Scanner | Replaces Chunk Finder |
-| Sus Chunk Finder | Replaces Sus Chunk Finder |
-| Prime Chunk Finder | Replaces Prime Chunk Finder |
-| Player Bypass | Replaces Player Finder light-data mode; simulation mode retained |
-| Light ESP | Replaces Light Source Finder |
-| Quantum | New resent-chunk activity detector |
-| Render Util | New Quantum detection renderer |
-| Render Distance Toggle | Replaces Auto Render |
-| Home Meta | Replaces Home Setter META behavior; SET mode retained |
-| Auto Relog | New depth-triggered relog; the distinct Relog Loader workflow remains |
-| Air Stuck | New movement utility |
-| Donut NoFall | New server-dependent fall-damage mitigation |
-| Donut Speed Mine | New mining utility |
-| Trident Util | New trident settings |
-| Riptide | Additional manual-use module present in Spectre's source |
-| Fake Stats | Replaces the old Fake Scoreboard HUD; Fake Identity remains |
-| Region Map | Replaces the map layout/rendering with Spectre's region IDs and colors |
-
-Replacement modules retain their existing addon identifiers. Unrelated tools,
-including seed cracking, trading, chat games and Base Scout, remain in the addon.
-New modules are opt-in; the six new movement/relog/trident tools are in **Donut**.
-Finder and staff detections are heuristics, not proof of a base or a vanished
-player; movement/mining behavior depends on the server. Seed-aware Chunk Finder
-prediction is limited to vanilla world generation, eight chunks and coordinates
-within ±250,000 blocks. Sus Chunk Finder's bare formations are hypotheses, not
-proof that a geode was mined.
-
-**Fake Stats:** local sidebar values and your tab balance can be overridden or
-scrambled. The optional payment-balance setting uses Fake Identity's existing
-local balance. A private render scoreboard leaves genuine client/server values
-available to other modules. Disable Scoreboard Hider to see the sidebar. The old
-separate Fake Scoreboard HUD is no longer registered.
-
-**Region Map:** Spectre's 9×9 region layout replaces the old baked palette. Region
-IDs, cell gaps, opacity, text/player scale and indicator color are configurable.
-Existing RTP dots, base heatmap, Nether coordinate projection and custom PNGs are
-retained. Out-of-map coordinates are not labeled as an edge region. The layout is
-a source snapshot, not a live server-topology feed.
-
-Spectre's custom client GUI, updater, media player and unrelated combat/building
-modules are outside this port. No Spectre telemetry or Discord integration is
-included. See [source attribution and licenses](src/main/resources/SPECTRE-NOTICES.txt).
-
-## v2.4.5 — previous release
-
-Install **one** jar that matches the AUTISM Client version:
-
-| Jar | AUTISM Client | Addon API |
-| --- | --- | --- |
-| `autism-base-finding-tools-2.4.5.jar` | V4 / `5.1-26.2` (current official) | v4 |
-| `autism-base-finding-tools-2.4.5+client5.0.jar` | `5.0-26.2` (public release) | v3 |
-
-### Patch notes
-
-- **Base Scout:** optional, bounded walking exploration coordinates existing finders, pauses/stops on safety or automation conflicts, and stores local candidate evidence for manual review. It is not a survival guarantee or proof of a base.
-- **Finders:** Classic and Dog+ Sus Chunk modes; optional settled mined-geode candidates; Player Finder light-data/simulation modes; underground light detection; and revised chunk/stash candidate reporting. These are investigative signals, not confirmed player locations.
-- **Chat Games:** broader local solvers and 316 bundled trivia questions. The client setting exposes 489 curated default words/phrases and preserves existing custom additions; live Minecraft registries and the large English fallback remain automatic.
-- **Chat Bot / AI:** reuse the selected V4 provider for conversations, keep game actions separate from replies, and offer an optional authenticated local AI-control bridge.
-- **Trading and automation:** safer AH Sniper include/exclude/minimum-stack filters and confirmation checks; safer AH Sell inventory filtering; and GoTo/Gather/Elytra/AutoEat/AutoTool coordination around screens, route ownership, and inventory changes.
-- **Safety and evidence:** validated payment recipients/amounts, bounded Base Scout journals and manual reviews, and clearer separation between detection confidence and verified findings.
-
-The sections below provide module details, setup, and known limitations.
-
-## v2.4.5 release
-
-### Which jar do I download?
-
-Install **one** matching jar alongside the AUTISM Client:
-
-| Jar | AUTISM Client version | API |
-| --- | --- | --- |
-| `autism-base-finding-tools-2.4.5.jar` | V4 / `5.1-26.2` (current official) | v4 |
-| `autism-base-finding-tools-2.4.5+client5.0.jar` | `5.0-26.2` (public release) | v3 |
 
 ### Highlights
 
