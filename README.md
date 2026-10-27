@@ -295,8 +295,6 @@ $task = & '.\tools\client-ai.ps1' -Action Submit -Prompt 'Summarize enabled find
 
 Submission returns a task ID, not proof of completion. Check Status for rejection, progress, approval-waiting or completion; approve plans only in the client's AI panel. Enabling the module initializes the host normally if needed. The script reads the short-lived bearer token from the game directory's `run` folder without printing it. `/ai/status`, `/ai/task` and `/ai/cancel` require that token and reject browser-origin requests. Unsupported controller builds fail closed. Offline live QA verified genuine read-only delegation: the host answered with the actual dimension ID and the final API returned it in `result`. Safe rejection, completed-task cancellation and token cleanup also passed; existing plans/settings were restored unchanged. For simultaneous instances, use JVM option `-Dautism.seedcracker.bridge.port=25661` and script argument `-Port 25661`.
 
-Spectre-containing builds carry GPL-3.0-only distribution terms; see [License](#license) before redistributing them.
-
 ## Build
 
 From the project root, build the addon with either of these commands:
