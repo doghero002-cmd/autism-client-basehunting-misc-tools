@@ -21,10 +21,14 @@ class ChatGameVocabularyTest {
     @Test
     void curatedDefaultsIncludePhrasesAndAcceptAdditionalWords() {
         var defaults = ChatGameVocabulary.defaultExtraWords();
-        assertEquals(489, defaults.size(), "all curated answer, plugin, country, and phrase defaults are editable");
+        assertEquals(610, defaults.size(), "all curated answer, plugin, country, and phrase defaults are editable");
         assertTrue(defaults.contains("the nether"));
         assertTrue(defaults.contains("trial chambers"));
         assertTrue(defaults.contains("woodland mansion"));
+        assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("World Wide Web")));
+        assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("Wellington")));
+        assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("Chicago")));
+        assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("Redmond Washington")));
         assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("creeper")));
         assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("SMARTPHONE")));
         assertTrue(defaults.stream().anyMatch(word -> word.equalsIgnoreCase("Afghanistan")));

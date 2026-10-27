@@ -39,7 +39,7 @@ public final class FlipScreen extends AddonScreen {
 
     private static FlipEngine engine() {
         AHFlipperModule m = AHFlipperModule.INSTANCE;
-        return m == null ? null : m.engine();
+        return m == null || !m.isEnabled() ? null : m.engine();
     }
 
     private int panelX() { return PAD; }
@@ -60,7 +60,7 @@ public final class FlipScreen extends AddonScreen {
             Tone.SECONDARY, b -> onClose()));
 
         int by = screenHeight() - 28;
-        addRenderableWidget(new StyledButton(PAD, by, 110, 18, Component.literal("Open /ah for item"),
+        addRenderableWidget(new StyledButton(PAD, by, 110, 18, Component.literal("Open /ah"),
             Tone.SUCCESS, b -> searchSelected()));
         addRenderableWidget(new StyledButton(PAD + 116, by, 110, 18, Component.literal("Paper-trade it"),
             Tone.NORMAL, b -> paperSelected()));
@@ -79,9 +79,9 @@ public final class FlipScreen extends AddonScreen {
     private void searchSelected() {
         Opportunity o = selectedFlip();
         Minecraft mc = Minecraft.getInstance();
-        if (o == null || mc.getConnection() == null) { toast("Select a flip first", Palette.WARN); return; }
-        mc.gui.setScreen(null);
-        mc.getConnection().sendCommand("ah " + AhGui.searchName(o.listing().itemKey()));
+        if (mc.getConnection() == null || mc.player == null) { toast("Join a server first", Palette.WARN); return; }
+        mc.player.closeContainer();
+        mc.getConnection().sendCommand(o == null ? "ah" : "ah " + AhGui.searchName(o.listing().itemKey()));
     }
 
     private void paperSelected() {
@@ -143,9 +143,17 @@ public final class FlipScreen extends AddonScreen {
             text(g, Math.round(o.confidence() * 100) + "%", x + w - 36, ry + 2, body);
             ry += ROW_H;
         }
-        if (f.isEmpty()) {
-            text(g, "No flips yet. Open /ah (it auto-pages) or set a watchlist;", x + 8, y + 22, muted);
-            text(g, "two passes a few minutes apart start inferring sales.", x + 8, y + 34, muted);
+        if (f.isEmpty() && AHFlipperModule.INSTANCE != null) {
+            int statusY = y + 22;
+            for (String message : AHFlipperModule.INSTANCE.diagnostics()) {
+                for (var line : this.font.split(Component.literal(message), Math.max(40, w - 16))) {
+                    if (statusY > y + h - 12) break;
+                    g.text(this.font, line, x + 8, statusY, muted, false);
+                    statusY += 10;
+                }
+                statusY += 4;
+                if (statusY > y + h - 12) break;
+            }
         }
 
         int dx = x + w + 8, dw = panelW() - w - 8;

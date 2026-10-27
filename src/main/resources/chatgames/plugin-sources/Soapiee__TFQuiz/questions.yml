@@ -1,0 +1,129 @@
+Questions:
+  1:
+    # Write the question in speech marks
+    Question: "'A' is the most common letter used in the English language"
+    # State whether the correct answer is "True" or "False"
+    Answer: False
+    # (Optional) Write an explanation for the correct answer. This will be shown once the answer is revealed
+    Correction_Message: "'E' is the most common letter used in the English language"
+  2:
+    Question: "In the English language there is no word that rhymes with orange"
+    Answer: True
+    # (Optional) Leave the correction message blank if you do not want a message to be shown
+    Correction_Message: ""
+  3:
+    Question: "The unicorn is the national animal of Scotland"
+    Answer: True
+    Correction_Message: ""
+  4:
+    Question: "Goldfish have a two second memory"
+    Answer: False
+    Correction_Message: ""
+  5:
+    Question: "An octopus has two hearts"
+    Answer: False
+    Correction_Message: "An octopus has three hearts"
+  6:
+    Question: "An octopus has three hearts"
+    Answer: True
+    Correction_Message: ""
+  7:
+    Question: "An octopus has four hearts"
+    Answer: False
+    Correction_Message: "An octopus has three hearts"
+  8:
+    Question: "Cinderella was the first Disney princess"
+    Answer: False
+    Correction_Message: "The first disney princess was Snow White"
+  9:
+    Question: "Alexander Fleming discovered penicillin"
+    Answer: True
+    Correction_Message: ""
+  10:
+    Question: "The black box in a plane is black"
+    Answer: False
+    Correction_Message: "The 'black box' in a plane is actually orange"
+  11:
+    Question: "Australia is wider than the moon"
+    Answer: True
+    Correction_Message: ""
+  12:
+    Question: "The United States has the longest coastline in the world"
+    Answer: False
+    Correction_Message: "Canada has the longest coastline in the world"
+  13:
+    Question: "Spaghetto is the singular word for a piece of spaghetti"
+    Answer: True
+    Correction_Message: ""
+  14:
+    Question: "The Olympics are held every five years"
+    Answer: False
+    Correction_Message: "The Olympics is held every 4 years, not every 5 years"
+  15:
+    Question: "If you sneeze with your eyes open, then your eyes will pop out"
+    Answer: False
+    Correction_Message: ""
+  16:
+    Question: "You can swallow and breathe at the same time"
+    Answer: False
+    Correction_Message: ""
+  17:
+    Question: "Our blood contains gold"
+    Answer: True
+    Correction_Message: ""
+  18:
+    Question: "There are 14 bones in a human foot"
+    Answer: False
+    Correction_Message: "The human foot has 28 bones"
+  19:
+    Question: "Penguins can fly"
+    Answer: False
+    Correction_Message: ""
+  20:
+    Question: "Spiders have eight legs"
+    Answer: True
+    Correction_Message: ""
+  21:
+    Question: "The sun is a star"
+    Answer: True
+    Correction_Message: ""
+  22:
+    Question: "The capital of Australia is Sydney"
+    Answer: False
+    Correction_Message: "Canberra is the capital of Australia"
+  23:
+    Question: "Bees have two wings"
+    Answer: False
+    Correction_Message: "Bees have 4 wings"
+  24:
+    Question: "Giraffes have 3 stomachs"
+    Answer: False
+    Correction_Message: "Giraffes have 4 stomachs"
+  25:
+    Question: "Butterflies taste with their feet"
+    Answer: True
+    Correction_Message: ""
+  26:
+    Question: "Sound travels faster than light"
+    Answer: False
+    Correction_Message: "Light travels faster than sound"
+  27:
+    Question: "The sun rises in the east"
+    Answer: True
+    Correction_Message: ""
+  28:
+    Question: "In Roman numerals, “X” represents the number 50."
+    Answer: False
+    Correction_Message: "X = 10"
+  29:
+    Question: "In Roman numerals, “V” represents the number 5"
+    Answer: True
+    Correction_Message: ""
+  30:
+    Question: "The decimal 0.25 is the same as 1/4 as a fraction"
+    Answer: True
+    Correction_Message: ""
+  31:
+    Question: "Lightning is hotter than the surface of the Sun."
+    Answer: True
+    Correction_Message: ""

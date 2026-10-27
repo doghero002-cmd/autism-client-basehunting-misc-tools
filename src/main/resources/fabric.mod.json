@@ -7,9 +7,10 @@
   "authors": [
     "KaptainWutax",
     "19MisterX98",
-    "AUTISM addon port"
+    "AUTISM addon port",
+    "cody-raves (Spectre modules)"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "icon": "assets/seedcrackerx/icon.png",
   "custom": {
     "autism:color": "80,200,120",

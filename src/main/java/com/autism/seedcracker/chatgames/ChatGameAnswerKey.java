@@ -19,7 +19,8 @@ public final class ChatGameAnswerKey {
     private static Map<String, String> readDefaults() {
         try {
             Map<String, String> answers = new LinkedHashMap<>();
-            for (String resource : java.util.List.of("minecraft-answers.json", "public-plugin-answers.json")) {
+            for (String resource : java.util.List.of("minecraft-answers.json", "public-plugin-answers.json",
+                "expanded-plugin-answers.json", "plugin-fact-answers.json")) {
                 try (var input = ChatGameAnswerKey.class.getResourceAsStream("/chatgames/" + resource)) {
                     if (input == null) throw new IOException("Bundled answer key missing: " + resource);
                     for (var entry : load(input).entrySet()) {

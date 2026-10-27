@@ -1,6 +1,8 @@
 package com.autism.seedcracker.modules;
 
 import com.autism.seedcracker.SeedcrackerAddon;
+import com.autism.seedcracker.spectre.mechanics.HomeMetaSequence;
+import com.autism.seedcracker.util.ActionPacer;
 
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.EnumSetting;
@@ -9,265 +11,292 @@ import autismclient.api.module.StringSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.Locale;
+import java.util.concurrent.ArrayBlockingQueue;
+
 /**
- * Home Setter.
- *
- * One-shot home tool with two modes:
- *  - SET:  delete the configured home slot, wait a beat, set it at your position, auto-disable.
- *          (Clean-room port of the obfuscated Zelith "HomeSetter".)
- *  - META: /sethome (twice), /rtp away, wait for the teleport, /home back, auto-disable - the
- *          Anubis HomeMeta stash/escape sequence, merged in so it isn't a separate menu entry.
+ * Existing Home Setter ID, SET mode, command templates and silent-chat API are retained.
+ * META command order adapted from Spectre HomeMetaModule (GPL-3.0-only), revision
+ * d5a7dd3de0be67bea273d4ed74d2c76c11e0f6da, by cody-raves and contributors.
+ * Intentional changes: client-tick scheduling, paced commands, bounded confirmation/teleport waits,
+ * and cancellation on connection/world/player changes. No external logging is performed.
  */
 public final class HomeSetterModule extends Module {
-
     public enum Mode { SET, META }
 
+    private static final System.Logger LOGGER = System.getLogger(HomeSetterModule.class.getName());
     private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Mode", Mode.SET, Mode.values())
-        .description("SET = set the home slot at your position. META = sethome, /rtp away, then /home back (stash/escape sequence).")
+        .description("SET = delete/delay/set. META = delete, set and confirm, RTP, then return home.")
         .group("General"));
     private final IntSetting slot = add(new IntSetting("slot", "Home slot", 1, 1, 10, 1)
-        .description("Which home slot number to set.")
-        .group("General"));
+        .description("Which home slot number to set.").group("General"));
     private final BoolSetting deleteFirst = add(new BoolSetting("delete-first", "Delete old home first", true)
-        .description("Run the delete command before setting, to overwrite an existing home.")
+        .description("SET: run the delete command before setting, to overwrite an existing home.")
         .group("General").visibleWhen(() -> mode.get() == Mode.SET));
     private final StringSetting setCommand = add(new StringSetting("set-command", "Set command", "sethome %slot%")
         .description("Command used to set the home. %slot% is replaced with the slot number.")
-        .group("General").visibleWhen(() -> mode.get() == Mode.SET));
+        .group("General"));
     private final StringSetting deleteCommand = add(new StringSetting("delete-command", "Delete command", "delhome %slot%")
         .description("Command used to delete the home. %slot% is replaced with the slot number.")
-        .group("General").visibleWhen(() -> mode.get() == Mode.SET));
+        .group("General"));
     private final IntSetting delayMs = add(new IntSetting("delay-ms", "Delay (ms)", 750, 100, 5000, 50)
-        .description("Milliseconds to wait between the delete and set commands.")
+        .description("SET: milliseconds to wait between the delete and set commands.")
         .group("General").visibleWhen(() -> mode.get() == Mode.SET));
-
-    // META mode (Anubis HomeMeta): sethome -> /rtp -> wait for the teleport -> /home back.
     private final IntSetting metaDelayTicks = add(new IntSetting("meta-delay", "Step delay (ticks)", 20, 5, 100, 1)
-        .description("Ticks between sequence steps (20 = 1s). Raise on laggy servers.")
+        .description("Minimum delay between META steps (20 ticks = 1s).")
         .group("Meta").visibleWhen(() -> mode.get() == Mode.META));
     private final StringSetting metaRtpCommand = add(new StringSetting("meta-rtp", "RTP command", "rtp")
-        .description("Command used to teleport away.")
+        .description("Command used to teleport away after the home-set confirmation.")
         .group("Meta").visibleWhen(() -> mode.get() == Mode.META));
     private final IntSetting metaRtpTimeout = add(new IntSetting("meta-rtp-timeout", "RTP timeout (s)", 15, 5, 60, 1)
-        .description("Give up if the RTP teleport hasn't happened after this long.")
+        .description("Maximum wait for each RTP/return-home teleport. Timeout aborts the sequence.")
         .group("Meta").visibleWhen(() -> mode.get() == Mode.META));
-
-    // SilentHome (Water port): hide the server's "Home set"/"Home deleted" confirmation lines so
-    // nothing appears in chat while setting a stash home, optionally logging to a webhook instead.
     private final BoolSetting silent = add(new BoolSetting("silent", "Silent (hide confirmations)", false)
-        .description("Suppress the server's home-command confirmation chat lines for a few seconds around the command (Water SilentHome).")
+        .description("Hide matching system-chat lines briefly around this module's commands.")
         .group("Silent"));
-    private final StringSetting silentPatterns = add(new StringSetting("silent-patterns", "Suppress patterns",
-            "home,sethome,delhome")
-        .description("Comma-separated case-insensitive substrings; system chat containing any of them is hidden during the window.")
+    private final StringSetting silentPatterns = add(new StringSetting("silent-patterns", "Suppress patterns", "home,sethome,delhome")
+        .description("Comma-separated case-insensitive substrings hidden during the bounded window.")
         .group("Silent").visibleWhen(() -> silent.get()));
-    private final StringSetting webhook = add(new StringSetting("webhook", "Webhook", "")
-        .description("Optional Discord webhook: posts the home slot + coordinates after setting (your private log).")
-        .group("Silent").visibleWhen(() -> silent.get()));
+    // Retain the serialized legacy key/value without exposing a nonfunctional network control.
+    private final StringSetting webhook = add(new StringSetting("webhook", "Legacy webhook (not sent)", "")
+        .description("Retained for profile compatibility only. No external transmission is performed.")
+        .group("Silent").visibleWhen(() -> false));
 
-    private static final java.time.Duration HTTP_TIMEOUT = java.time.Duration.ofSeconds(8L);
-    private static final java.net.http.HttpClient HTTP = com.autism.seedcracker.util.Http.CLIENT;
+    private static volatile HomeSetterModule active;
+    private static volatile HomeSetterModule suppressor;
+    private volatile long suppressUntilMs;
+    private volatile String[] suppressPatterns = new String[0];
+    private volatile ClientPacketListener suppressionConnection;
 
-    /** Suppression window read by HomeSetterChatMixin (static: the mixin has no module ref). */
-    private static volatile long suppressUntilMs = 0;
-    private static volatile String[] suppressPatterns = new String[0];
-
-    /** True if this system-chat line should be hidden (called from HomeSetterChatMixin). */
-    public static boolean shouldSuppress(net.minecraft.network.chat.Component message) {
-        if (System.currentTimeMillis() > suppressUntilMs || message == null) return false;
-        String text = message.getString().toLowerCase(java.util.Locale.ROOT);
-        for (String p : suppressPatterns) {
-            if (!p.isEmpty() && text.contains(p)) return true;
-        }
-        return false;
-    }
-
-    private volatile boolean running = false;
+    private record FeedbackScope(long run, long step) {}
+    private record Feedback(FeedbackScope scope, String line, boolean teleport) {}
+    private final ArrayBlockingQueue<Feedback> feedback = new ArrayBlockingQueue<>(32);
+    private volatile FeedbackScope feedbackScope;
+    private volatile FeedbackScope overflowScope;
+    private long generation;
+    private final HomeMetaSequence sequence = new HomeMetaSequence();
+    private ClientPacketListener connection;
+    private ClientLevel level;
+    private LocalPlayer player;
+    private Vec3 homePosition;
+    private Vec3 rtpPosition;
+    private Mode runMode;
+    private int homeSlot;
+    private boolean preserveSuppressionOnDisable;
 
     public HomeSetterModule() {
         super(SeedcrackerAddon.ID + ":z-home-setter", "Home Setter",
-            "One-shot: sets a home at your current position by running the server home commands.");
+            "One-shot: sets a home, or runs the confirmed home/RTP/return sequence.");
+    }
+
+    /** Existing HomeSetterChatMixin remains unchanged; feed confirmation before hiding any line. */
+    public static boolean shouldSuppress(Component message) {
+        onChatMessage(message);
+        HomeSetterModule owner = suppressor;
+        if (owner == null || message == null) return false;
+        owner.expireSuppression(Minecraft.getInstance());
+        if (suppressor != owner) return false;
+        String text = message.getString().toLowerCase(Locale.ROOT);
+        for (String pattern : owner.suppressPatterns) if (text.contains(pattern)) return true;
+        return false;
+    }
+
+    /** Public chat bridge; only immutable feedback is queued, never game work on a network thread. */
+    public static void onChatMessage(Component message) {
+        if (message != null) onChatMessage(message.getString());
+    }
+
+    public static void onChatMessage(String message) {
+        HomeSetterModule owner = active;
+        if (owner != null && message != null && message.length() <= 4096) owner.enqueue(message, false);
     }
 
     @Override
     public void onEnable() {
-        if (running) return;
+        stopRun(true);
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null || mc.getConnection() == null) {
+        if (mc.player == null || mc.level == null || mc.getConnection() == null || mc.player.isDeadOrDying()) {
             AutismClientMessaging.sendPrefixed("§c[Home Setter] Join a world first.");
             setEnabledSilently(false);
             return;
         }
-        if (mode.get() == Mode.META) {
-            startMeta(mc);
+        connection = mc.getConnection();
+        level = mc.level;
+        player = mc.player;
+        runMode = mode.get();
+        homeSlot = slot.get();
+        try {
+            long now = nowMs();
+            if (runMode == Mode.META) {
+                sequence.startMeta(homeSlot, metaDelayTicks.get() * 50L, metaRtpTimeout.get() * 1000L,
+                    setCommand.get(), deleteCommand.get(), metaRtpCommand.get(), now);
+            } else {
+                sequence.startSet(homeSlot, deleteFirst.get(), delayMs.get(), setCommand.get(), deleteCommand.get(), now);
+            }
+        } catch (IllegalArgumentException failure) {
+            AutismClientMessaging.sendPrefixed("§c[Home Setter] " + failure.getMessage());
+            setEnabledSilently(false);
             return;
         }
-        running = true;
-        int homeSlot = slot.get();
-        int wait = delayMs.get();
-        boolean doDelete = deleteFirst.get();
-        String setCmd = buildCommand(setCommand.get(), homeSlot);
-        String delCmd = buildCommand(deleteCommand.get(), homeSlot);
-
-        boolean quiet = silent.get();
-        if (quiet) {
-            // Window covers delete + delay + set + server response lag.
-            suppressPatterns = splitPatterns(silentPatterns.get());
-            suppressUntilMs = System.currentTimeMillis() + wait + 5000L;
-        } else {
-            AutismClientMessaging.sendPrefixed("§7[Home Setter] Setting home §f" + homeSlot + " §7at your position...");
-        }
-
-        // Run the delete on the client thread, then set after a delay off-thread.
-        if (doDelete) {
-            sendCommand(mc, delCmd);
-        }
-        Thread delayThread = new Thread(() -> {
-            try {
-                Thread.sleep(wait);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            mc.execute(() -> {
-                // User toggled off during the delay: don't fire the command seconds later.
-                if (!running || mc.getConnection() == null) {
-                    running = false;
-                    return;
-                }
-                sendCommand(mc, setCmd);
-                if (!quiet) {
-                    AutismClientMessaging.sendPrefixed("§a[Home Setter] Home §f" + homeSlot + " §aset.");
-                }
-                postWebhook(mc, homeSlot);
-                running = false;
-                setEnabledSilently(false);
-            });
-        }, "HomeSetter-Delay");
-        delayThread.setDaemon(true);
-        delayThread.start();
+        active = this;
+        syncFeedbackScope();
+        if (!silent.get()) AutismClientMessaging.sendPrefixed("§7[Home Setter] Starting " + runMode + " for home " + homeSlot + ".");
     }
 
     @Override
     public void onDisable() {
-        running = false;
-        metaStep = MetaStep.IDLE;
+        stopRun(!preserveSuppressionOnDisable);
+        preserveSuppressionOnDisable = false;
     }
 
-    // ---- META mode: sethome -> rtp -> wait for teleport -> home back ----
+    @Override
+    public void onGameLeft() {
+        // This is a one-shot transaction, not resumable work: persistence must not restart it.
+        stopRun(true);
+        if (isEnabled()) setEnabledSilently(false);
+    }
 
-    private enum MetaStep { IDLE, SETHOME_1, SETHOME_2, RTP, WAIT_TELEPORT, HOME_BACK }
+    @Override
+    public void onGameJoin() {
+        if (sequence.running()) finish(false, "session changed");
+        clearSuppression();
+    }
 
-    private MetaStep metaStep = MetaStep.IDLE;
-    private int metaTicks;
-    private Vec3 metaStartPos;
-    private long metaRtpSentAt;
+    @Override
+    public boolean ticksWhenDisabled() { return true; }
 
-    private void startMeta(Minecraft mc) {
-        running = true;
-        metaStep = MetaStep.SETHOME_1;
-        metaTicks = 0;
-        metaStartPos = mc.player.position();
-        AutismClientMessaging.sendPrefixed("§7[Home Meta] Starting: sethome -> rtp -> home back.");
+    @Override
+    public boolean hasDisabledTickWork() { return suppressor == this; }
+
+    @Override
+    public boolean onPacketReceive(Packet<?> packet) {
+        if (packet instanceof ClientboundSystemChatPacket chat && !chat.overlay()) onChatMessage(chat.content());
+        else if (packet instanceof ClientboundPlayerPositionPacket) enqueue(null, true);
+        return false;
     }
 
     @Override
     public void tick() {
-        if (metaStep == MetaStep.IDLE) return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.getConnection() == null) { abortMeta("left the world"); return; }
-
-        if (metaStep == MetaStep.WAIT_TELEPORT) {
-            // The RTP lands when we've moved far from the start point.
-            if (mc.player.position().distanceToSqr(metaStartPos) > 64 * 64) {
-                metaStep = MetaStep.HOME_BACK;
-                metaTicks = 0;
-            } else if (System.currentTimeMillis() - metaRtpSentAt > metaRtpTimeout.get() * 1000L) {
-                abortMeta("rtp timed out");
-            }
+        expireSuppression(mc);
+        if (!isEnabled() || !sequence.running()) return;
+        if (mc.getConnection() != connection || mc.level != level || mc.player != player
+            || mc.player == null || mc.player.isDeadOrDying()) {
+            finish(false, "world, player or connection changed");
             return;
         }
+        long now = nowMs();
+        if (overflowScope != null && overflowScope == feedbackScope) {
+            finish(false, "too much pending server feedback");
+            return;
+        }
+        for (int i = 0; i < 32; i++) {
+            Feedback event = feedback.poll();
+            if (event == null) break;
+            if (event.scope() != feedbackScope) continue;
+            if (event.teleport()) sequence.onServerTeleport();
+            else sequence.onChatMessage(event.line(), now);
+            syncFeedbackScope();
+        }
 
-        if (++metaTicks < metaDelayTicks.get()) return;
-        metaTicks = 0;
-        String setCmd = buildCommand(setCommand.get(), slot.get());
-        switch (metaStep) {
-            case SETHOME_1 -> { sendCommand(mc, setCmd); metaStep = MetaStep.SETHOME_2; }
-            // ponytail: double-sethome mirrors Anubis HomeMeta (some servers eat the first under lag)
-            case SETHOME_2 -> { sendCommand(mc, setCmd); metaStep = MetaStep.RTP; }
-            case RTP -> {
-                sendCommand(mc, buildCommand(metaRtpCommand.get(), slot.get()));
-                metaRtpSentAt = System.currentTimeMillis();
-                metaStep = MetaStep.WAIT_TELEPORT;
-            }
-            case HOME_BACK -> {
-                sendCommand(mc, "home " + slot.get());
-                AutismClientMessaging.sendPrefixed("§a[Home Meta] Done - heading home.");
-                finishMeta();
-            }
-            default -> { }
+        Vec3 position = mc.player.position();
+        String command = sequence.nextCommand(now,
+            rtpPosition == null ? Double.NaN : position.distanceToSqr(rtpPosition),
+            homePosition == null ? Double.NaN : position.distanceToSqr(homePosition));
+        syncFeedbackScope();
+        if (sequence.step() == HomeMetaSequence.Step.FAILED) {
+            finish(false, sequence.failure());
+            return;
+        }
+        if (sequence.step() == HomeMetaSequence.Step.COMPLETE) {
+            finish(true, "return-home teleport confirmed");
+            return;
+        }
+        if (command == null || ActionPacer.holding() || !ActionPacer.tryAction()) return;
+
+        HomeMetaSequence.Step sentStep = sequence.step();
+        if (sentStep == HomeMetaSequence.Step.SET) homePosition = position;
+        if (sentStep == HomeMetaSequence.Step.RTP) rtpPosition = position;
+        sequence.commandSent(now);
+        syncFeedbackScope();
+        if (silent.get()) armSuppression(connection);
+        try {
+            connection.sendCommand(command);
+        } catch (RuntimeException failure) {
+            LOGGER.log(System.Logger.Level.WARNING, "Home Setter command failed at " + sentStep, failure);
+            finish(false, "command send failed (not retried)");
+            return;
+        }
+        if (sequence.step() == HomeMetaSequence.Step.COMPLETE) finish(true, "home " + homeSlot + " set command sent");
+    }
+
+    private void enqueue(String line, boolean teleport) {
+        FeedbackScope scope = feedbackScope;
+        if (scope != null && !feedback.offer(new Feedback(scope, line, teleport))) overflowScope = scope;
+    }
+
+    private void syncFeedbackScope() {
+        FeedbackScope current = feedbackScope;
+        if (current == null || current.step() != sequence.version()) {
+            feedbackScope = new FeedbackScope(generation, sequence.version());
         }
     }
 
-    private void abortMeta(String why) {
-        AutismClientMessaging.sendPrefixed("§c[Home Meta] Aborted: " + why + ".");
-        finishMeta();
-    }
-
-    private void finishMeta() {
-        metaStep = MetaStep.IDLE;
-        running = false;
+    private void finish(boolean success, String detail) {
+        if (!success || !silent.get()) {
+            AutismClientMessaging.sendPrefixed((success ? "§a" : "§c") + "[Home Setter] " + detail + ".");
+        }
+        preserveSuppressionOnDisable = success && silent.get();
         setEnabledSilently(false);
     }
 
-    private static String buildCommand(String template, int slotNumber) {
-        String cmd = template == null || template.isBlank() ? "sethome %slot%" : template.trim();
-        cmd = cmd.replace("%slot%", Integer.toString(slotNumber));
-        return cmd.startsWith("/") ? cmd.substring(1) : cmd;
+    private void stopRun(boolean clearSilentWindow) {
+        generation++;
+        feedbackScope = null;
+        overflowScope = null;
+        feedback.clear();
+        if (active == this) active = null;
+        sequence.cancel();
+        connection = null;
+        level = null;
+        player = null;
+        homePosition = rtpPosition = null;
+        if (clearSilentWindow) clearSuppression();
     }
 
-    private static String[] splitPatterns(String raw) {
-        if (raw == null || raw.isBlank()) return new String[0];
-        String[] parts = raw.toLowerCase(java.util.Locale.ROOT).split(",");
-        java.util.List<String> out = new java.util.ArrayList<>();
-        for (String p : parts) {
-            String t = p.trim();
-            if (!t.isEmpty()) out.add(t);
-        }
-        return out.toArray(new String[0]);
+    private void armSuppression(ClientPacketListener currentConnection) {
+        String raw = silentPatterns.get();
+        suppressPatterns = raw == null ? new String[0] : java.util.Arrays.stream(raw.split(",", 33))
+            .limit(32).map(s -> s.trim().toLowerCase(Locale.ROOT))
+            .filter(s -> !s.isEmpty() && s.length() <= 128).toArray(String[]::new);
+        suppressionConnection = currentConnection;
+        suppressUntilMs = System.currentTimeMillis() + 5_000;
+        suppressor = this;
     }
 
-    /** Fire-and-forget webhook log of the new home position. */
-    private void postWebhook(Minecraft mc, int homeSlot) {
-        String url = webhook.get();
-        if (url == null || url.isBlank() || mc.player == null) return;
-        String content = "Home " + homeSlot + " set at "
-            + mc.player.getBlockX() + " " + mc.player.getBlockY() + " " + mc.player.getBlockZ();
-        String json = "{\"content\":" + com.autism.seedcracker.util.pure.Json.quote(content) + "}";
-        try {
-            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(url.trim()))
-                .timeout(HTTP_TIMEOUT)
-                .header("Content-Type", "application/json")
-                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json))
-                .build();
-            HTTP.sendAsync(req, java.net.http.HttpResponse.BodyHandlers.discarding());
-        } catch (Throwable ignored) {}
+    private void expireSuppression(Minecraft mc) {
+        if (suppressor == this && (System.currentTimeMillis() >= suppressUntilMs
+            || mc.getConnection() != suppressionConnection)) clearSuppression();
     }
 
-    private static void sendCommand(Minecraft mc, String command) {
-        if (command == null || command.isBlank()) return;
-        ClientPacketListener connection = mc.getConnection();
-        if (connection == null) return;
-        try {
-            connection.sendCommand(command);
-        } catch (Throwable t) {
-            try {
-                connection.sendChat("/" + command);
-            } catch (Throwable ignored) {
-            }
-        }
+    private void clearSuppression() {
+        if (suppressor == this) suppressor = null;
+        suppressUntilMs = 0;
+        suppressPatterns = new String[0];
+        suppressionConnection = null;
     }
+
+    private static long nowMs() { return System.nanoTime() / 1_000_000L; }
+
+    @Override
+    public String info() { return sequence.step().name().toLowerCase(Locale.ROOT); }
 }

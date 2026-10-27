@@ -70,7 +70,7 @@ public final class FakeIdentityModule extends Module {
         .description("Play a ding when faking a payment.")
         .group("Fake /pay").visibleWhen(payEnabled::get));
     private final BoolSetting payUpdatesBalance = add(new BoolSetting("pay-balance", "Pay updates balance", true)
-        .description("Deduct the faked amount from the Fake Scoreboard balance (you paid it out).")
+        .description("Deduct the faked amount from the shared Fake Stats balance (you paid it out).")
         .group("Fake /pay").visibleWhen(payEnabled::get));
 
     // --- Fake incoming payments ----------------------------------------------------------------

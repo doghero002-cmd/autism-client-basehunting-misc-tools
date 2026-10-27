@@ -234,18 +234,18 @@ public final class ChatGamesModule extends Module {
         if (ChatLine.isPlayerChat(line, onlineNames(mc))) return;
 
         // Round-end lines first: learn the answer, and cancel any reply we haven't sent yet.
-        String revealed = ChatLine.revealedAnswer(line);
+        var splitReveal = closedRound.takeQuoted(line, System.currentTimeMillis());
+        String revealed = splitReveal == null ? ChatLine.revealedAnswer(line) : splitReveal.answer();
         if (revealed != null || ChatLine.isRoundOver(line)) {
             if (pendingQuestion == null && revealed != null) {
-                var closed = closedRound.take(System.currentTimeMillis());
+                var closed = splitReveal == null ? closedRound.take(System.currentTimeMillis()) : splitReveal.round();
                 if (closed != null && learnTrivia.get()) {
-                    if (closed.canLearn()) solver.learn(closed.question(), revealed);
-                    solver.addWord(revealed);
+                    solver.learnReveal(closed.question(), revealed, closed.canLearn());
                     DebugProbe.trace(id(), "late-reveal", closed.question() + " -> " + revealed);
                     saveTrivia();
                 }
             } else if (pendingQuestion != null && revealed == null) {
-                closedRound.remember(pendingQuestion, pendingCanLearn, System.currentTimeMillis());
+                closedRound.remember(pendingQuestion, pendingCanLearn, System.currentTimeMillis(), ChatLine.isRevealHeader(line));
             } else if (revealed != null) {
                 closedRound.clear();
             }
@@ -282,8 +282,7 @@ public final class ChatGamesModule extends Module {
             }
             if (revealed != null && learnTrivia.get() && pendingQuestion != null
                 && System.currentTimeMillis() - pendingQuestionAt < 5 * 60_000L) {
-                if (pendingCanLearn) solver.learn(pendingQuestion, revealed);
-                solver.addWord(revealed);
+                solver.learnReveal(pendingQuestion, revealed, pendingCanLearn);
                 DebugProbe.trace(id(), pendingCanLearn ? "learned" : "revealed", pendingQuestion + " -> " + revealed);
                 saveTrivia();
             }
@@ -601,6 +600,17 @@ public final class ChatGamesModule extends Module {
         }
         addWorldWords(s, Minecraft.getInstance());
         try {
+            Path learnedWords = dir().resolve("chatgames-learned-words.txt");
+            if (Files.isRegularFile(learnedWords)) {
+                if (Files.size(learnedWords) > 256 * 1024) throw new java.io.IOException("Learned vocabulary exceeds 256 KB");
+                try (var entries = Files.lines(learnedWords, StandardCharsets.UTF_8)) {
+                    entries.limit(2000).forEach(s::addLearnedWord);
+                }
+            }
+        } catch (java.io.IOException invalid) {
+            AutismClientMessaging.sendPrefixed("\u00a7e[ChatGames] Could not load learned vocabulary: " + invalid.getMessage());
+        }
+        try {
             Path f = dir().resolve("chatgames-learned.json");
             if (Files.exists(f)) {
                 Map<String, String> learned = new Gson().fromJson(Files.readString(f, StandardCharsets.UTF_8),
@@ -643,8 +653,26 @@ public final class ChatGamesModule extends Module {
         try {
             Path f = dir().resolve("chatgames-learned.json");
             Files.createDirectories(f.getParent());
-            Files.writeString(f, new Gson().toJson(solver.triviaSnapshot()), StandardCharsets.UTF_8);
-        } catch (Exception ignored) {}
+            saveLearnedFile(f, new Gson().toJson(solver.triviaSnapshot()));
+            saveLearnedFile(dir().resolve("chatgames-learned-words.txt"),
+                String.join("\n", solver.learnedWordsSnapshot().stream().sorted().toList()));
+        } catch (java.io.IOException failure) {
+            AutismClientMessaging.sendPrefixed("\u00a7e[ChatGames] Could not save learning: " + failure.getClass().getSimpleName());
+        }
+    }
+
+    private static void saveLearnedFile(Path destination, String content) throws java.io.IOException {
+        Path temporary = Files.createTempFile(destination.getParent(), "chatgames-learning-", ".tmp");
+        try {
+            Files.writeString(temporary, content, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, destination, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                Files.move(temporary, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 
     @Override

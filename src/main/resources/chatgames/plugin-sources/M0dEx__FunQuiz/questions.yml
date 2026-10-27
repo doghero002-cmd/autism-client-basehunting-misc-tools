@@ -1,0 +1,363 @@
+# 50 Question by FadeKivi
+# From PlayMinecraft.eu
+# You can change "- give EMERALD 1" to any other item. e.x. "- give GOLD_INGOT 1"
+
+questions:
+    q1:
+        question: What is another word for lexicon?
+        hide-answer: false
+        answers:
+            - dictionary
+            - dict
+        rewards:
+            - give EMERALD 1
+    q2:
+        question: What is the name of the seventh planet from the sun?
+        hide-answer: false
+        answers:
+            - Uranus
+        rewards:
+            - give EMERALD 1
+    q3:
+        question: What is the world's longest river?
+        hide-answer: false
+        answers:
+            - Amazon
+        rewards:
+            - give EMERALD 1
+    q4:
+        question: Who founded Mojang?
+        hide-answer: false
+        answers:
+            - Notch
+        rewards:
+            - give EMERALD 1
+    q5:
+        question: Who was the first human in space?
+        hide-answer: false
+        answers:
+            - yuri gagarin
+            - gagarin
+        rewards:
+            - give EMERALD 1
+    q6:
+        question: What is the name of the German airline?
+        hide-answer: false
+        answers:
+            - lufthansa
+        rewards:
+            - give EMERALD 1
+    q7:
+        question: How many stars are on the American flag?
+        hide-answer: false
+        answers:
+            - fifty
+            - 50
+        rewards:
+            - give EMERALD 1
+    q8:
+        question: Who invented Ferrari?
+        hide-answer: false
+        answers:
+            - enzo ferrari
+        rewards:
+            - give EMERALD 1
+    q9:
+        question: In what year did princess diana die?
+        hide-answer: false
+        answers:
+            - 1997
+        rewards:
+            - give EMERALD 1
+    q10:
+        question: Which dog used to be sacred in China?
+        hide-answer: false
+        answers:
+            - pekingese
+        rewards:
+            - give EMERALD 1
+    q11:
+        question: What kind of animal is the largest living creature on Earth?
+        hide-answer: false
+        answers:
+            - whale
+        rewards:
+            - give EMERALD 1
+    q12:
+        question: What do dragonflies prefer to eat?
+        hide-answer: false
+        answers:
+            - mosquitoes
+        rewards:
+            - give EMERALD 1
+    q13:
+        question: Which mammal cannot jump?
+        hide-answer: false
+        answers:
+            - elephant
+        rewards:
+            - give EMERALD 1
+    q14:
+        question: How many oscars did the Titanic movie got?
+        hide-answer: false
+        answers:
+            - eleven
+            - 11
+        rewards:
+            - give EMERALD 1
+    q15:
+        question: What is the house number of the Simpsons?
+        hide-answer: false
+        answers:
+            - 742
+        rewards:
+            - give EMERALD 1
+    q16:
+        question: What is the profession of Popeye?
+        hide-answer: false
+        answers:
+            - seaman
+        rewards:
+            - give EMERALD 1
+    q17:
+        question: What is the name of the prison in the film The Rock?
+        hide-answer: false
+        answers:
+            - alcatraz
+        rewards:
+            - give EMERALD 1
+    q18:
+        question: In which city is the famous Manneken Pis fountain?
+        hide-answer: false
+        answers:
+            - brussels
+        rewards:
+            - give EMERALD 1
+    q19:
+        question: Who did the Mona Lisa paint?
+        hide-answer: false
+        answers:
+            - leonardo da vinci
+            - da vinci
+        rewards:
+            - give EMERALD 1
+    q20:
+        question: In which city did Romeo and Julia live?
+        hide-answer: false
+        answers:
+            - verona
+        rewards:
+            - give EMERALD 1
+    q21:
+        question: Which country is the origin of the cocktail Mojito?
+        hide-answer: false
+        answers:
+            - cuba
+        rewards:
+            - give EMERALD 1
+    q22:
+        question: How many calories does a glass of water contain?
+        hide-answer: false
+        answers:
+            - zero
+            - 0
+        rewards:
+            - give EMERALD 1
+    q23:
+        question: What is called a meal in open air?
+        hide-answer: false
+        answers:
+            - picnic
+        rewards:
+            - give EMERALD 1
+    q24:
+        question: Which country does the Peroni beer come from?
+        hide-answer: false
+        answers:
+            - italy
+        rewards:
+            - give EMERALD 1
+    q25:
+        question: What is Japanese sake made from?
+        hide-answer: false
+        answers:
+            - rice
+        rewards:
+            - give EMERALD 1
+    q26:
+        question: Which device is used to measure the air pressure?
+        hide-answer: false
+        answers:
+            - barometer
+        rewards:
+            - give EMERALD 1
+    q27:
+        question:   Which planet was discovered by Frederik Herschel in 1781?
+        hide-answer: false
+        answers:
+            - uranus
+        rewards:
+            - give EMERALD 1
+    q28:
+        question: Which natural substance is the hardest?
+        hide-answer: false
+        answers:
+            - diamond
+        rewards:
+            - give EMERALD 1
+    q29:
+        question: Which natural substance is the hardest?
+        hide-answer: false
+        answers:
+            - diamond
+        rewards:
+            - give EMERALD 1
+    q30:
+        question: In what year was Google launched on the web?
+        hide-answer: false
+        answers:
+            - 1998
+        rewards:
+            - give EMERALD 1
+    q31:
+        question: In which Nintendo DS game do you have to raise a puppy as well as possible?
+        hide-answer: false
+        answers:
+            - nintendogs
+        rewards:
+            - give EMERALD 1
+    q32:
+        question:   What is the capital of Turkey?
+        hide-answer: false
+        answers:
+            - ankara
+        rewards:
+            - give EMERALD 1
+    q33:
+        question: Which Turkish city has the name of a cartoon character?
+        hide-answer: false
+        answers:
+            - batman
+        rewards:
+            - give EMERALD 1
+    q34:
+        question: How many continents are there?
+        hide-answer: false
+        answers:
+            - seven
+            - 7
+        rewards:
+            - give EMERALD 1
+    q35:
+        question: Which is the largest desert on earth?
+        hide-answer: false
+        answers:
+            - sahara
+        rewards:
+            - give EMERALD 1
+    q36:
+        question: What is the second largest country in Europe after Russia?
+        hide-answer: false
+        answers:
+            - france
+        rewards:
+            - give EMERALD 1
+    q37:
+        question: What is the largest city in Canada?
+        hide-answer: false
+        answers:
+            - toronto
+        rewards:
+            - give EMERALD 1
+    q38:
+        question: What is Elvis Presley s middle name?
+        hide-answer: false
+        answers:
+            - aaron
+        rewards:
+            - give EMERALD 1
+    q39:
+        question: Which country does Celine Dion come from?
+        hide-answer: false
+        answers:
+            - canada
+        rewards:
+            - give EMERALD 1
+    q40:
+        question: What animal has three hearts?
+        hide-answer: false
+        answers:
+            - octopus
+        rewards:
+            - give EMERALD 1
+    q41:
+        question: What color is mollusk blood?
+        hide-answer: false
+        answers:
+            - blue
+        rewards:
+            - give EMERALD 1
+    q42:
+        question: What is the smallest bird?
+        hide-answer: false
+        answers:
+            - colibri
+        rewards:
+            - give EMERALD 1
+    q43:
+        question: What is the largest snake on Earth?
+        hide-answer: false
+        answers:
+            - anaconda
+        rewards:
+            - give EMERALD 1
+    q44:
+        question: What is the national sport in Japan?
+        hide-answer: false
+        answers:
+            - sumo wrestling
+            - sumo
+        rewards:
+            - give EMERALD 1
+    q45:
+        question: In which country were the first Olympic Games held?
+        hide-answer: false
+        answers:
+            - greece
+        rewards:
+            - give EMERALD 1
+    q46:
+        question: Which car won Fernando Alonso his first tittle in Formula 1 with?
+        hide-answer: false
+        answers:
+            - renault
+        rewards:
+            - give EMERALD 1
+    q47:
+        question: Where were the Olympic Games held in 1996?
+        hide-answer: false
+        answers:
+            - atlanta
+        rewards:
+            - give EMERALD 1
+    q48:
+        question: In which sport can you win the Davis Cup?
+        hide-answer: false
+        answers:
+            - tennis
+        rewards:
+            - give EMERALD 1
+    q49:
+        question: What is the largest vegetable?
+        hide-answer: false
+        answers:
+            - pumpkin
+        rewards:
+            - give EMERALD 1
+    q50:
+        question: Which vegetable makes your eyes tear when you peel it?
+        hide-answer: false
+        answers:
+            - onion
+        rewards:
+            - give EMERALD 1

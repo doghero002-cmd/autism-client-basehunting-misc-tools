@@ -116,13 +116,14 @@ public final class ApiFlipSource implements AutoCloseable {
     /** Same shape as {@link GuiListingReader#itemKey}: path id plus sorted "+enchLevel" suffixes. */
     static String itemKey(ApiAuctionItem item) {
         if (item.id().isEmpty()) return null;
-        String id = item.id().get().toLowerCase(Locale.ROOT);
-        StringBuilder sb = new StringBuilder(id.contains(":") ? id.substring(id.indexOf(':') + 1) : id);
+        String id = GuiListingReader.marketBaseKey(item.id().get());
+        if (id == null) return null;
+        StringBuilder sb = new StringBuilder(id);
         if (item.itemData().isPresent()) {
             TreeMap<String, Integer> sorted = new TreeMap<>();
             for (ApiEnchantment e : item.itemData().get().enchantments()) {
                 String eid = e.id().toLowerCase(Locale.ROOT);
-                sorted.put(eid.contains(":") ? eid.substring(eid.indexOf(':') + 1) : eid, e.level());
+                sorted.put(eid.startsWith("minecraft:") ? eid.substring("minecraft:".length()) : eid, e.level());
             }
             sorted.forEach((k, v) -> sb.append('+').append(k).append(v));
         }

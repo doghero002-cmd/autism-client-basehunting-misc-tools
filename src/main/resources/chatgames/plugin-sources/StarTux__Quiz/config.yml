@@ -1,0 +1,50 @@
+interval:
+  Median: 90
+  Variance: 30
+  MinPlayers: 10
+  AnswerTime: 10
+  Seconds: 40
+prizes:
+- Description: 100 Credits
+  Commands: [ 'money grant {player} 100' ]
+  Chance: 3
+- Description: 200 Credits
+  Commands: [ 'money grant {player} 200' ]
+  Chance: 3
+- Description: 300 Credits
+  Commands: [ 'money grant {player} 300' ]
+  Chance: 3
+- Description: 500 Credits
+  Commands: [ 'money grant {player} 500' ]
+  Chance: 3
+- Description: 1000 Credits
+  Commands: [ 'money grant {player} 1000' ]
+  Chance: 2
+- Description: 2 Diamonds
+  Commands: [ 'give {player} diamond 2' ]
+  Chance: 3
+- Description: 4 Diamonds
+  Commands: [ 'give {player} diamond 4' ]
+  Chance: 3
+- Description: 8 Diamonds
+  Commands: [ 'give {player} diamond 8' ]
+  Chance: 2
+- Description: 3 Days of Win+
+  Commands: [ 'perks grant {player} Win+ 3' ]
+- Description: 10 Days of Win+
+  Commands: [ 'perks grant {player} Win+ 10' ]
+- Description: 30 Days of Win+
+  Commands: [ 'perks grant {player} Win+ 30' ]
+questions:
+- Question: Who made Minecraft?
+  Answers: [Notch, Jeb, Dinnerbone, md_5]
+  Correct: 0
+- Question: Who invented the redstone repeater?
+  Answers: [Notch, Jeb, Dinnerbone, md_5]
+  Correct: 1
+- Question: Who made Bukkit?
+  Answers: [Notch, Jeb, Dinnerbone, md_5]
+  Correct: 2
+- Question: Who made Spigot?
+  Answers: [Notch, Jeb, Dinnerbone, md_5]
+  Correct: 3

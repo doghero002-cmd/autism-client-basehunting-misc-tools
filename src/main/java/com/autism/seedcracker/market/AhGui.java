@@ -93,6 +93,25 @@ public final class AhGui {
         return name.contains("auction") || name.equals("ah") || name.startsWith("ah ");
     }
 
+    private static final java.util.regex.Pattern PAGE_SUFFIX = java.util.regex.Pattern.compile(
+        "\\s*(?:[-|:]\\s*)?[\\[(]?\\s*page\\s+(\\d+)(?:\\s*(?:/|of)\\s*\\d+)?\\s*[\\])]?\\s*$");
+
+    /** Keep the search/filter text, but not a trailing page counter, when comparing full passes. */
+    public static String scanKey(String title) {
+        return PAGE_SUFFIX.matcher(label(title).replaceAll("\\s+", " ")).replaceFirst("").trim();
+    }
+
+    /** Zero means no displayed page counter; an unreadable counter cannot prove a first page. */
+    public static int pageNumber(String title) {
+        var match = PAGE_SUFFIX.matcher(label(title));
+        if (!match.find()) return 0;
+        try {
+            return Integer.parseInt(match.group(1));
+        } catch (NumberFormatException invalid) {
+            return Integer.MAX_VALUE;
+        }
+    }
+
     public static boolean isConfirmTitle(String title) {
         String name = label(title);
         return name.contains("confirm") || name.contains("purchase") || name.contains("buy item");

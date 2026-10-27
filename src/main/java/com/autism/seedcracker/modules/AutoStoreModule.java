@@ -12,6 +12,8 @@ import autismclient.api.module.IntSetting;
 import autismclient.api.module.StringListSetting;
 import autismclient.modules.Module;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.Container;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -69,59 +71,57 @@ public final class AutoStoreModule extends Module {
 
         AbstractContainerMenu menu = mc.player.containerMenu;
         if (menu == null || menu instanceof InventoryMenu) return; // no container open
-        if (mc.gui.screen() == null) return; // menu desync guard: only act while the screen is up
+        if (!(mc.gui.screen() instanceof AbstractContainerScreen<?> screen) || screen.getMenu() != menu) return;
 
-        // Count container slots by slot-container IDENTITY (same fix ChestStealer has) - custom
-        // menus break the "last 36 = player inv" assumption.
+        Container inventory = mc.player.getInventory();
         int containerSlots = 0;
-        for (int i = 0; i < menu.slots.size(); i++) {
-            if (menu.slots.get(i).container == mc.player.getInventory()) break;
-            containerSlots++;
-        }
+        for (Slot slot : menu.slots) if (slot.container != inventory) containerSlots++;
         if (containerSlots <= 0) return;
-        if (requireChest.get() && !hasStorageRows(menu, containerSlots)) return;
+        if (requireChest.get() && !hasStorageRows(containerSlots)) return;
 
         Set<Item> filter = cachedFilter();
-
-        // Player inventory slots inside this menu: [containerSlots, containerSlots+27) = main inv,
-        // [containerSlots+27, containerSlots+36) = hotbar.
-        int mainStart = containerSlots;
-        int hotbarStart = containerSlots + 27;
-        int end = keepHotbar.get() ? hotbarStart : containerSlots + 36;
-
-        for (int i = mainStart; i < end; i++) {
-            if (i >= menu.slots.size()) break;
+        boolean blocked = false;
+        for (int i = 0; i < menu.slots.size(); i++) {
             Slot slot = menu.slots.get(i);
-            if (!slot.hasItem()) continue;
+            if (!isDepositSource(slot, inventory, keepHotbar.get()) || !slot.hasItem() || !slot.mayPickup(mc.player)) continue;
             ItemStack stack = slot.getItem();
             if (!matches(stack, filter)) continue;
-            // Container-full failsafe: QUICK_MOVE no-ops into a full container -> infinite clicks.
-            if (!containerHasRoomFor(menu, containerSlots, stack)) {
-                com.autism.seedcracker.compat.ClientNotify.warning("[Auto Store] Container full.");
-                cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get() * 8);
-                return;
+            if (!containerHasRoomFor(menu, inventory, stack)) {
+                blocked = true;
+                continue; // Another matching stack may fit even when this one does not.
             }
 
-            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; } // global budget
+            if (!com.autism.seedcracker.util.ActionPacer.tryAction()) { cooldown = 2; return; }
             ContainerMutex.notifyContainerAction();
             mc.gameMode.handleContainerInput(menu.containerId, i, 0, ContainerInput.QUICK_MOVE, mc.player);
             cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get());
-            return; // one click per cycle
+            return;
+        }
+        if (blocked) {
+            com.autism.seedcracker.compat.ClientNotify.warning("[Auto Store] No room for matching items.");
+            cooldown = com.autism.seedcracker.util.Humanizer.delay(delayTicks.get() * 8);
         }
     }
 
-    /** True if the open container can accept at least part of this stack. */
-    private static boolean containerHasRoomFor(AbstractContainerMenu menu, int containerSlots, ItemStack stack) {
-        for (int i = 0; i < containerSlots; i++) {
-            ItemStack cur = menu.slots.get(i).getItem();
-            if (cur.isEmpty()) return true;
-            if (ItemStack.isSameItemSameComponents(cur, stack) && cur.getCount() < cur.getMaxStackSize()) return true;
+    static boolean isDepositSource(Slot slot, Container inventory, boolean keepHotbar) {
+        int index = slot.getContainerSlot();
+        return slot.container == inventory && index >= (keepHotbar ? 9 : 0) && index < 36;
+    }
+
+    /** Custom menus may interleave player and storage slots, restrict inputs or lower stack limits. */
+    static boolean containerHasRoomFor(AbstractContainerMenu menu, Container inventory, ItemStack stack) {
+        for (Slot slot : menu.slots) {
+            if (slot.container == inventory || !slot.mayPlace(stack)) continue;
+            int limit = Math.min(slot.getMaxStackSize(stack), stack.getMaxStackSize());
+            ItemStack current = slot.getItem();
+            if (limit > 0 && (current.isEmpty()
+                || ItemStack.isSameItemSameComponents(current, stack) && current.getCount() < limit)) return true;
         }
         return false;
     }
 
     /** True when the menu has generic storage rows (chest/barrel/shulker/hopper GUIs). */
-    private boolean hasStorageRows(AbstractContainerMenu menu, int containerSlots) {
+    private static boolean hasStorageRows(int containerSlots) {
         // Generic containers come in multiples of 9 (9/18/27/54) or 5 (hopper). Furnaces (3),
         // enchanting (2) etc. don't.
         return containerSlots % 9 == 0 || containerSlots == 5;

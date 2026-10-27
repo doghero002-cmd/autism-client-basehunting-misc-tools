@@ -1,3 +1,4 @@
+// Region data adapted from cody-raves/Spectre d5a7dd3; GPL-3.0-only. See SPECTRE-NOTICES.txt.
 package com.autism.seedcracker.hud;
 
 import autismclient.api.hud.HudElementProvider;
@@ -7,17 +8,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.BlockPos;
 
-/**
- * Region Map HUD.
- *
- * DonutSMP server-region overlay coloured by cluster, ported from the CodeEngine "RegionMap"
- * module (dev.nyx.module.modules.donutsmp.RegionMap) to the AUTISM screen-space HUD renderer.
- *
- * Uses CodeEngine's real region grid: a 9x9 cell map (byte lookup table mapping each cell to a
- * server cluster), the same cell-index math ({@link #cellIndexOf}), the same cluster-lookup
- * fallback, the six server clusters with their real colours, a header showing the player's cell,
- * and a highlight on the cell the player is currently in.
- */
+/** Spectre's Donut region layout, shared by the module and the legacy HUD adapter. */
 public final class RegionMapHud implements HudElementProvider {
     private static final int PAD = 3;
     private static final int GAP = 1;
@@ -27,27 +18,11 @@ public final class RegionMapHud implements HudElementProvider {
     private static final int CELL = 18;                  // px per cell
     private static final int REGION_CELL_BLOCKS = 50000; // blocks per region cell
 
-    /**
-     * CodeEngine region byte-map: 81 entries (9x9, row-major), each an index into the cluster
-     * values() array. Index 5 = "ocean / unclaimed" filler in the source.
-     */
-    private static final byte[] GRID_MAP = {
-        3, 3, 3, 2, 2, 2, 2, 2, 5,
-        3, 3, 3, 2, 2, 2, 2, 2, 5,
-        3, 3, 3, 2, 2, 2, 2, 2, 5,
-        5, 5, 3, 2, 2, 2, 2, 2, 4,
-        4, 4, 4, 2, 2, 2, 2, 2, 4,
-        1, 1, 0, 0, 0, 0, 0, 2, 4,
-        1, 1, 0, 0, 0, 0, 0, 2, 0,
-        1, 0, 0, 0, 0, 0, 0, 0, 0,
-        1, 1, 1, 1, 1, 1, 0, 0, 0
-    };
-
-    /** Server clusters (CodeEngine values() order + labels). Colours chosen to match the source. */
+    /** Spectre's cluster order, with ABGR colours converted to Minecraft ARGB. */
     public enum Cluster {
         EU_CENTRAL("EU Central", 0xFF9FCE63),
         EU_WEST("EU West", 0xFF00A663),
-        NA_EAST("NA East", 0xFF4FADE6),
+        NA_EAST("NA East", 0xFF4FADEA),
         NA_WEST("NA West", 0xFF2F6EBA),
         ASIA("Asia", 0xFFF5C242),
         OCEANIA("Oceania", 0xFFFC8803),
@@ -58,21 +33,17 @@ public final class RegionMapHud implements HudElementProvider {
         Cluster(String label, int argb) { this.label = label; this.argb = argb; }
     }
 
-    /**
-     * Water Client region layout: [regionId, clusterIndex] per cell (row-major, 9x9). The
-     * regionId is the real DonutSMP region number shown in each cell; clusterIndex maps to the
-     * Cluster enum order (EU Central, EU West, NA East, NA West, Asia, Oceania).
-     */
+    // Spectre DonutRegionMapData: [region ID, cluster index], row-major.
     private static final int[][] REGION_LAYOUT = {
-        {82, 4}, {100, 2}, {101, 2}, {102, 2}, {103, 1}, {104, 1}, {105, 1}, {106, 1}, {91, 1},
-        {83, 4}, {44, 2}, {75, 2}, {42, 2}, {41, 1}, {40, 1}, {39, 1}, {38, 1}, {92, 1},
-        {84, 4}, {45, 2}, {14, 2}, {13, 2}, {12, 1}, {11, 1}, {10, 1}, {37, 1}, {93, 1},
-        {85, 4}, {46, 4}, {74, 4}, {3, 2}, {2, 1}, {1, 1}, {25, 1}, {36, 1}, {94, 1},
-        {86, 3}, {47, 3}, {72, 3}, {71, 3}, {5, 1}, {4, 1}, {24, 1}, {35, 1}, {95, 1},
-        {87, 3}, {51, 0}, {17, 0}, {9, 5}, {8, 5}, {7, 5}, {23, 5}, {34, 5}, {96, 1},
-        {88, 3}, {54, 0}, {18, 0}, {61, 5}, {62, 5}, {21, 5}, {22, 5}, {33, 5}, {97, 5},
-        {89, 5}, {26, 0}, {27, 5}, {28, 5}, {29, 5}, {30, 5}, {59, 5}, {32, 5}, {98, 5},
-        {90, 5}, {107, 0}, {108, 0}, {109, 0}, {110, 0}, {111, 0}, {112, 0}, {113, 0}, {99, 5}
+        {82, 5}, {100, 3}, {101, 3}, {102, 3}, {103, 2}, {104, 2}, {105, 2}, {106, 2}, {91, 2},
+        {83, 5}, {44, 3}, {75, 3}, {42, 3}, {41, 2}, {40, 2}, {39, 2}, {38, 2}, {92, 2},
+        {84, 5}, {45, 3}, {14, 3}, {13, 3}, {12, 2}, {11, 2}, {10, 2}, {37, 2}, {93, 2},
+        {85, 5}, {46, 5}, {74, 5}, {3, 3}, {2, 2}, {1, 2}, {25, 2}, {36, 2}, {94, 2},
+        {86, 4}, {47, 4}, {72, 4}, {71, 4}, {5, 2}, {4, 2}, {24, 2}, {35, 2}, {95, 2},
+        {87, 4}, {51, 1}, {17, 1}, {9, 0}, {8, 0}, {7, 0}, {23, 0}, {34, 0}, {96, 2},
+        {88, 4}, {54, 1}, {18, 1}, {61, 0}, {62, 0}, {21, 0}, {22, 0}, {33, 0}, {97, 0},
+        {89, 0}, {26, 1}, {27, 0}, {28, 0}, {29, 0}, {30, 0}, {59, 0}, {32, 0}, {98, 0},
+        {90, 0}, {107, 1}, {108, 1}, {109, 1}, {110, 1}, {111, 1}, {112, 1}, {113, 1}, {99, 0}
     };
 
     /** Cluster-index -> Cluster, matching REGION_LAYOUT's clusterIndex (0-based into the 6 real clusters). */
@@ -86,13 +57,45 @@ public final class RegionMapHud implements HudElementProvider {
         return REGION_LAYOUT[cell - 1][0];
     }
 
-    /** The cluster for a 1-based cell from the water region layout (NONE for index 5 filler). */
     public static Cluster layoutClusterOf(int cell) {
         if (cell < 1 || cell > REGION_LAYOUT.length) return Cluster.NONE;
-        int idx = REGION_LAYOUT[cell - 1][1];
-        if (idx < 0 || idx >= LAYOUT_CLUSTERS.length) return Cluster.NONE;
-        // Water layout uses index 5 as "Oceania" for its map; index 5 cells are still coloured.
-        return LAYOUT_CLUSTERS[idx];
+        return LAYOUT_CLUSTERS[REGION_LAYOUT[cell - 1][1]];
+    }
+
+    public static int cellAt(double worldX, double worldZ, int cellBlocks) {
+        if (!Double.isFinite(worldX) || !Double.isFinite(worldZ) || cellBlocks < 1) return -1;
+        double half = GRID * (double) cellBlocks / 2;
+        int col = (int) Math.floor((worldX + half) / cellBlocks);
+        int row = (int) Math.floor((worldZ + half) / cellBlocks);
+        return col >= 0 && row >= 0 && col < GRID && row < GRID ? row * GRID + col + 1 : -1;
+    }
+
+    public static int effectiveGap(int size, int gap) {
+        return Math.max(0, Math.min(gap, (size - GRID) / (GRID - 1)));
+    }
+
+    public static double cellStart(int cell, int size, int gap) {
+        gap = effectiveGap(size, gap);
+        return cell * ((size - (GRID - 1) * gap) / (double) GRID + gap);
+    }
+
+    public static double cellWidth(int size, int gap) {
+        return (size - (GRID - 1) * effectiveGap(size, gap)) / (double) GRID;
+    }
+
+    public static double mapPixel(double fraction, int size, int gap) {
+        if (!Double.isFinite(fraction) || fraction < 0 || fraction >= 1) return Double.NaN;
+        double cell = fraction * GRID;
+        int index = (int) Math.floor(cell);
+        return cellStart(index, size, gap) + (cell - index) * cellWidth(size, gap);
+    }
+
+    public static double mapFraction(double pixel, int size, int gap) {
+        if (!Double.isFinite(pixel) || pixel < 0 || pixel >= size) return Double.NaN;
+        double width = cellWidth(size, gap);
+        int cell = (int) Math.floor(pixel / (width + effectiveGap(size, gap)));
+        double inside = pixel - cellStart(cell, size, gap);
+        return inside < width ? (cell + inside / width) / GRID : Double.NaN;
     }
 
     /**
@@ -102,12 +105,9 @@ public final class RegionMapHud implements HudElementProvider {
      */
     public static double[] cellPositionOf(double worldX, double worldZ, int cellBlocks) {
         double offset = ((long) 9 * cellBlocks) / 2.0;
-        double cx = ((worldX + offset) % cellBlocks) / cellBlocks;
-        double cz = ((worldZ + offset) % cellBlocks) / cellBlocks;
-        return new double[] {
-            Math.max(0.0, Math.min(1.0, cx)),
-            Math.max(0.0, Math.min(1.0, cz))
-        };
+        double cx = (worldX + offset) / cellBlocks;
+        double cz = (worldZ + offset) / cellBlocks;
+        return new double[] {cx - Math.floor(cx), cz - Math.floor(cz)};
     }
 
     /** CodeEngine's cluster fallback array (regionMapServerClusterArray). */
@@ -145,12 +145,7 @@ public final class RegionMapHud implements HudElementProvider {
         if (cell < 1 || grid < 1) return Cluster.NA_EAST;
         int max = grid * grid;
         if (cell > max) cell = max;
-        if (grid == GRID && cell <= GRID_MAP.length) {
-            int idx = GRID_MAP[cell - 1] & 0xFF;
-            Cluster[] vals = Cluster.values();
-            if (idx < vals.length - 1) return vals[idx]; // exclude NONE
-            return Cluster.NONE;
-        }
+        if (grid == GRID) return layoutClusterOf(cell);
         int col = (cell - 1) % grid;
         int row = (cell - 1) / grid;
         int fx = Math.min(2, col * 3 / Math.max(1, grid));

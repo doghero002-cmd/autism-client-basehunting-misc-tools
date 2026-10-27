@@ -40,17 +40,33 @@ public final class GuiListingReader {
     public static String itemKey(ItemStack stack) {
         Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (id == null) return null;
-        StringBuilder sb = new StringBuilder(id.getPath());
+        String base = marketBaseKey(id.toString());
+        if (base == null) return null;
+        StringBuilder sb = new StringBuilder(base);
         ItemEnchantments ench = stack.get(DataComponents.STORED_ENCHANTMENTS);
         if (ench == null || ench.isEmpty()) ench = stack.get(DataComponents.ENCHANTMENTS);
         if (ench != null && !ench.isEmpty()) {
             java.util.TreeMap<String, Integer> sorted = new java.util.TreeMap<>();
             for (var e : ench.entrySet()) {
-                sorted.put(e.getKey().unwrapKey().map(k -> k.identifier().getPath()).orElse("?"), e.getIntValue());
+                sorted.put(e.getKey().unwrapKey().map(k -> {
+                    String name = k.identifier().toString();
+                    return name.startsWith("minecraft:") ? name.substring("minecraft:".length()) : name;
+                }).orElse("?"), e.getIntValue());
             }
             sorted.forEach((k, v) -> sb.append('+').append(k).append(v));
         }
         return sb.toString();
+    }
+
+    static String marketBaseKey(String raw) {
+        if (raw == null) return null;
+        String id = raw.toLowerCase(Locale.ROOT);
+        if (!id.matches("(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+")) return null;
+        String path = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
+        if (java.util.Set.of("spawner", "trial_spawner", "vault", "potion", "splash_potion", "lingering_potion",
+                "tipped_arrow", "player_head", "player_wall_head", "bundle", "suspicious_stew", "firework_rocket", "firework_star").contains(path)
+            || path.endsWith("shulker_box") || path.endsWith("_bundle")) return null;
+        return id.startsWith("minecraft:") ? path : id;
     }
 
     static String seller(ItemStack stack) {
@@ -58,7 +74,7 @@ public final class GuiListingReader {
             var lore = stack.get(DataComponents.LORE);
             if (lore == null) return "?";
             for (var c : lore.lines()) {
-                Matcher m = SELLER.matcher(c.getString());
+                Matcher m = SELLER.matcher(net.minecraft.ChatFormatting.stripFormatting(c.getString()));
                 if (m.find()) return m.group(1).toLowerCase(Locale.ROOT);
             }
         } catch (Throwable ignored) {}

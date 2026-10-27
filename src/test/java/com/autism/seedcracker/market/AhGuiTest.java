@@ -50,6 +50,20 @@ class AhGuiTest {
     }
 
     @Test
+    void scanIdentityIgnoresOnlyPageSuffixesNotSearchOrSortTerms() {
+        assertEquals("auction house", AhGui.scanKey("§6Auction House - Page 1"));
+        assertEquals("auction house - elytra", AhGui.scanKey("Auction House - Elytra (Page 2 of 7)"));
+        assertEquals(AhGui.scanKey("Auction House [Page 1/2]"), AhGui.scanKey("Auction House [Page 2/2]"));
+        assertEquals("", AhGui.scanKey(null));
+        assertEquals(0, AhGui.pageNumber("Auction House"));
+        assertEquals(1, AhGui.pageNumber("§6Auction House [Page 1/2]"));
+        assertEquals(2, AhGui.pageNumber("Auction House - Page 2 of 4"));
+        assertTrue(AhGui.pageNumber("Auction House - Page 99999999999999999999") > 1);
+        assertNotEquals(AhGui.scanKey("Auction House - Diamond"), AhGui.scanKey("Auction House - Elytra"));
+        assertNotEquals(AhGui.scanKey("Auction House - Lowest price"), AhGui.scanKey("Auction House - Recent"));
+    }
+
+    @Test
     void confirmationUsesContainerSlotsNotTheCombinedInventorySize() {
         assertTrue(AhGui.isConfirmDialog(9, "Confirm Purchase"));
         assertTrue(AhGui.isConfirmDialog(27, "Confirm Purchase")); // 27 + 36 inventory slots = 63.

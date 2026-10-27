@@ -42,6 +42,20 @@ public abstract class ClientLevelMixin extends Level {
         }
     }
 
+    @Inject(method = "sendBlockUpdated", at = @At("TAIL"))
+    private void spectre$updateQuantumBaseline(BlockPos pos, BlockState oldState, BlockState newState, int flags, CallbackInfo ci) {
+        if ((Object) this != net.minecraft.client.Minecraft.getInstance().level) return;
+        var module = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":quantum");
+        if (module instanceof com.autism.seedcracker.modules.QuantumModule quantum && quantum.isEnabled()) {
+            try { quantum.onBlockUpdate(pos, newState); }
+            catch (RuntimeException error) {
+                try { quantum.setEnabled(false); }
+                catch (RuntimeException cleanup) { error.addSuppressed(cleanup); }
+                org.slf4j.LoggerFactory.getLogger("DogsTools/Spectre").warn("Quantum block update failed", error);
+            }
+        }
+    }
+
     @Inject(method = "getUncachedNoiseBiome", at = @At("HEAD"), cancellable = true)
     private void getGeneratorStoredBiome(int x, int y, int z, CallbackInfoReturnable<Holder<Biome>> ci) {
         var biome = registryAccess().lookupOrThrow(Registries.BIOME).get(Biomes.THE_VOID);

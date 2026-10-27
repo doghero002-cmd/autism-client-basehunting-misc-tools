@@ -11,7 +11,7 @@ class ApiCompatTest {
             com.autism.seedcracker.modules.SusChunkFinderModule.Mode.CLASSIC,
             com.autism.seedcracker.modules.SusChunkFinderModule.Mode.values(),
             com.autism.seedcracker.modules.SusChunkFinderModule.Mode::toString);
-        assertEquals(2, com.autism.seedcracker.modules.SusChunkFinderModule.Mode.values().length);
+        assertEquals(3, com.autism.seedcracker.modules.SusChunkFinderModule.Mode.values().length);
         for (String retired : new String[]{"GEODE", "DOGS", "BETA", "WATER", "XENON", "TYPES",
             "NEW_CHUNKS", "OLD_CHUNKS", "TUNNEL", "ACTIVITY", "SIGNAL", "FARM"}) {
             assertEquals("Classic", setting.deserialize(retired), retired);

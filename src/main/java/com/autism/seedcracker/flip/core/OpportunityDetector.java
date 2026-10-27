@@ -168,7 +168,7 @@ public final class OpportunityDetector {
         List<String> reasons = List.of(
             String.format(Locale.ROOT, "%.0f%% under the cheapest other ask", (1.0 - candidate.totalPrice() / floor) * 100),
             String.format(Locale.ROOT, "%d other asks, low-third median %.0f", others.size(), reference),
-            "Ask-based only: no sale history yet, alert only");
+            "Ask-based only: insufficient sale history, alert only");
         MarketStats pseudo = new MarketStats(candidate.itemKey(), candidate.bucket(), 0, 0, 0, 0,
             floor, floor, reference, reference, others.get(others.size() - 1), 0, Double.isNaN(spread) ? 0 : spread,
             0, confidence, 0, now);

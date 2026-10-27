@@ -3,11 +3,15 @@ package com.autism.seedcracker.chatgames;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import com.autism.seedcracker.chatgames.ChatGameSolver.Kind;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ChatGameSolverTest {
 
@@ -35,6 +39,104 @@ class ChatGameSolverTest {
             .withStyle(style -> style.withClickEvent(new net.minecraft.network.chat.ClickEvent.OpenUrl(java.net.URI.create("https://example.com"))))));
         assertNull(ChatGameReaction.select(net.minecraft.network.chat.Component.literal("click GO")
             .withStyle(style -> style.withClickEvent(new net.minecraft.network.chat.ClickEvent.RunCommand(first)))));
+    }
+
+    @Test
+    void lifestealRetypeBannerKeepsTheFollowingPromptAndItsExactAnswer() {
+        var round = new ChatLine.Round();
+        assertNull(round.accept("\u203a CHAT GAME \u2039", 1000));
+        assertTrue(round.awaitingPayload(1001));
+        String question = round.accept("The first to type 'Acacia Stairs' wins!", 1001);
+        assertTrue(ChatLine.isGamePrompt(question));
+        assertFalse(ChatLine.isRoundOver(question));
+        var answer = solver.solve(question, true, round.genericPayload());
+        assertNotNull(answer);
+        assertEquals(ChatGameSolver.Kind.TYPE, answer.kind());
+        assertEquals("Acacia Stairs", answer.text());
+        assertNull(solver.solve("CHAT GAME", true));
+        assertTrue(ChatLine.isGenericHeader("CHAT GAME"));
+        var noVocabulary = new ChatGameSolver(List.of());
+        for (String literal : List.of("JlpB0Lr457", "mKA1jBTGY", "5+5", "Reverse", "Unscramble", "Acacia Stairs")) {
+            var copied = noVocabulary.solve("The first to type '" + literal + "' wins!", true);
+            assertNotNull(copied);
+            assertEquals(Kind.TYPE, copied.kind());
+            assertEquals(literal, copied.text());
+        }
+    }
+
+    @Test
+    void lifestealFragmentsAssembleRetypeReverseAndMissingLettersBeforeSolving() {
+        var words = new ChatGameSolver(List.of("mangrove button", "diamond", "diamond axe"));
+        var round = new ChatLine.Round();
+        assertNull(round.accept("\u203a CHAT GAME \u2039", 1000));
+        assertNull(round.accept("The first to fill in '__ng_ov_ _____n'", 1001));
+        assertNull(round.accept("wins!", 1002));
+        assertNull(round.accept("(make sure to only type the missing", 1003));
+        String fill = round.accept("letters)", 1004);
+        assertNotNull(fill);
+        assertEquals("marebutto", words.solve(fill, false).text());
+        assertEquals(Kind.FILL, words.solve(fill, false).kind());
+        assertTrue(words.validatesAiAnswer(fill, "marebutto"));
+        assertFalse(words.validatesAiAnswer(fill, "mangrove button"));
+        assertEquals("diamond axe", words.solve("Fill in: d_am_nd _xe", false).text());
+        assertNull(round.accept("\u203a CHAT GAME \u2039", 2000));
+        assertNull(round.accept("The first to unreverse 'sriatS", 2001));
+        String reverse = round.accept("etalspeeD dehsiloP' back to the right order wins!", 2002);
+        assertEquals("Polished Deepslate Stairs", words.solve(reverse, false).text());
+        assertNull(round.accept("CHAT GAME", 3000));
+        assertNull(round.accept("The first to type 'Smooth Sandstone", 3001));
+        assertEquals("Smooth Sandstone Stairs", words.solve(round.accept("Stairs' wins!", 3002), false).text());
+        assertEquals("5+5", words.solve("The first to type '5+5' wins!", true).text());
+    }
+
+    @Test
+    void fillRevealsGrowWholeWordVocabularyInsteadOfIndexingMissingLetterNoise() {
+        var words = new ChatGameSolver(List.of());
+        String question = "The first to fill in '__ng_ov_ _____n' wins! (make sure to only type the missing letters)";
+        words.learnReveal(question, "marebutto", true);
+        assertEquals(1, words.dictionarySize());
+        assertEquals("mangrove button", words.fill("__ng_ov_ _____n"));
+        assertEquals("marebutto", words.solve(question, false).text());
+        assertEquals("marebutto", words.triviaSnapshot().get(ChatGameSolver.normalizeQuestion(question)));
+        var restored = new ChatGameSolver(List.of());
+        words.learnedWordsSnapshot().forEach(restored::addLearnedWord);
+        assertEquals("mangrove button", restored.fill("__ng_ov_ _____n"));
+        assertFalse(restored.containsWord("marebutto"));
+        words.learnReveal(question, "wrong", true);
+        assertEquals(1, words.dictionarySize());
+        var ambiguous = new ChatGameSolver(List.of("mangrove button", "mangrove mitten"));
+        assertNull(ambiguous.solve(question, false));
+    }
+
+    @Test
+    void quotedSplitRevealRequiresItsOwnRecentAnswerHeaderAndIsConsumedOnce() {
+        var window = new ChatLine.RevealWindow();
+        String header = "Nobody got it in time; the answer was";
+        assertTrue(ChatLine.isRevealHeader(header));
+        assertNull(ChatLine.revealedAnswer(header));
+        window.remember("The first to unreverse 'sriatS etalspeeD dehsiloP' back to the right order wins!", false, 1000, true);
+        var reveal = window.takeQuoted("'Polished Deepslate Stairs'!", 1001);
+        assertNotNull(reveal);
+        assertEquals("Polished Deepslate Stairs", reveal.answer());
+        assertNull(window.takeQuoted("'other'!", 1002));
+        window.remember("Old question", true, 1000, true);
+        assertNull(window.takeQuoted("'old'!", 11001));
+        window.remember("Interrupted question", true, 2000, true);
+        assertNull(window.takeQuoted("Server Store", 2001));
+        assertNull(window.takeQuoted("'unrelated quote'!", 2002));
+        window.remember("Not an answer header", true, 3000);
+        assertNull(window.takeQuoted("'not a reveal'!", 3001));
+    }
+
+    @Test
+    void lifestealTypedWinnerRevealsTheExactTextAndClosesTheRound() {
+        String outcome = "\u265bdoghero9 typed 'Acacia Stairs' in 11.80 seconds! (+2)";
+        assertEquals("Acacia Stairs", ChatLine.revealedAnswer(outcome));
+        assertEquals("doghero9", ChatLine.winner(outcome));
+        assertTrue(ChatLine.isRoundOver(outcome));
+        assertNull(ChatLine.revealedAnswer("The first to type 'Acacia Stairs' wins!"));
+        assertFalse(ChatLine.isRoundOver("The first to type 'Acacia Stairs' wins!"));
+        assertTrue(ChatLine.isPlayerChat("<Someone> doghero9 typed 'fake' in 1 second", List.of("Someone")));
     }
 
     @Test
@@ -75,13 +177,24 @@ class ChatGameSolverTest {
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();
         var words = ChatGameVocabulary.builtInWords();
+        var indexed = new ChatGameSolver(words);
         for (var registry : List.of(net.minecraft.core.registries.BuiltInRegistries.ITEM,
             net.minecraft.core.registries.BuiltInRegistries.BLOCK,
             net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE,
             net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT,
             net.minecraft.core.registries.BuiltInRegistries.POTION,
             net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION)) {
-            for (var key : registry.keySet()) assertTrue(words.contains(key.getPath().replace('_', ' ')), key.toString());
+            for (var key : registry.keySet()) {
+                String name = key.getPath().replace('_', ' ');
+                assertTrue(words.contains(name), key.toString());
+                assertTrue(indexed.containsWord(name), "Collected but not indexed: " + key);
+            }
+        }
+        assertTrue(indexed.containsWord("cherry grove"));
+        assertTrue(indexed.containsWord("wind burst"));
+        assertNotNull(indexed.fill("__ng_ov_ _____n"));
+        for (String alias : List.of("enchantment table", "zombie pigman", "mushroom cow", "ice plains spikes")) {
+            assertTrue(ChatGameVocabulary.defaultExtraWords().contains(alias), alias);
         }
         ChatGameSolver expanded = new ChatGameSolver(words);
         for (String structure : List.of("trail ruins", "ocean ruin warm", "village snowy", "shipwreck beached")) {
@@ -210,15 +323,128 @@ class ChatGameSolverTest {
         assertEquals("glowstone dust", solver.solve("What item do you use in a brewing stand to create a thick potion?", true).text());
         assertEquals("Markus Persson", solver.solve("What is Notch's real name?", true).text());
         assertEquals("Java", solver.solve("Which programming language is Minecraft written in?", true).text());
+        assertEquals("water", solver.solve("What do you need to turn powder to concrete?", true).text());
+        assertEquals("Harming", solver.solve("A splash potion of what will heal a skeleton?", true).text());
+        assertEquals("8", solver.solve("One block in the nether is equal to how many blocks in the overworld?", true).text());
+        assertEquals("World Wide Web", solver.solve("In a website browser address bar, what does 'www' stand for?", true).text());
+        assertEquals("Pickaxe", solver.solve("You use it to mine stone", true).text());
+        assertEquals("F2", solver.solve("What is the default screenshot button.", true).text());
+        assertEquals("86400", solver.solve("How many seconds are there in a day?", true).text());
+        assertEquals("4", solver.solve("What is the maximum vanilla enchantment level for Blast Protection?", true).text());
+        assertEquals("brown mooshroom", solver.solve("Which mob is created when lightning strikes a red mooshroom?", true).text());
+        assertEquals("Wellington", solver.solve("What is the capital of New Zealand?", true).text());
         assertNull(solver.solve("How many neutral mobs exist? (1.15)", true));
         assertNull(solver.solve("How many minecraft editions/games are there?", true));
         assertNotNull(ChatGameAnswerKey.class.getResource("/chatgames/public-plugin-NOTICES.txt"));
     }
 
     @Test
+    void expandedPluginBankPackagesProvenanceLicensesAndOriginalSources() throws Exception {
+        try (var input = ChatGameAnswerKey.class.getResourceAsStream("/chatgames/expanded-plugin-sources.json");
+             var notices = ChatGameAnswerKey.class.getResourceAsStream("/chatgames/expanded-plugin-NOTICES.txt")) {
+            assertNotNull(input);
+            assertNotNull(notices);
+            var manifest = com.google.gson.JsonParser.parseString(
+                new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonArray();
+            String licenseText = new String(notices.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            var repositories = new java.util.HashSet<String>();
+            int pairs = 0;
+            for (var value : manifest) {
+                var source = value.getAsJsonObject();
+                String repository = source.get("repo").getAsString();
+                assertTrue(repositories.add(repository), repository);
+                assertTrue(source.get("commit").getAsString().matches("[0-9a-f]{40}"));
+                assertTrue(java.util.Set.of("MIT", "GPL-2.0", "GPL-3.0", "AGPL-3.0")
+                    .contains(source.get("license").getAsString()));
+                assertTrue(licenseText.contains(repository));
+                try (var original = ChatGameAnswerKey.class.getResourceAsStream(
+                    "/chatgames/" + source.get("sourceResource").getAsString())) {
+                    assertNotNull(original, repository);
+                    assertTrue(original.readAllBytes().length > 0, repository);
+                }
+                for (var entry : source.getAsJsonArray("entries")) {
+                    var pair = entry.getAsJsonObject();
+                    assertEquals(pair.get("answer").getAsString(), ChatGameAnswerKey.defaults()
+                        .get(ChatGameSolver.normalizeQuestion(pair.get("question").getAsString())));
+                    pairs++;
+                }
+            }
+            assertEquals(6, repositories.size());
+            assertEquals(36, pairs);
+        }
+    }
+
+    @Test
+    void fortyDistinctPluginSourcesHaveAttributedSolvableExamples() throws Exception {
+        try (var input = ChatGameAnswerKey.class.getResourceAsStream("/chatgames/plugin-question-sources.json")) {
+            assertNotNull(input);
+            var sources = com.google.gson.JsonParser.parseString(
+                new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonArray();
+            var repositories = new java.util.HashSet<String>();
+            var commits = new java.util.HashSet<String>();
+            int pairs = 0;
+            int generatedMath = 0;
+            int generatedWords = 0;
+            for (var value : sources) {
+                var source = value.getAsJsonObject();
+                String repository = source.get("repo").getAsString();
+                String commit = source.get("commit").getAsString();
+                assertTrue(repositories.add(repository.toLowerCase(java.util.Locale.ROOT)), repository);
+                assertTrue(commit.matches("[0-9a-f]{40}") && commits.add(commit), repository);
+                assertTrue(source.get("url").getAsString().contains(commit));
+                var entries = source.getAsJsonArray("entries");
+                assertFalse(entries.isEmpty(), repository);
+                try (var bankInput = ChatGameAnswerKey.class.getResourceAsStream(
+                    "/chatgames/" + source.get("bankResource").getAsString())) {
+                    assertNotNull(bankInput, repository);
+                    var bank = com.google.gson.JsonParser.parseString(
+                        new String(bankInput.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                    for (var entryValue : entries) {
+                        var entry = entryValue.getAsJsonObject();
+                        String question = entry.get("question").getAsString();
+                        String answer = entry.get("answer").getAsString();
+                        assertEquals(answer, bank.get(question).getAsString(), repository);
+                        assertEquals(answer, ChatGameAnswerKey.defaults().get(ChatGameSolver.normalizeQuestion(question)), repository);
+                        if (source.has("sha256")) {
+                            assertTrue(source.get("sha256").getAsString().matches("[0-9a-f]{64}"));
+                            var solved = solver.solve(question, true);
+                            assertNotNull(solved, question);
+                            assertEquals(answer, solved.text(), question);
+                        }
+                        pairs++;
+                    }
+                }
+                String kind = source.get("kind").getAsString();
+                if (kind.equals("generated-math-example")) {
+                    var parameters = source.getAsJsonObject("inputs");
+                    int left = parameters.get("left").getAsInt();
+                    int right = parameters.get("right").getAsInt();
+                    var bounds = parameters.getAsJsonArray("bounds");
+                    assertTrue(left >= bounds.get(0).getAsInt() && left <= bounds.get(1).getAsInt());
+                    assertTrue(right >= bounds.get(2).getAsInt() && right <= bounds.get(3).getAsInt());
+                    int expected = parameters.get("operator").getAsString().equals("*") ? left * right : left + right;
+                    assertEquals(String.valueOf(expected), entries.get(0).getAsJsonObject().get("answer").getAsString());
+                    generatedMath++;
+                } else if (kind.equals("generated-word-example")) {
+                    var parameters = source.getAsJsonObject("inputs");
+                    assertTrue(java.util.Arrays.equals(
+                        parameters.get("word").getAsString().toLowerCase(java.util.Locale.ROOT).chars().sorted().toArray(),
+                        parameters.get("permutation").getAsString().toLowerCase(java.util.Locale.ROOT).chars().sorted().toArray()));
+                    generatedWords++;
+                }
+            }
+            assertEquals(40, repositories.size());
+            assertEquals(40, commits.size());
+            assertEquals(208, pairs);
+            assertEquals(6, generatedMath);
+            assertEquals(2, generatedWords);
+        }
+    }
+
+    @Test
     void bundledMinecraftBankSolvesEveryEntryAndSupportsOverrides() {
         var defaults = ChatGameAnswerKey.defaults();
-        assertTrue(defaults.size() >= 200);
+        assertEquals(458, defaults.size(), "all curated and attributed plugin questions are loaded without conflicts");
         for (var entry : defaults.entrySet()) {
             var answer = solver.solve("[ChatGames] Trivia: " + entry.getKey(), true);
             assertNotNull(answer, entry.getKey());

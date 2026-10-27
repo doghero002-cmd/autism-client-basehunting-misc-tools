@@ -36,21 +36,25 @@ public final class BaseAlerts {
         if (mc == null || mc.player == null) return;
         double px = mc.player.getX(), pz = mc.player.getZ();
 
-        for (BaseTracker.Fused f : BaseTracker.fusedNearest(px, pz, 8)) {
-            if (f.confidence() < ANNOUNCE_CONFIDENCE) continue;
-            if (!f.sources().contains("+")) continue; // single-finder clusters stay per-module
-            long cell = (((long) Math.floorDiv(f.blockX(), CELL_BLOCKS)) << 32)
-                ^ (Math.floorDiv(f.blockZ(), CELL_BLOCKS) & 0xffffffffL);
-            if (!claim(cell, now)) continue;
-            int dist = (int) Math.sqrt(f.distSq());
-            String msg = "Base candidate (score " + f.confidence() + "/100): " + f.sources()
-                + " agree at X:" + f.blockX() + " Z:" + f.blockZ() + " (" + dist + "m)";
-            mc.execute(() -> {
-                AutismClientMessaging.sendPrefixed("§6§l[Base] §f" + msg);
-                ClientNotify.warning(msg);
-            });
-            return; // one ping per pass
+        BaseTracker.Fused candidate = claimNext(px, pz, now);
+        if (candidate == null) return;
+        int dist = (int) Math.sqrt(candidate.distSq());
+        String msg = "Base candidate (score " + candidate.confidence() + "/100): " + candidate.sources()
+            + " agree at X:" + candidate.blockX() + " Z:" + candidate.blockZ() + " (" + dist + "m)";
+        mc.execute(() -> {
+            AutismClientMessaging.sendPrefixed("§6§l[Base] §f" + msg);
+            ClientNotify.warning(msg);
+        });
+    }
+
+    static BaseTracker.Fused claimNext(double playerX, double playerZ, long now) {
+        for (BaseTracker.Fused candidate : BaseTracker.fusedNearestAt(playerX, playerZ, Integer.MAX_VALUE, now)) {
+            if (candidate.confidence() < ANNOUNCE_CONFIDENCE || !candidate.sources().contains("+")) continue;
+            long cell = (((long) Math.floorDiv(candidate.blockX(), CELL_BLOCKS)) << 32)
+                ^ (Math.floorDiv(candidate.blockZ(), CELL_BLOCKS) & 0xffffffffL);
+            if (claim(cell, now)) return candidate;
         }
+        return null;
     }
 
     static boolean claim(long cell, long now) {

@@ -40,7 +40,44 @@ as does this addon. Historical version answers preserve the upstream version
 family labels, not exact patch versions. Obsolete counts and ambiguous entries
 were omitted. Questions with multiple accepted answers use one accepted answer.
 
-The four question/word sources above are distributed under the MIT License:
+asiddiqi18/Trivia-Plugin (TriviaTreasure)
+Question source: src/main/resources/questions.yml
+Commit: b3a2615c8d397e2c752a377778d156d788ea8948
+https://github.com/asiddiqi18/Trivia-Plugin/blob/b3a2615c8d397e2c752a377778d156d788ea8948/src/main/resources/questions.yml
+Copyright (c) 2020 MarCarrot
+Twenty-one selected Minecraft/general-trivia pairs. One accepted answer is
+selected; typographic apostrophes are normalized to ASCII. Tree-height, spider
+climbing, rarity, exact mining-time, block-feet and unsupported language-count
+claims are excluded, as is the obsolete uncarved-pumpkin wording.
+
+Mythical-Games/ChatGames
+Question/hint source: src/main/java/com/mythicalgames/chatgames/Config.java
+Commit: c39f596f040f0beae3b7031d1275d6e7f8d09269
+https://github.com/Mythical-Games/ChatGames/blob/c39f596f040f0beae3b7031d1275d6e7f8d09269/src/main/java/com/mythicalgames/chatgames/Config.java
+Copyright (c) 2023 AllayMC
+Two trivia pairs and three default hint/answer pairs. The unqualified rarest-ore
+question is excluded. Number/sequence generators are not imported as trivia.
+
+Fendernt/Shiny-Quizes
+Question source: src/main/java/shinyquizesplugin/shinyquizesplugin/Quiz/Questions/CustomQuestions/CustomQuestionsManager.java
+Commit: 8867eb29cf7a53a8325f199c8ce6810a2997101d
+https://github.com/Fendernt/Shiny-Quizes/blob/8867eb29cf7a53a8325f199c8ce6810a2997101d/src/main/java/shinyquizesplugin/shinyquizesplugin/Quiz/Questions/CustomQuestions/CustomQuestionsManager.java
+Copyright (c) 2022 FenderRoy
+Fourteen default pairs; upstream wording/spelling and answer targets are kept.
+Pool-variant, fictional ship-ownership and culinary/botanical ambiguity are
+excluded. These questions assume the plugin's English-language context.
+
+ProjectEdenGG/Nexus
+Question source: src/main/java/gg/projecteden/nexus/features/chat/games/ChatGameType.java
+Commit: 211ba34ede9ab0e65a8de973bddba73dab58a9a1
+https://github.com/ProjectEdenGG/Nexus/blob/211ba34ede9ab0e65a8de973bddba73dab58a9a1/src/main/java/gg/projecteden/nexus/features/chat/games/ChatGameType.java
+Copyright (c) 2021 Project Eden
+Forty selected TriviaQuestion enum entries: 24 Minecraft and 16 geography pairs.
+One accepted answer is selected; numeric helper answers use decimal digits.
+Server-specific trivia/commands, changing counts, unqualified saturation/build
+height claims and disputed geography superlatives are not imported.
+
+The eight question/word sources above are distributed under the MIT License:
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

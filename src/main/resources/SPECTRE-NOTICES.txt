@@ -1,0 +1,29 @@
+Spectre DonutSMP module ports
+
+Source: https://github.com/cody-raves/Spectre
+Revision: d5a7dd3de0be67bea273d4ed74d2c76c11e0f6da
+Retrieved: 2026-10-26
+Upstream license: GPL-3.0-only (SPECTRE-LICENSE.txt).
+GoNuts-derived portions retain their MIT notice (GONUTS-LICENSE.txt).
+The user supplied express permission to port these modules; the published
+upstream licenses and attribution are retained.
+
+The ports adapt Donut and Base Raid modules, their required detection/helpers,
+Spawner Nametags, Fake Stats and Region Map to the native AUTISM addon API.
+No Spectre client framework, branding UI, updater, telemetry, Discord integration,
+or separate Spectre runtime dependency is included. Existing local rendering,
+settings, finder reports and inventory/navigation coordination are reused.
+
+Modifications include native lifecycle and packet handling, client-thread queues,
+bounded caches and scans, cleanup on world changes/disconnect, preserved addon
+identifiers where replacing a module, native GUI/HUD drawing, corrected map
+bounds/projection and integration with the addon's local fake payment balance.
+Fake Stats draws a private scoreboard projection instead of replacing the live
+client scoreboard, so other modules continue reading genuine server values.
+These changes are not an upstream Spectre release or an endorsement by its author.
+
+The combined add-on containing these ports is distributed under GPL-3.0-only.
+The existing project LICENSE remains the Unlicense for its original code;
+other bundled components and dependencies retain their respective notices.
+Source must accompany distribution of the combined binary as required by GPLv3.
+See the repository README for the module replacement map and verification limits.

@@ -5,7 +5,6 @@ import com.autism.seedcracker.commands.BedrockFinderCommand;
 import com.autism.seedcracker.commands.HeatConfirmCommand;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
 import com.autism.seedcracker.hud.BaseTrackerHud;
-import com.autism.seedcracker.hud.FakeScoreboardHud;
 import com.autism.seedcracker.hud.SeedHud;
 import com.autism.seedcracker.hud.SessionStatsHud;
 import com.autism.seedcracker.hud.StashWarningHud;
@@ -111,7 +110,7 @@ public final class SeedcrackerAddon extends AutismAddon {
     @Override
     public void onInitialize() {
         this.name = "Dogs BaseHunting/QQL Tools";
-        this.authors = "KaptainWutax, 19MisterX98";
+        this.authors = "KaptainWutax, 19MisterX98, cody-raves (Spectre)";
         this.color = 0xFF50C878;
 
         // Modules register with NO explicit category TYPE: reg(...) lands each under the addon's
@@ -130,8 +129,14 @@ public final class SeedcrackerAddon extends AutismAddon {
         reg(new DonutRTPStashFinderModule());
         reg(new RelogLoaderModule());
 
-        // Zelith chunk-scanner finder modules (ported). The shared renderer self-registers a
-        // LevelRenderEvents collector that all six feed their flagged chunks into.
+        regTab(new com.autism.seedcracker.modules.AutoRelogModule(), "Donut");
+        regTab(new com.autism.seedcracker.modules.AirStuckModule(), "Donut");
+        regTab(new com.autism.seedcracker.modules.DonutNoFallModule(), "Donut");
+        regTab(new com.autism.seedcracker.modules.SpeedMineModule(), "Donut");
+        regTab(new com.autism.seedcracker.modules.TridentUtilModule(), "Donut");
+        regTab(new com.autism.seedcracker.modules.RiptideModule(), "Donut");
+
+        // Register the shared chunk renderer before finders can be enabled by saved settings.
         ChunkFlagRenderer.init();
         regTab(new com.autism.seedcracker.modules.NetheriteFinderModule(), "Finders");
         regTab(new StashFinderModule(), "Finders");
@@ -144,6 +149,8 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new com.autism.seedcracker.modules.AiRemoteControlModule(), "Automation");
         regTab(new com.autism.seedcracker.modules.PlayerChunksModule(), "Finders");
         regTab(new com.autism.seedcracker.modules.LightSourceFinderModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.QuantumModule(), "Finders");
+        regTab(new com.autism.seedcracker.modules.RenderUtilModule(), "Finder Tools");
         regTab(new PrimeChunkFinderModule(), "Finders");
         regTab(new ActivityFinderModule(), "Finders");
         regTab(new GrowthFinderModule(), "Finders");
@@ -176,6 +183,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new ScoreboardHiderModule(), "Render");
         regTab(new com.autism.seedcracker.modules.StorageRecorderModule(), "Render");
         regTab(new com.autism.seedcracker.modules.FakeIdentityModule(), "Fake");
+        regTab(new com.autism.seedcracker.modules.FakeStatsModule(), "Fake");
 
         // Trading.
         regTab(new AHFlipperModule(), "Trading");
@@ -219,6 +227,7 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new FlagDetectorModule(), safety);
         regTab(new com.autism.seedcracker.modules.AntiCheatGuesserModule(), safety);
         regTab(new com.autism.seedcracker.modules.MacroProtectorModule(), safety);
+        regTab(new com.autism.seedcracker.modules.StaffListModule(), safety);
         regTab(new com.autism.seedcracker.modules.SpectatorDetectorModule(), safety);
         regTab(new TabDetectorModule(), safety);
         regTab(new com.autism.seedcracker.modules.SessionGuardModule(), safety);
@@ -232,6 +241,8 @@ public final class SeedcrackerAddon extends AutismAddon {
         regTab(new HoleTunnelStairsEspModule(), esp);
         regTab(new AmethystEspModule(), esp);
         regTab(new BedrockHoleEspModule(), esp);
+        regTab(new com.autism.seedcracker.modules.BlockEntityDebugModule(), esp);
+        regTab(new com.autism.seedcracker.modules.SpawnerNametagsModule(), esp);
 
         // Small quality-of-life helpers.
         String utility = "Utility";
@@ -272,12 +283,15 @@ public final class SeedcrackerAddon extends AutismAddon {
         AutismAddons.hud().register(new SeedHud());
         AutismAddons.hud().register(new StashWarningHud());
         AutismAddons.hud().register(new SessionStatsHud());
-        AutismAddons.hud().register(new FakeScoreboardHud());
         AutismAddons.hud().register(new BaseTrackerHud());
+        AutismAddons.hud().register(new com.autism.seedcracker.spectre.staff.StaffHud());
+        AutismAddons.hud().register(new com.autism.seedcracker.spectre.staff.StaffGhost());
 
         // Local QA bridge (127.0.0.1 only): lets an external driver run commands and read state without
         // window focus. No-op if the port is taken.
         com.autism.seedcracker.bridge.GameBridge.start();
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
+            client -> com.autism.seedcracker.bridge.GameBridge.stop());
         AutismAddons.events().onGameLeft(com.autism.seedcracker.bridge.ScoutControl::disable);
 
         // AI subsystem bridge (API v4+ AI-update client): reflective so it compiles and loads whether or

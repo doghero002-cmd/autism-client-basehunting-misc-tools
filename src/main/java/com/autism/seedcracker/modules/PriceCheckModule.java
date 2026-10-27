@@ -22,8 +22,8 @@ import net.minecraft.world.item.ItemStack;
  * market database; listings far under the recent median get highlighted in chat as deals.
  * The .price command charts any item's history and stats.
  *
- * Passive by design: no clicks, no commands, no packets - it just reads what the server already
- * sent you, so there is nothing for an anticheat to flag.
+ * Passive by default. Optional auto-scanning turns pages, and TRACK_ITEM can reopen /ah on the
+ * configured idle timer; neither mode buys listings.
  */
 public final class PriceCheckModule extends Module {
 
@@ -40,9 +40,9 @@ public final class PriceCheckModule extends Module {
 
     private final autismclient.api.module.EnumSetting<ScanMode> scanMode = add(new autismclient.api.module.EnumSetting<>(
             "scan-mode", "Auto scan", ScanMode.OFF, ScanMode.values())
-        .description("OFF = record only what you browse. TRACK_ITEM = open /ah <item> yourself, then it pages through for you. "
-            + "LOWEST_PRICE = open /ah sorted by lowest price, then it pages through. It never opens /ah by itself and stops "
-            + "if you move or close the screen.")
+        .description("OFF = record only what you browse. TRACK_ITEM = page through the tracked item; reopens /ah while idle only "
+            + "when Re-scan every is above zero. LOWEST_PRICE = open /ah sorted by lowest price yourself. "
+            + "Paging stops on movement, the page limit or the last page, until /ah is reopened.")
         .group("Auto Scan"));
     private final autismclient.api.module.StringSetting trackItem = add(new autismclient.api.module.StringSetting(
             "track-item", "Tracked item", "")
@@ -72,27 +72,41 @@ public final class PriceCheckModule extends Module {
 
     @Override
     public void onEnable() {
+        resetSession();
         PriceTracker.load();
-        seenThisScreen.clear();
-        lastContainerId = -1;
     }
 
     @Override
     public void onDisable() {
+        resetSession();
         PriceTracker.save(true);
     }
 
     @Override
     public void onGameLeft() {
+        resetSession();
         PriceTracker.save(true);
         if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+
+    private void resetSession() {
+        seenThisScreen.clear();
+        lastContainerId = -1;
+        scan.reset();
+        scanCooldown = 0;
+        lastAlertAt = 0;
+        idleSince = -1;
+        idlePos = null;
+        nextReopenAt = 0;
+        unparsedPages = 0;
+        formatWarned = false;
     }
 
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || com.autism.seedcracker.market.AhGui.purchasing()) return;
-        if (pageCooldown > 0) pageCooldown--;
+        if (scan.cooldown > 0) scan.cooldown--;
         if (scanCooldown > 0) { scanCooldown--; return; }
         scanCooldown = 10; // scan twice a second; listings don't change faster
 
@@ -100,19 +114,20 @@ public final class PriceCheckModule extends Module {
         if (menu == null || menu instanceof InventoryMenu) {
             seenThisScreen.clear();
             lastContainerId = -1;
-            resetScan();
+            scan.reset();
             tickAutoReopen(mc);
             return;
         }
         idleSince = -1;
+        boolean auctionPage = com.autism.seedcracker.market.AhGui.isAuctionPage(mc, menu);
         if (menu.containerId != lastContainerId) {
             seenThisScreen.clear();
             lastContainerId = menu.containerId;
-            resetScan(); // a freshly opened /ah starts a new scan
+            scan.menuChanged(auctionPage);
         }
 
         int containerSlots = com.autism.seedcracker.market.AhGui.containerSlots(mc, menu);
-        if (!com.autism.seedcracker.market.AhGui.isAuctionPage(mc, menu)) return;
+        if (!auctionPage) return;
 
         String trackOnly = scanMode.get() == ScanMode.TRACK_ITEM && !trackItem.get().isBlank()
             ? PriceTracker.normalize(trackItem.get()) : null;
@@ -139,7 +154,7 @@ public final class PriceCheckModule extends Module {
 
             if (dealAlerts.get()) maybeAlert(itemId, stack, price);
         }
-        if (recordedThisPass > 0) pageHadData = true;
+        if (recordedThisPass > 0) scan.hadData = true;
         tickAutoPage(mc, menu, containerSlots);
 
         // Fail loud: a full AH page where nothing parses means the server changed its listing
@@ -162,10 +177,53 @@ public final class PriceCheckModule extends Module {
     private boolean formatWarned = false;
 
     // ---- auto paging ----
-    private int pageCooldown = 0;
-    private int pagesTurned = 0;
-    private boolean pageHadData = false;
-    private net.minecraft.world.phys.Vec3 scanStartPos = null;
+    private final Scan scan = new Scan();
+
+    static final class Scan {
+        int cooldown;
+        int turns;
+        boolean hadData;
+        boolean stopped;
+        boolean awaitingPage;
+        net.minecraft.world.phys.Vec3 start;
+
+        boolean begin(net.minecraft.world.phys.Vec3 position) {
+            if (stopped) return false;
+            if (start == null) {
+                start = position;
+                turns = 0;
+            }
+            return true;
+        }
+
+        void advance(int delay) {
+            turns++;
+            hadData = false;
+            cooldown = delay;
+            awaitingPage = true;
+        }
+
+        void menuChanged(boolean auctionPage) {
+            // Some servers open a new menu for each page; that is not a fresh scan budget.
+            if (!awaitingPage || !auctionPage) reset();
+            awaitingPage = false;
+        }
+
+        void stop() {
+            stopped = true;
+            start = null;
+            hadData = false;
+        }
+
+        void reset() {
+            start = null;
+            turns = 0;
+            hadData = false;
+            cooldown = 0;
+            stopped = false;
+            awaitingPage = false;
+        }
+    }
 
     /**
      * Turns to the next AH page once the current page has been recorded. Only opens /ah itself via
@@ -174,20 +232,17 @@ public final class PriceCheckModule extends Module {
      */
     private void tickAutoPage(Minecraft mc, AbstractContainerMenu menu, int containerSlots) {
         if (scanMode.get() == ScanMode.OFF || mc.gameMode == null) return;
-        if (scanStartPos == null) {
-            scanStartPos = mc.player.position();
-            pagesTurned = 0;
-        }
+        if (!scan.begin(mc.player.position())) return;
         // Moving = the player wants control back.
-        if (mc.player.position().distanceToSqr(scanStartPos) > 0.25) {
+        if (mc.player.position().distanceToSqr(scan.start) > 0.25) {
             stopScan("you moved");
             return;
         }
-        if (pagesTurned >= maxPages.get()) {
-            stopScan("scanned " + pagesTurned + " pages");
+        if (scan.turns >= maxPages.get()) {
+            stopScan("scanned " + scan.turns + " pages");
             return;
         }
-        if (pageCooldown > 0 || !pageHadData || com.autism.seedcracker.market.AhGui.pagedWithin(1000)) return;
+        if (scan.cooldown > 0 || !scan.hadData || com.autism.seedcracker.market.AhGui.pagedWithin(1000)) return;
 
         int next = com.autism.seedcracker.market.AhGui.findNextPageSlot(menu, containerSlots);
         if (next < 0) {
@@ -199,16 +254,7 @@ public final class PriceCheckModule extends Module {
         mc.gameMode.handleContainerInput(menu.containerId, next, 0,
             net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
         com.autism.seedcracker.market.AhGui.notePageTurn();
-        pagesTurned++;
-        pageHadData = false;
-        pageCooldown = com.autism.seedcracker.util.Humanizer.delay(pageDelay.get());
-    }
-
-    private void resetScan() {
-        scanStartPos = null;
-        pagesTurned = 0;
-        pageHadData = false;
-        pageCooldown = 0;
+        scan.advance(com.autism.seedcracker.util.Humanizer.delay(pageDelay.get()));
     }
 
     // ---- periodic re-open (TRACK_ITEM only) ----
@@ -238,12 +284,11 @@ public final class PriceCheckModule extends Module {
     }
 
     private void stopScan(String why) {
-        if (scanStartPos != null && pagesTurned > 0) {
+        if (scan.start != null && scan.turns > 0) {
             com.autism.seedcracker.compat.ClientNotify.success("[Price Check] Auto scan stopped: " + why
-                + " (" + pagesTurned + " pages). Open .price to see the charts.");
+                + " (" + scan.turns + " pages). Open .price to see the charts.");
         }
-        scanStartPos = null;
-        pagesTurned = Integer.MAX_VALUE / 2; // stay stopped until the screen is reopened
+        scan.stop();
     }
 
     private void maybeAlert(String itemId, ItemStack stack, double totalPrice) {
@@ -270,8 +315,8 @@ public final class PriceCheckModule extends Module {
 
     @Override
     public String info() {
-        if (scanStartPos != null && pagesTurned > 0 && pagesTurned < Integer.MAX_VALUE / 2) {
-            return "scanning p" + (pagesTurned + 1) + "/" + maxPages.get();
+        if (scan.start != null && scan.turns > 0 && !scan.stopped) {
+            return "scanning p" + (scan.turns + 1) + "/" + maxPages.get();
         }
         int items = PriceTracker.knownItems().size();
         return items > 0 ? items + " items tracked" : "learning";

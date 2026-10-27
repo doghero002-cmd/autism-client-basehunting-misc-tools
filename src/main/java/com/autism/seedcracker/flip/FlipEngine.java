@@ -44,6 +44,8 @@ public final class FlipEngine {
     private final List<Listing> scanBuffer = new ArrayList<>();
     private String scanSearchKey;
     private List<Opportunity> ranked = List.of();
+    private List<String> rejections = List.of();
+    private int liveListings;
     private Set<String> benched = Set.of();
     private long lastRankAt;
     private boolean rankDirty = true;
@@ -174,6 +176,8 @@ public final class FlipEngine {
         lastCompleteScan.clear();
         store.clearBook();
         ranked = List.of();
+        rejections = List.of();
+        liveListings = 0;
         invalidateRank();
     }
 
@@ -194,24 +198,46 @@ public final class FlipEngine {
         benched = tuning.benchLosers ? ledger.losingMarkets(2, 24 * 3_600_000L, now) : Set.of();
 
         List<Opportunity> out = new ArrayList<>();
+        Map<String, Integer> rejected = new HashMap<>();
+        liveListings = 0;
         for (String item : store.bookItems()) {
-            if (benched.contains(item)) continue;
             List<Listing> book = store.book(item, now);
             if (book.isEmpty()) continue;
+            liveListings += book.size();
+            String base = item.split("\\+", 2)[0];
+            if (GuiListingReader.marketBaseKey(base) == null) {
+                rejected.merge("Unsupported variant metadata", book.size(), Integer::sum);
+                continue;
+            }
+            if (benched.contains(item)) {
+                rejected.merge("Market benched after paper losses", book.size(), Integer::sum);
+                continue;
+            }
             List<Sale> sales = store.sales(item);
             Map<com.autism.seedcracker.flip.core.FlipModel.StackBucket, MarketAnalyzer.Analysis> byBucket = new HashMap<>();
             for (Listing l : book) {
                 MarketAnalyzer.Analysis a = byBucket.computeIfAbsent(l.bucket(), b -> analyzer.analyze(item, b, sales, now));
-                OpportunityDetector.Evaluation e = a.stats().hasPrices()
+                boolean enoughSales = a.stats().hasPrices() && a.stats().sampleCount() >= tuning.minSamples;
+                OpportunityDetector.Evaluation e = enoughSales
                     ? detector.evaluate(l, a.stats(), a.keptSales(), book)
-                    : tuning.askFallback ? detector.evaluateAgainstAsks(l, book, now) : null;
-                if (e != null && e.accepted()) out.add(e.opportunity().get());
+                    : tuning.askFallback ? detector.evaluateAgainstAsks(l, book, now)
+                        : detector.evaluate(l, a.stats(), a.keptSales(), book);
+                if (e.accepted()) out.add(e.opportunity().get());
+                else for (String reason : e.rejections()) rejected.merge(reason, 1, Integer::sum);
             }
         }
+        rejections = rejected.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+            .limit(3).map(e -> e.getKey() + " (" + e.getValue() + " listings)").toList();
         out.sort(Comparator.comparingDouble(Opportunity::score).reversed());
         ranked = List.copyOf(out.size() > 50 ? out.subList(0, 50) : out);
         return ranked;
     }
+
+    /** Diagnostics from the most recent rank, including data that failed the configured filters. */
+    public int liveListings() { return liveListings; }
+
+    public List<String> rejections() { return rejections; }
 
     /** Records a paper position for an opportunity the user (or auto-paper) picked. */
     public boolean paper(Opportunity o, long now) {

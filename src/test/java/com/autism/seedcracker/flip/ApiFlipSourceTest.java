@@ -33,6 +33,23 @@ class ApiFlipSourceTest {
         assertEquals("diamond_chestplate+protection4+unbreaking3", ApiFlipSource.itemKey(item("minecraft:diamond_chestplate", 1,
             new ApiEnchantment("minecraft:unbreaking", 3), new ApiEnchantment("minecraft:protection", 4))));
         assertEquals("ender_pearl", ApiFlipSource.itemKey(item("ENDER_PEARL", 16)));
+        assertEquals("custom:ender_pearl", ApiFlipSource.itemKey(item("custom:ender_pearl", 16)));
+        assertEquals("diamond_chestplate+custom:protection4", ApiFlipSource.itemKey(item("minecraft:diamond_chestplate", 1,
+            new ApiEnchantment("custom:protection", 4))));
+    }
+
+    @Test
+    void unrepresentedVariantsCannotSupplyComparablesOrBuyCandidates() {
+        for (String id : List.of("spawner", "potion", "splash_potion", "lingering_potion", "tipped_arrow", "player_head",
+            "shulker_box", "blue_shulker_box", "bundle", "red_bundle", "firework_rocket", "suspicious_stew")) {
+            assertNull(ApiFlipSource.itemKey(item("minecraft:" + id, 1)), id);
+            var seller = new ApiSeller(Optional.of("Bob"), Optional.empty());
+            assertTrue(ApiFlipSource.toListings(List.of(new ApiAuctionListing(Optional.of(item("minecraft:" + id, 1)),
+                Optional.of(new BigDecimal("10000")), Optional.of(seller), OptionalLong.empty())), 5L).isEmpty(), id);
+            assertTrue(ApiFlipSource.toSales(List.of(new ApiCompletedTransaction(Optional.of(item("minecraft:" + id, 1)),
+                Optional.of(new BigDecimal("10000")), Optional.of(seller), Optional.of(BigInteger.valueOf(1_800_000_000_000L))))).isEmpty(), id);
+        }
+        assertNull(ApiFlipSource.itemKey(item("minecraft:diamond+fake", 1)));
     }
 
     @Test

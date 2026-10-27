@@ -70,7 +70,8 @@ public final class AHFlipperModule extends Module {
         .group("Keyless").visibleWhen(autoPage::get));
     private final StringSetting watchlist = add(new StringSetting("watchlist", "Re-scan watchlist", "")
         .description("Comma list of items (e.g. elytra, ender_pearl). While AFK with no screen open, opens /ah <item> "
-            + "for each in turn on the interval below so the sale history keeps building. Blank = never opens /ah itself.")
+            + "for each in turn. Auto-opened passes close when finished so later scans can run; manually opened screens stay open. "
+            + "Blank = never opens /ah itself.")
         .group("Keyless"));
     private final IntSetting rescanMinutes = add(new IntSetting("rescan-minutes", "Re-scan every (min)", 6, 2, 60, 1)
         .description("Keep this short: sale detection only trusts passes under 20 minutes apart.")
@@ -122,13 +123,119 @@ public final class AHFlipperModule extends Module {
     private long reservedCoins;
     private String buyStatus = "waiting for sales-backed deals";
 
-    // auto-paging state
-    private int lastContainerId = -1;
-    private int pageCooldown;
-    private int pagesTurned;
-    private boolean pageRead;
-    private String lastPageSignature = "";
+    private final Paging paging = new Paging();
     private net.minecraft.world.phys.Vec3 scanStartPos;
+    private long firstPageAt;
+    private long lastPageObservedAt;
+    private String scanStatus = "Open /ah or add a watchlist to start learning";
+    private final WatchPass watchPass = new WatchPass();
+    private volatile String watchCommand;
+    private String auctionQuery = "";
+
+    static final class Paging {
+        int containerId = -1;
+        int cooldown;
+        int turns;
+        boolean read;
+        boolean awaitingPage;
+        boolean fromFirstPage;
+        long requestedAt;
+        String signature = "";
+        String searchKey = "";
+
+        boolean openMenu(int id, String title) {
+            String key = AhGui.scanKey(title);
+            if (id == containerId && key.equals(searchKey)) return false;
+            if (awaitingPage && key.equals(searchKey)) {
+                containerId = id;
+                return false;
+            }
+            reset();
+            containerId = id;
+            searchKey = key;
+            fromFirstPage = AhGui.pageNumber(title) <= 1;
+            return true;
+        }
+
+        boolean timedOut(long now) {
+            return awaitingPage && (now < requestedAt || now - requestedAt >= 8_000);
+        }
+
+        boolean waitingForMenu(long now, boolean anotherScreenOpen) {
+            return awaitingPage && !anotherScreenOpen && !timedOut(now);
+        }
+
+        boolean readPage(String incoming, int delay) {
+            if (incoming.isEmpty()) {
+                read = false;
+                return false;
+            }
+            if (incoming.equals(signature)) {
+                if (!awaitingPage) read = true;
+                return false;
+            }
+            signature = incoming;
+            read = true;
+            awaitingPage = false;
+            cooldown = Math.max(cooldown, delay);
+            return true;
+        }
+
+        void turn(int delay, long now) {
+            turns++;
+            read = false;
+            awaitingPage = true;
+            requestedAt = now;
+            cooldown = delay;
+        }
+
+        void reset() {
+            containerId = -1;
+            cooldown = 0;
+            turns = 0;
+            read = false;
+            awaitingPage = false;
+            fromFirstPage = false;
+            requestedAt = 0;
+            signature = "";
+            searchKey = "";
+        }
+    }
+
+    static final class WatchPass {
+        private Object menu;
+        private net.minecraft.world.phys.Vec3 origin;
+        private long requestedAt;
+        boolean finished;
+
+        void request(net.minecraft.world.phys.Vec3 position, long now) {
+            clear();
+            origin = position;
+            requestedAt = now;
+        }
+
+        void observe(Object current, boolean newPass, net.minecraft.world.phys.Vec3 position, long now) {
+            if (origin == null) return;
+            if (origin.distanceToSqr(position) > 0.25 || now < requestedAt
+                || menu == null && now - requestedAt >= 8_000 || menu != null && newPass) clear();
+            else menu = current;
+        }
+
+        boolean expired(long now) {
+            return origin != null && menu == null && (now < requestedAt || now - requestedAt >= 8_000);
+        }
+
+        boolean canClose(Object current, net.minecraft.world.phys.Vec3 position) {
+            return finished && menu != null && menu == current && origin != null && origin.distanceToSqr(position) <= 0.25;
+        }
+
+        void clear() {
+            menu = null;
+            origin = null;
+            requestedAt = 0;
+            finished = false;
+        }
+    }
 
     // watchlist re-scan state
     private int watchIndex;
@@ -177,6 +284,9 @@ public final class AHFlipperModule extends Module {
         purchaseExecutor = null;
         buyStatus = "waiting for sales-backed deals";
         resetPaging();
+        clearWatchPass();
+        scanStatus = "Open /ah or add a watchlist to start learning";
+        auctionQuery = "";
         watchIndex = 0;
         idleSince = -1;
         idlePos = null;
@@ -195,6 +305,8 @@ public final class AHFlipperModule extends Module {
     @Override
     public void onDisable() {
         cancelPurchase();
+        clearWatchPass();
+        resetPaging();
         if (engine != null) engine.save();
         if (api != null) api.close();
         api = null;
@@ -206,6 +318,9 @@ public final class AHFlipperModule extends Module {
     public void onGameLeft() {
         cancelPurchase();
         resetPaging();
+        clearWatchPass();
+        scanStatus = "Join a world, then open /ah to start learning";
+        auctionQuery = "";
         idleSince = -1;
         idlePos = null;
         if (engine != null) {
@@ -218,6 +333,11 @@ public final class AHFlipperModule extends Module {
     @Override
     protected void onOptionValueChanged(String name) {
         if (engine != null) engine.invalidateRank();
+        if (name.equals("source") || name.equals("watchlist") || name.equals("auto-page")) {
+            clearWatchPass();
+            resetPaging();
+            if (engine != null) engine.abortScan();
+        }
         if (name.equals("auto-buy") || name.equals("buy-budget") || name.equals("max-buys")
             || name.equals("max-buy") || name.equals("min-profit") || name.equals("min-roi")
             || name.equals("min-confidence") || name.equals("min-samples") || name.equals("tax")
@@ -227,13 +347,39 @@ public final class AHFlipperModule extends Module {
     @Override
     protected void onSettingsReset() {
         cancelPurchase();
-        if (engine != null) engine.invalidateRank();
+        clearWatchPass();
+        resetPaging();
+        if (engine != null) {
+            engine.abortScan();
+            engine.invalidateRank();
+        }
     }
 
     @Override
     public boolean onPacketSend(net.minecraft.network.protocol.Packet<?> packet) {
+        Minecraft mc = Minecraft.getInstance();
+        FlipEngine current = engine;
         if (packet instanceof net.minecraft.network.protocol.game.ServerboundContainerClosePacket) {
-            Minecraft.getInstance().execute(this::cancelPurchase);
+            mc.execute(() -> {
+                if (engine != current) return;
+                cancelPurchase();
+                clearWatchPass();
+                resetPaging();
+                if (engine != null) engine.abortScan();
+            });
+        } else if (packet instanceof net.minecraft.network.protocol.game.ServerboundChatCommandPacket command) {
+            String query = command.command().trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (query.equals("ah") || query.startsWith("ah ")) {
+                boolean automatic = query.equals(watchCommand);
+                if (automatic) watchCommand = null;
+                mc.execute(() -> {
+                    if (engine != current) return;
+                    if (!automatic) clearWatchPass();
+                    auctionQuery = query;
+                    resetPaging();
+                    if (engine != null) engine.abortScan();
+                });
+            }
         }
         return false;
     }
@@ -242,6 +388,11 @@ public final class AHFlipperModule extends Module {
         if (pendingBuy != null && purchaseExecutor != null) purchaseExecutor.cancelFlip();
         pendingBuy = null;
         purchaseExecutor = null;
+    }
+
+    private void clearWatchPass() {
+        watchCommand = null;
+        watchPass.clear();
     }
 
     /**
@@ -308,13 +459,26 @@ public final class AHFlipperModule extends Module {
 
         boolean readPages = source.get() != Source.API || api == null || !api.hasKey();
         AbstractContainerMenu menu = mc.player.containerMenu;
+        if (watchPass.expired(now)) {
+            scanStatus = "Watchlist /ah did not open; waiting for the next interval";
+            clearWatchPass();
+        }
         if (AhGui.purchasing()) {
             if (engine.scanning()) engine.abortScan();
             resetPaging();
+            clearWatchPass();
         } else if (menu == null || menu instanceof InventoryMenu) {
-            if (engine.scanning()) engine.abortScan();
-            resetPaging();
-            if (readPages) tickWatchlist(mc, now);
+            if (paging.waitingForMenu(now, mc.gui.screen() != null)) {
+                scanStatus = "Waiting for the next auction menu";
+            } else {
+                if (engine.scanning()) {
+                    engine.abortScan();
+                    scanStatus = "Pass interrupted before the last page; open /ah to rescan";
+                }
+                resetPaging();
+                if (mc.gui.screen() != null || watchPass.menu != null) clearWatchPass();
+                if (readPages) tickWatchlist(mc, now);
+            }
         } else {
             idleSince = -1;
             if (readPages) tickPages(mc, menu, now);
@@ -325,6 +489,13 @@ public final class AHFlipperModule extends Module {
             if (!o.listing().seller().equalsIgnoreCase(mc.player.getGameProfile().name())) maybeAlert(o, now);
         }
         tickAutoBuy(mc, opportunities, now);
+        if (watchPass.finished) {
+            boolean close = !AhGui.purchasing() && watchPass.canClose(mc.player.containerMenu, mc.player.position())
+                && mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> screen
+                && screen.getMenu() == mc.player.containerMenu && AhGui.isAuctionPage(mc, mc.player.containerMenu);
+            clearWatchPass();
+            if (close) mc.player.closeContainer();
+        }
     }
 
     private void syncTuning() {
@@ -346,52 +517,73 @@ public final class AHFlipperModule extends Module {
     private void tickPages(Minecraft mc, AbstractContainerMenu menu, long now) {
         int slots = AhGui.containerSlots(mc, menu);
         if (!AhGui.isAuctionPage(mc, menu)) {
+            if (mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) {
+                scanStatus = "Not recognized as /ah: " + AhGui.screenTitle(mc).replace('\n', ' ').replace('\r', ' ');
+            } else if (engine.scanning()) scanStatus = "Pass interrupted before the last page; reopen /ah to rescan";
             engine.abortScan();
             resetPaging();
+            clearWatchPass();
             return;
         }
-        if (menu.containerId != lastContainerId) {
-            resetPaging();
-            lastContainerId = menu.containerId;
-            String title = mc.gui.screen() == null ? "" : mc.gui.screen().getTitle().getString();
-            engine.beginScan(title.toLowerCase(Locale.ROOT).trim());
+        String title = (auctionQuery.isEmpty() ? "" : auctionQuery + " | ") + AhGui.screenTitle(mc);
+        boolean newPass = paging.openMenu(menu.containerId, title);
+        watchPass.observe(menu, newPass, mc.player.position(), now);
+        if (newPass) {
+            engine.beginScan(paging.searchKey);
             scanStartPos = mc.player.position();
+            firstPageAt = now;
+            lastPageObservedAt = 0;
+            scanStatus = "Waiting for priced listings on /ah";
         }
-        if (pageCooldown > 0) pageCooldown--;
+        if (paging.cooldown > 0) paging.cooldown--;
 
         List<Listing> page = new ArrayList<>();
         StringBuilder sig = new StringBuilder();
         for (int i = 0; i < slots; i++) {
-            Listing l = GuiListingReader.read(menu.slots.get(i).getItem(), now);
-            if (l == null) continue;
-            page.add(l);
-            sig.append(l.listingKey()).append(';');
+            Listing listing = GuiListingReader.read(menu.slots.get(i).getItem(), now);
+            if (listing == null) continue;
+            page.add(listing);
+            sig.append(listing.listingKey()).append(';');
         }
-        // In-place paginating plugins keep the containerId; a changed signature = a new page landed.
         String signature = sig.toString();
-        if (!page.isEmpty() && !signature.equals(lastPageSignature)) {
-            lastPageSignature = signature;
+        boolean changed = paging.readPage(signature, com.autism.seedcracker.util.Humanizer.delay(pageDelay.get()));
+        if (!page.isEmpty() && (changed || now - lastPageObservedAt >= 1000)) {
             engine.addPage(page);
-            pageRead = true;
-            pageCooldown = Math.max(pageCooldown, com.autism.seedcracker.util.Humanizer.delay(pageDelay.get()));
+            lastPageObservedAt = now;
         }
-        if (!autoPage.get() || !engine.scanning() || mc.gameMode == null) return;
-
+        if (!engine.scanning()) return;
         if (scanStartPos != null && mc.player.position().distanceToSqr(scanStartPos) > 0.25) {
-            engine.abortScan();
+            abortPass("Paused because you moved; reopen /ah to start another pass");
+            clearWatchPass();
             return;
         }
-        if (!pageRead || pageCooldown > 0 || AhGui.pagedWithin(1000)) return;
+        if (paging.timedOut(now)) {
+            abortPass("Next page did not arrive; pass incomplete (no sales inferred)");
+            return;
+        }
+        if (page.isEmpty() && !paging.awaitingPage
+            && now - Math.max(firstPageAt, lastPageObservedAt) >= 8_000) {
+            abortPass("No readable priced listings on this page; check the search or listing format");
+            return;
+        }
+        scanStatus = !autoPage.get() ? "Auto-page is off: reading visible asks only"
+            : "Scanning page " + (paging.turns + 1) + ": " + engine.scanBufferSize() + " listings read";
+        if (!autoPage.get() || mc.gameMode == null || page.isEmpty() || !paging.read || paging.cooldown > 0 || AhGui.pagedWithin(1000)) return;
         int next = AhGui.findNextPageSlot(menu, slots);
         if (next < 0) {
-            int inferred = engine.completeScan(now, mc.player.getGameProfile().name());
-            if (inferred > 0 && alerts.get()) {
-                AutismClientMessaging.sendPrefixed("§7[AH Flipper] Pass complete: §f" + inferred + "§7 sales inferred.");
+            if (!paging.fromFirstPage) {
+                abortPass("Pass started after page 1; reopen /ah from the first page (no sales inferred)");
+                return;
             }
+            int count = engine.scanBufferSize();
+            int inferred = engine.completeScan(now, mc.player.getGameProfile().name());
+            scanStatus = "Pass complete: " + count + " listings, " + inferred + " sales inferred";
+            watchPass.finished = true;
+            if (alerts.get()) AutismClientMessaging.sendPrefixed("§7[AH Flipper] " + scanStatus + ".");
             return;
         }
-        if (pagesTurned + 1 >= maxPages.get()) {
-            engine.abortScan();
+        if (paging.turns + 1 >= maxPages.get()) {
+            abortPass("Page limit reached: incomplete pass; use a narrower /ah search or raise Max pages");
             return;
         }
         if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return;
@@ -399,18 +591,20 @@ public final class AHFlipperModule extends Module {
         mc.gameMode.handleContainerInput(menu.containerId, next, 0,
             net.minecraft.world.inventory.ContainerInput.PICKUP, mc.player);
         AhGui.notePageTurn();
-        pagesTurned++;
-        pageRead = false;
-        pageCooldown = com.autism.seedcracker.util.Humanizer.delay(pageDelay.get());
+        paging.turn(com.autism.seedcracker.util.Humanizer.delay(pageDelay.get()), now);
+    }
+
+    private void abortPass(String reason) {
+        engine.abortScan();
+        scanStatus = reason;
+        watchPass.finished = true;
     }
 
     private void resetPaging() {
-        lastContainerId = -1;
-        pageCooldown = 0;
-        pagesTurned = 0;
-        pageRead = false;
-        lastPageSignature = "";
+        paging.reset();
         scanStartPos = null;
+        firstPageAt = 0;
+        lastPageObservedAt = 0;
     }
 
     /** AFK-only: re-open /ah for the next watchlist item so passes keep coming without input. */
@@ -430,8 +624,13 @@ public final class AHFlipperModule extends Module {
         if (!com.autism.seedcracker.util.ActionPacer.tryAction()) return;
         // Split the interval across the list so each item is revisited about every rescanMinutes.
         nextRescanAt = now + com.autism.seedcracker.util.Humanizer.delayMs(rescanMinutes.get() * 60_000L / list.size());
-        String item = list.get(watchIndex++ % list.size());
-        mc.getConnection().sendCommand("ah " + AhGui.searchName(item));
+        String item = list.get(Math.floorMod(watchIndex++, list.size()));
+        watchPass.request(pos, now);
+        scanStatus = "Opening watchlist search: " + AhGui.searchName(item);
+        String command = "ah " + AhGui.searchName(item);
+        watchCommand = command.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        auctionQuery = watchCommand;
+        mc.getConnection().sendCommand(command);
     }
 
     private void tickAutoBuy(Minecraft mc, List<Opportunity> opportunities, long now) {
@@ -522,12 +721,30 @@ public final class AHFlipperModule extends Module {
         }
     }
 
+    /** Read-only diagnostics shared by the panel and the flip status command. */
+    public List<String> diagnostics() {
+        if (engine == null || !isEnabled()) return List.of("Enable AH Flipper in the Trading tab first.");
+        long now = System.currentTimeMillis();
+        int count = engine.rank(now).size();
+        List<String> lines = new ArrayList<>();
+        lines.add("Source: " + source.get() + ". " + scanStatus);
+        lines.add(engine.liveListings() + " current listings, " + engine.knownSales() + " remembered sales, " + count + " qualifying flips.");
+        if (!apiError().isBlank() && source.get() != Source.KEYLESS) lines.add("API feed: " + apiError());
+        if (engine.liveListings() == 0) lines.add("No market data yet: open /ah for an item, or set Re-scan watchlist. Enabling alone does not open a blank watchlist.");
+        if (count == 0 && engine.liveListings() > 0) lines.addAll(engine.rejections());
+        lines.add(autoBuy.get() || pendingBuy != null ? "Auto-buy: " + buyStatus
+            : "Auto-buy is OFF: alerts and paper trading only. Nothing is bought automatically.");
+        lines.add("Ask-only deals never auto-buy. Sales-backed buying needs a positive budget. Automatic selling is not implemented.");
+        return List.copyOf(lines);
+    }
+
     @Override
     public String info() {
         if (engine == null) return "idle";
         if (autoBuy.get() || pendingBuy != null) return buyStatus;
-        if (engine.scanning()) return "scanning p" + (pagesTurned + 1) + " (" + engine.scanBufferSize() + ")";
+        if (engine.scanning()) return "scanning p" + (paging.turns + 1) + " (" + engine.scanBufferSize() + ")";
         int flips = engine.rank(System.currentTimeMillis()).size();
+        if (flips == 0) return engine.liveListings() == 0 ? scanStatus : engine.liveListings() + " listings, none meet filters";
         return flips + " flips, " + engine.knownSales() + " sales";
     }
 }

@@ -1,3 +1,4 @@
+// Adapted from Spectre's Region Map; GPL-3.0-only. See SPECTRE-NOTICES.txt.
 package com.autism.seedcracker.modules;
 
 import java.io.IOException;
@@ -45,6 +46,15 @@ public final class RegionMapModule extends Module {
         .description("Vertical screen position.").group("Render"));
     private final IntSetting size = add(new IntSetting("size", "Size", 180, 80, 600, 4)
         .description("Canvas size (square, in pixels).").group("Render"));
+    private final IntSetting cellGap = add(new IntSetting("cell-gap", "Cell gap", 2, 0, 10, 1).group("Render"));
+    private final IntSetting playerScale = add(new IntSetting("player-scale", "Player scale (%)", 100, 50, 300, 10).group("Render"));
+    private final IntSetting textScale = add(new IntSetting("text-scale", "Region text scale (%)", 100, 10, 200, 10).group("Render"));
+    private final IntSetting opacity = add(new IntSetting("opacity", "Opacity (%)", 100, 10, 100, 5).group("Render"));
+    private final BoolSetting shadow = add(new BoolSetting("shadow", "Shadow", true).group("Render"));
+    private final BoolSetting showRegionIds = add(new BoolSetting("show-region-ids", "Region IDs", true).group("Render"));
+    private final BoolSetting showCoordinates = add(new BoolSetting("show-coordinates", "Coordinates", true).group("Render"));
+    private final autismclient.api.module.ColorSetting playerColor = add(new autismclient.api.module.ColorSetting(
+        "player-indicator", "Player indicator", 0xFFFF4D4D).group("Render"));
     private final BoolSetting showDots = add(new BoolSetting("show-dots", "RTP dots", true)
         .description("Plot your teleport landings as colour-coded dots.").group("RTP Log"));
     private final BoolSetting showHeat = add(new BoolSetting("show-heat", "Base heatmap", true)
@@ -151,12 +161,12 @@ public final class RegionMapModule extends Module {
 
     private void registerLayer() {
         if (layerRegistered) return;
-        layerRegistered = true;
         HudElementRegistry.attachElementAfter(VanillaHudElements.MISC_OVERLAYS, LAYER_ID,
             (GuiGraphicsExtractor ctx, DeltaTracker delta) -> {
                 RegionMapModule m = instance;
                 if (m != null && m.isEnabled()) m.render(ctx);
             });
+        layerRegistered = true;
     }
 
     /** World half-extent of the whole map in Overworld blocks. */
@@ -192,8 +202,8 @@ public final class RegionMapModule extends Module {
                 long half = mapHalf();
                 float fx = (float) ((wx + half) / (2.0 * half)); // 0..1 across the canvas
                 float fz = (float) ((wz + half) / (2.0 * half));
-                if (fx >= 0 && fx <= 1 && fz >= 0 && fz <= 1) {
-                    int cell = RegionMapHud.cellIndexOf((int) Math.floor(wx), (int) Math.floor(wz), GRID, cellBlocks.get());
+                if (fx >= 0 && fx < 1 && fz >= 0 && fz < 1) {
+                    int cell = RegionMapHud.cellAt(wx, wz, cellBlocks.get());
                     dots.add(new Dot(fx, fz, clusterOfCell(cell)));
                     while (dots.size() > maxDots.get()) dots.remove(0);
                 }
@@ -205,6 +215,7 @@ public final class RegionMapModule extends Module {
 
     private void render(GuiGraphicsExtractor ctx) {
         Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null) return;
         Font font = mc.font;
         int ox = x.get();
         int oy = y.get();
@@ -212,15 +223,23 @@ public final class RegionMapModule extends Module {
         long half = mapHalf();
         int cs = sz / GRID;
 
-        // Canvas background (dark) + subtle border.
-        ctx.fill(ox - 2, oy - 2, ox + sz + 2, oy + sz + 2, 0xE60B0D12);
-        ctx.fill(ox, oy, ox + sz, oy + sz, 0xFF14161C);
+        if (shadow.get()) ctx.fill(ox, oy, ox + sz + 4, oy + sz + 4, tint(0x70000000));
+        ctx.fill(ox - 2, oy - 2, ox + sz + 2, oy + sz + 2, tint(0xE60B0D12));
+        ctx.fill(ox, oy, ox + sz, oy + sz, tint(0xFF14161C));
 
-        // Map background: built-in region_map.png by default, or a custom PNG when overridden.
         Identifier mapTex = resolveMapTexture(mc);
-        if (!blitMap(ctx, mapTex, ox, oy, sz) && !mapTex.equals(DEFAULT_MAP)) {
-            releaseCustomImage(mc);
-            blitMap(ctx, DEFAULT_MAP, ox, oy, sz);
+        boolean custom = !mapTex.equals(DEFAULT_MAP) && blitMap(ctx, mapTex, ox, oy, sz);
+        if (!custom && !mapTex.equals(DEFAULT_MAP)) releaseCustomImage(mc);
+        int gap = custom ? 0 : RegionMapHud.effectiveGap(sz, cellGap.get());
+        double cellWidth = RegionMapHud.cellWidth(sz, gap);
+        if (!custom) {
+            for (int cell = 1; cell <= GRID * GRID; cell++) {
+                double left = RegionMapHud.cellStart((cell - 1) % GRID, sz, gap);
+                double top = RegionMapHud.cellStart((cell - 1) / GRID, sz, gap);
+                ctx.fill(ox + (int) Math.round(left), oy + (int) Math.round(top),
+                    ox + (int) Math.round(left + cellWidth), oy + (int) Math.round(top + cellWidth),
+                    tint(RegionMapHud.layoutClusterOf(cell).argb));
+            }
         }
 
         // Base-find heatmap overlay (green -> yellow -> red by find density), on top of the cells.
@@ -231,12 +250,14 @@ public final class RegionMapModule extends Module {
                 if (heat <= 0f) continue;
                 int col = (cell - 1) % GRID;
                 int row = (cell - 1) / GRID;
-                int cx0 = ox + col * cs;
-                int cy0 = oy + row * cs;
-                int cx1 = (col == GRID - 1) ? ox + sz : ox + (col + 1) * cs;
-                int cy1 = (row == GRID - 1) ? oy + sz : oy + (row + 1) * cs;
-                ctx.fill(cx0, cy0, cx1, cy1, heatColor(heat));
-                if (font != null && cs >= 14) {
+                double left = RegionMapHud.cellStart(col, sz, gap);
+                double top = RegionMapHud.cellStart(row, sz, gap);
+                int cx0 = ox + (int) Math.round(left);
+                int cy0 = oy + (int) Math.round(top);
+                int cx1 = ox + (int) Math.round(left + cellWidth);
+                int cy1 = oy + (int) Math.round(top + cellWidth);
+                ctx.fill(cx0, cy0, cx1, cy1, tint(heatColor(heat)));
+                if (font != null && cs >= 14 && !showRegionIds.get()) {
                     int finds = com.autism.seedcracker.finder.BaseHeatTracker.finds(cell);
                     if (finds > 0) {
                         String n = String.valueOf(finds);
@@ -247,27 +268,40 @@ public final class RegionMapModule extends Module {
             }
         }
 
-        // Crisp 1px separators between cells (clean grid look).
-        for (int i = 0; i <= GRID; i++) {
-            int gx = ox + i * cs;
-            int gy = oy + i * cs;
-            ctx.fill(gx, oy, gx + 1, oy + sz, 0x33000000);
-            ctx.fill(ox, gy, ox + sz, gy + 1, 0x33000000);
+        if (showRegionIds.get() && font != null) {
+            for (int cell = 1; cell <= GRID * GRID; cell++) {
+                String label = Integer.toString(RegionMapHud.regionIdOf(cell));
+                float scale = Math.min(textScale.get() / 100f, (float) (cellWidth - 2) / Math.max(1, font.width(label)));
+                if (scale <= 0) continue;
+                float left = (float) (ox + RegionMapHud.cellStart((cell - 1) % GRID, sz, gap));
+                float top = (float) (oy + RegionMapHud.cellStart((cell - 1) / GRID, sz, gap));
+                ctx.pose().pushMatrix();
+                try {
+                    ctx.pose().translate(left + ((float) cellWidth - font.width(label) * scale) / 2,
+                        top + ((float) cellWidth - font.lineHeight * scale) / 2);
+                    ctx.pose().scale(scale, scale);
+                    ctx.text(font, label, 0, 0, tint(0xFFFFFFFF), shadow.get());
+                } finally {
+                    ctx.pose().popMatrix();
+                }
+            }
         }
         // Outer border.
-        ctx.fill(ox, oy, ox + sz, oy + 1, 0xFF3A3A46);
-        ctx.fill(ox, oy + sz - 1, ox + sz, oy + sz, 0xFF3A3A46);
-        ctx.fill(ox, oy, ox + 1, oy + sz, 0xFF3A3A46);
-        ctx.fill(ox + sz - 1, oy, ox + sz, oy + sz, 0xFF3A3A46);
+        ctx.fill(ox, oy, ox + sz, oy + 1, tint(0xFF3A3A46));
+        ctx.fill(ox, oy + sz - 1, ox + sz, oy + sz, tint(0xFF3A3A46));
+        ctx.fill(ox, oy, ox + 1, oy + sz, tint(0xFF3A3A46));
+        ctx.fill(ox + sz - 1, oy, ox + sz, oy + sz, tint(0xFF3A3A46));
 
         // RTP dots (small bright pixels, colour-coded by cluster).
         if (showDots.get()) {
             for (Dot d : dots) {
-                int dx = ox + (int) (d.fx * sz);
-                int dy = oy + (int) (d.fz * sz);
-                int color = d.cluster.argb | 0xFF000000;
-                ctx.fill(dx - 1, dy - 1, dx + 1, dy + 1, 0xAA000000);
-                ctx.fill(dx, dy, dx + 1, dy + 1, color);
+                double dotX = RegionMapHud.mapPixel(d.fx, sz, gap);
+                double dotZ = RegionMapHud.mapPixel(d.fz, sz, gap);
+                if (!Double.isFinite(dotX) || !Double.isFinite(dotZ)) continue;
+                int dx = ox + (int) dotX;
+                int dy = oy + (int) dotZ;
+                ctx.fill(dx - 1, dy - 1, dx + 1, dy + 1, tint(0xAA000000));
+                ctx.fill(dx, dy, dx + 1, dy + 1, tint(d.cluster.argb));
             }
         }
 
@@ -276,15 +310,11 @@ public final class RegionMapModule extends Module {
             boolean netherNow = mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER);
             double wx = netherNow ? mc.player.getX() * 8.0 : mc.player.getX();
             double wz = netherNow ? mc.player.getZ() * 8.0 : mc.player.getZ();
-            int cell = RegionMapHud.cellIndexOf((int) Math.floor(wx), (int) Math.floor(wz), GRID, cellBlocks.get());
+            int cell = RegionMapHud.cellAt(wx, wz, cellBlocks.get());
             if (cell >= 1) {
-                int col = (cell - 1) % GRID;
-                int row = (cell - 1) / GRID;
-                double[] sub = RegionMapHud.cellPositionOf(wx, wz, cellBlocks.get());
-                int px = ox + col * cs + (int) (sub[0] * cs);
-                int py = oy + row * cs + (int) (sub[1] * cs);
-                // soft glow then the directional arrow
-                ctx.fill(px - 3, py - 3, px + 4, py + 4, 0x40FF4D4D);
+                int px = ox + (int) RegionMapHud.mapPixel((wx + half) / (2 * half), sz, gap);
+                int py = oy + (int) RegionMapHud.mapPixel((wz + half) / (2 * half), sz, gap);
+                ctx.fill(px - 3, py - 3, px + 4, py + 4, tint(0x40000000 | (playerColor.get() & 0xFFFFFF)));
                 drawPlayerArrow(ctx, px, py, mc.player.getYRot());
             }
         }
@@ -299,32 +329,33 @@ public final class RegionMapModule extends Module {
                 boolean netherNow = mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER);
                 double wx = netherNow ? mc.player.getX() * 8.0 : mc.player.getX();
                 double wz = netherNow ? mc.player.getZ() * 8.0 : mc.player.getZ();
-                int cell = RegionMapHud.cellIndexOf((int) Math.floor(wx), (int) Math.floor(wz), GRID, cellBlocks.get());
-                String cellTxt = "region " + cell;
+                int cell = RegionMapHud.cellAt(wx, wz, cellBlocks.get());
+                String cellTxt = cell < 0 ? "Outside map" : RegionMapHud.regionIdOf(cell) + " · "
+                    + abbreviate(RegionMapHud.layoutClusterOf(cell).label);
                 int cw = font.width(cellTxt);
-                ctx.text(font, cellTxt, ox + sz - cw, oy - 10, 0xFF8A93A6);
+                ctx.text(font, cellTxt, ox + sz - cw, oy - 10, tint(0xFF8A93A6));
             }
         }
 
-        // Axis labels (small, subtle).
-        if (showAxes.get() && font != null) {
-            ctx.text(font, "+X", ox + sz / 2 - 4, oy + sz + 3, 0xFFAAAAAA);
+        int infoY = oy + sz + 4;
+        if (font != null && showAxes.get()) {
+            ctx.text(font, "-Z ↑    +X →    +Z ↓", ox, infoY, tint(0xFFAAAAAA));
+            infoY += 12;
         }
-
-        // Legend (centred, swatch + abbreviation). Swatches use the same colours as the baked map.
+        if (font != null && showCoordinates.get() && mc.player != null) {
+            ctx.text(font, "X: " + (int) Math.floor(mc.player.getX()) + "  Z: " + (int) Math.floor(mc.player.getZ()),
+                ox, infoY, tint(0xFFFFFFFF));
+            infoY += 12;
+        }
         if (showLegend.get() && font != null) {
-            int totalW = 0;
+            int index = 0;
             for (RegionMapHud.Cluster c : RegionMapHud.Cluster.values()) {
                 if (c == RegionMapHud.Cluster.NONE) continue;
-                totalW += 6 + 2 + font.width(abbreviate(c.label)) + 8;
-            }
-            int lx = ox + Math.max(0, (sz - totalW) / 2);
-            int ly = oy + sz + (showAxes.get() ? 14 : 5);
-            for (RegionMapHud.Cluster c : RegionMapHud.Cluster.values()) {
-                if (c == RegionMapHud.Cluster.NONE) continue;
-                ctx.fill(lx, ly + 1, lx + 6, ly + 7, legendColor(c));
-                ctx.text(font, abbreviate(c.label), lx + 8, ly, 0xFFFFFFFF);
-                lx += 8 + font.width(abbreviate(c.label)) + 8;
+                int lx = ox + (index % 3) * Math.max(sz / 3, 48);
+                int ly = infoY + (index / 3) * 12;
+                ctx.fill(lx, ly + 1, lx + 6, ly + 7, tint(c.argb));
+                ctx.text(font, abbreviate(c.label), lx + 8, ly, tint(0xFFFFFFFF));
+                index++;
             }
         }
 
@@ -333,12 +364,15 @@ public final class RegionMapModule extends Module {
             int[] mouse = mousePos(mc);
             int mx = mouse[0], my = mouse[1];
             if (mx >= ox && mx < ox + sz && my >= oy && my < oy + sz) {
-                long wx = (long) (((double) (mx - ox) / sz) * 2.0 * half - half);
-                long wz = (long) (((double) (my - oy) / sz) * 2.0 * half - half);
-                int cell = RegionMapHud.cellIndexOf((int) wx, (int) wz, GRID, cellBlocks.get());
-                String coords = "cell " + cell + "  X:" + wx + "  Z:" + wz;
+                double fx = RegionMapHud.mapFraction(mx - ox, sz, gap);
+                double fz = RegionMapHud.mapFraction(my - oy, sz, gap);
+                if (!Double.isFinite(fx) || !Double.isFinite(fz)) return;
+                long wx = (long) Math.floor(fx * 2.0 * half - half);
+                long wz = (long) Math.floor(fz * 2.0 * half - half);
+                int cell = RegionMapHud.cellAt(wx, wz, cellBlocks.get());
+                String coords = "region " + RegionMapHud.regionIdOf(cell) + "  X:" + wx + "  Z:" + wz;
                 int tw = font.width(coords);
-                int tx = Math.min(mx + 8, ox + sz - tw);
+                int tx = Math.max(2, Math.min(mx + 8, mc.getWindow().getGuiScaledWidth() - tw - 2));
                 int ty = Math.max(my - 12, oy);
                 ctx.fill(tx - 2, ty - 2, tx + tw + 2, ty + 10, 0xC0101018);
                 ctx.text(font, coords, tx, ty, 0xFFFFFFFF);
@@ -355,14 +389,26 @@ public final class RegionMapModule extends Module {
         float y = ((yaw % 360f) + 360f) % 360f;
         // Direction index 0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW.
         int dir = (Math.round((y + 180f) / 45f)) % 8;
-        int color = 0xFFFF4D4D;
-        int outline = 0xFF000000;
+        int color = tint(playerColor.get());
+        int outline = tint(0xFF000000);
         int[][] shape = ARROW_SHAPES[dir];
-        for (int[] pt : shape) {
-            int ax = px + pt[0], ay = py + pt[1];
-            ctx.fill(ax - 1, ay - 1, ax + 1, ay + 1, outline);
-            ctx.fill(ax, ay, ax + 1, ay + 1, color);
+        ctx.pose().pushMatrix();
+        try {
+            ctx.pose().translate((float) px, (float) py);
+            float scale = playerScale.get() / 100f;
+            ctx.pose().scale(scale, scale);
+            for (int[] pt : shape) {
+                int ax = pt[0], ay = pt[1];
+                ctx.fill(ax - 1, ay - 1, ax + 1, ay + 1, outline);
+                ctx.fill(ax, ay, ax + 1, ay + 1, color);
+            }
+        } finally {
+            ctx.pose().popMatrix();
         }
+    }
+
+    private int tint(int color) {
+        return ((color >>> 24) * opacity.get() / 100 << 24) | (color & 0xFFFFFF);
     }
 
     // 8 precomputed 5x5 arrow shapes, tip pointing the given direction. 0=N..7=NW.
@@ -422,64 +468,19 @@ public final class RegionMapModule extends Module {
         };
     }
 
-    /** Cluster colour matching the baked region_map.png (so the legend swatches match the map). */
-    private static int legendColor(RegionMapHud.Cluster c) {
-        return switch (c) {
-            case EU_CENTRAL -> 0xFFE04F4F;
-            case EU_WEST    -> 0xFFEAB52A;
-            case NA_EAST    -> 0xFFE85A1E;
-            case NA_WEST    -> 0xFF7A3CD6;
-            case ASIA       -> 0xFF2C7AD4;
-            case OCEANIA    -> 0xFF2EA44F;
-            default         -> 0xFF555555;
-        };
-    }
-
-    /**
-     * The cluster owning a 1-81 cell in the baked map layout (matches region_map.png). Used to
-     * colour RTP dots so they sit on the right region.
-     */
     private static RegionMapHud.Cluster clusterOfCell(int cell) {
-        if (cell < 1 || cell > 81) return RegionMapHud.Cluster.NONE;
-        return switch (CELL_CLUSTER[cell - 1]) {
-            case 0 -> RegionMapHud.Cluster.EU_CENTRAL;
-            case 1 -> RegionMapHud.Cluster.EU_WEST;
-            case 2 -> RegionMapHud.Cluster.NA_EAST;
-            case 3 -> RegionMapHud.Cluster.NA_WEST;
-            case 4 -> RegionMapHud.Cluster.ASIA;
-            case 5 -> RegionMapHud.Cluster.OCEANIA;
-            default -> RegionMapHud.Cluster.NONE;
-        };
+        return RegionMapHud.layoutClusterOf(cell);
     }
-
-    // 81 cells (row-major), cluster index per cell matching region_map.png:
-    // 0=EU Central(red) 1=EU West(yellow) 2=NA East(orange) 3=NA West(purple) 4=Asia(blue) 5=Oceania(green)
-    private static final int[] CELL_CLUSTER = {
-        0,1,1,1,2,2,2,2,2,
-        0,1,1,1,2,2,2,2,2,
-        0,1,1,1,2,2,2,2,2,
-        0,0,0,1,2,2,2,2,2,
-        3,3,3,3,2,2,2,2,2,
-        3,5,5,4,4,4,4,4,2,
-        3,5,5,4,4,4,4,4,2,
-        4,5,4,4,4,4,4,4,4,
-        4,5,5,5,5,5,5,4,4
-    };
 
     // ---- map image ----
     private final RegionMapImageState mapImageState = new RegionMapImageState();
     private Identifier customImageId;
-    private boolean builtinBlitFailed;
 
     private boolean blitMap(GuiGraphicsExtractor ctx, Identifier mapTex, int ox, int oy, int sz) {
-        boolean builtin = mapTex.equals(DEFAULT_MAP);
-        if (builtin && builtinBlitFailed) return false;
         try {
-            // This overload takes destination corners and normalized UVs, not source PNG dimensions.
             ctx.blit(mapTex, ox, oy, ox + sz, oy + sz, 0f, 1f, 0f, 1f);
             return true;
         } catch (RuntimeException error) {
-            if (builtin) builtinBlitFailed = true;
             MAP_LOG.warn("Could not draw Region Map texture {}", mapTex, error);
             return false;
         }
@@ -489,7 +490,6 @@ public final class RegionMapModule extends Module {
     private Identifier resolveMapTexture(Minecraft mc) {
         if (mapImageState.select(useCustomImage.get(), imagePath.get())) {
             releaseCustomImage(mc);
-            builtinBlitFailed = false;
             if (!mapImageState.path().isEmpty()) loadCustomImage(mc, mapImageState.path());
         }
         return customImageId == null ? DEFAULT_MAP : customImageId;
@@ -527,6 +527,5 @@ public final class RegionMapModule extends Module {
     private void resetMapImage() {
         releaseCustomImage(Minecraft.getInstance());
         mapImageState.reset();
-        builtinBlitFailed = false;
     }
 }

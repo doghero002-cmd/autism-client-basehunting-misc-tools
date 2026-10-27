@@ -1,0 +1,1446 @@
+[
+  {
+    "repo": "DragonHunt3r/ChatGames",
+    "commit": "e5ee5fc21b15e8f9a674288a4bef29c28cb5481f",
+    "url": "https://github.com/DragonHunt3r/ChatGames/tree/e5ee5fc21b15e8f9a674288a4bef29c28cb5481f",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "What are Creepers scared of?",
+        "answer": "ocelot"
+      },
+      {
+        "question": "What item do you need to breed llamas?",
+        "answer": "Hay bales"
+      },
+      {
+        "question": "How many hit points does a Ghast have?",
+        "answer": "10"
+      },
+      {
+        "question": "Are beehives obtainable with silk touch? (1.15)",
+        "answer": "yes"
+      },
+      {
+        "question": "Name an enchant that conflicts with smite.",
+        "answer": "sharpness"
+      },
+      {
+        "question": "What is the official name of update 1.4?",
+        "answer": "Pretty scary update"
+      },
+      {
+        "question": "What is the official name of update 1.5?",
+        "answer": "Redstone update"
+      },
+      {
+        "question": "What is the official name of update 1.6?",
+        "answer": "Horse update"
+      },
+      {
+        "question": "What is the official name of update 1.7?",
+        "answer": "The update that changed the world"
+      },
+      {
+        "question": "What is the official name of update 1.8?",
+        "answer": "Bountiful update"
+      },
+      {
+        "question": "What is the official name of update 1.9?",
+        "answer": "Combat update"
+      },
+      {
+        "question": "What is the official name of update 1.10?",
+        "answer": "Frostburn update"
+      },
+      {
+        "question": "What is the official name of update 1.11?",
+        "answer": "Exploration update"
+      },
+      {
+        "question": "What is the official name of update 1.12?",
+        "answer": "World of color update"
+      },
+      {
+        "question": "What is the official name of update 1.14?",
+        "answer": "Village and pillage"
+      },
+      {
+        "question": "What is the official name of update 1.15?",
+        "answer": "Buzzy bees"
+      },
+      {
+        "question": "What minecraft version added desert pyramids?",
+        "answer": "1.3"
+      },
+      {
+        "question": "What minecraft version added command blocks?",
+        "answer": "1.4"
+      },
+      {
+        "question": "What minecraft version added scoreboards?",
+        "answer": "1.5"
+      },
+      {
+        "question": "What minecraft version changed texture packs to resource packs?",
+        "answer": "1.6"
+      },
+      {
+        "question": "What minecraft version introduced amplified terrain?",
+        "answer": "1.7"
+      },
+      {
+        "question": "What minecraft version added the @e (entity) selector?",
+        "answer": "1.8"
+      },
+      {
+        "question": "What minecraft version overhauled the End?",
+        "answer": "1.9"
+      },
+      {
+        "question": "What minecraft version introduced auto jump?",
+        "answer": "1.10"
+      },
+      {
+        "question": "What minecraft version increased the chat message length to 256 characters?",
+        "answer": "1.11"
+      },
+      {
+        "question": "What minecraft version added hotbar saving/loading in creative mode?",
+        "answer": "1.12"
+      },
+      {
+        "question": "What minecraft version added datapacks?",
+        "answer": "1.13"
+      },
+      {
+        "question": "What minecraft version added suspicious stew?",
+        "answer": "1.14"
+      },
+      {
+        "question": "What minecraft version introduced bees?",
+        "answer": "1.15"
+      },
+      {
+        "question": "What minecraft version overhauled the Nether?",
+        "answer": "1.16"
+      },
+      {
+        "question": "What item do you use in a brewing stand to create a thick potion?",
+        "answer": "glowstone dust"
+      },
+      {
+        "question": "How many seconds does it take for the regeneration I effect to heal 3 hearts?",
+        "answer": "15"
+      },
+      {
+        "question": "What item do you need to create a strength I potion from an awkward potion?",
+        "answer": "Blaze powder"
+      },
+      {
+        "question": "How many seconds does a regular leaping II potion last for?",
+        "answer": "90"
+      },
+      {
+        "question": "What tool do you need to mine a beacon?",
+        "answer": "hand"
+      },
+      {
+        "question": "What minecraft edition/game are you currently playing?",
+        "answer": "java"
+      },
+      {
+        "question": "What is Notch's real name?",
+        "answer": "Markus Persson"
+      },
+      {
+        "question": "What year was minecraft classic released?",
+        "answer": "2009"
+      },
+      {
+        "question": "What year was minecraft's full release?",
+        "answer": "2011"
+      },
+      {
+        "question": "What super mario 64 item was the elytra inspired by?",
+        "answer": "wing cap"
+      }
+    ]
+  },
+  {
+    "repo": "RareHyperIonYT/ChatGames",
+    "commit": "ac8aa1e4fa01305e87c327a461cde9487bd505d5",
+    "url": "https://github.com/RareHyperIonYT/ChatGames/tree/ac8aa1e4fa01305e87c327a461cde9487bd505d5",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "Which programming language is Minecraft written in?",
+        "answer": "Java"
+      },
+      {
+        "question": "Which mob drops blaze rods?",
+        "answer": "blaze"
+      }
+    ]
+  },
+  {
+    "repo": "PlayerPicked/ChatGame",
+    "commit": "2edfe38e425556e7be265e3bdd0c15a81f58dea3",
+    "url": "https://github.com/PlayerPicked/ChatGame/tree/2edfe38e425556e7be265e3bdd0c15a81f58dea3",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "I sneak at night, my bones creak, and I shoot arrows at you!",
+        "answer": "Skeleton"
+      },
+      {
+        "question": "I sneak up quietly, then explode loudly, leaving a giant hole!",
+        "answer": "Creeper"
+      },
+      {
+        "question": "Sunlight is my enemy, but at night I'll attack you!",
+        "answer": "Zombie"
+      },
+      {
+        "question": "I strike in the darkness if you don't sleep enough!",
+        "answer": "Phantom"
+      },
+      {
+        "question": "I steal blocks, won't attack unless you look into my eyes!",
+        "answer": "Enderman"
+      },
+      {
+        "question": "I have three heads, I destroy hard, summon me and you better run!",
+        "answer": "Wither"
+      },
+      {
+        "question": "I live in the forest, I watch you quietly, if you're kind to me, I'll follow you!",
+        "answer": "Wolf"
+      }
+    ]
+  },
+  {
+    "repo": "The-Epic/SimpleChatGames",
+    "commit": "f45eca102b36daf3357dd27a7a9795ac261ef1b1",
+    "url": "https://github.com/The-Epic/SimpleChatGames/tree/f45eca102b36daf3357dd27a7a9795ac261ef1b1",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "What is the name of the hostile mob that explodes?",
+        "answer": "creeper"
+      },
+      {
+        "question": "What is the name of the game mode where players have infinite resources?",
+        "answer": "creative mode"
+      },
+      {
+        "question": "What is the name of the red, fiery dimension that can be accessed through a Nether portal?",
+        "answer": "Nether"
+      },
+      {
+        "question": "What is the name of the neutral mob that can be tamed with bones?",
+        "answer": "wolf"
+      },
+      {
+        "question": "What is the name of the material used to create armor?",
+        "answer": "iron"
+      },
+      {
+        "question": "What is the name of the food that restores the most hunger points?",
+        "answer": "steak"
+      },
+      {
+        "question": "What is the name of the rare ore that can be found underground?",
+        "answer": "diamond"
+      },
+      {
+        "question": "What is the name of the block that is used to create a bed?",
+        "answer": "wool"
+      },
+      {
+        "question": "What is the name of the block that grows wheat?",
+        "answer": "farmland"
+      },
+      {
+        "question": "What is the name of the block that can be used to make a furnace?",
+        "answer": "cobblestone"
+      },
+      {
+        "question": "What is the name of the material used to create tools and weapons?",
+        "answer": "iron"
+      },
+      {
+        "question": "What is the name of the passive mob that can be milked?",
+        "answer": "cow"
+      },
+      {
+        "question": "What is the name of the item used to craft a fishing rod?",
+        "answer": "string"
+      },
+      {
+        "question": "What is the name of the item used to craft a bow?",
+        "answer": "sticks"
+      },
+      {
+        "question": "What is the name of the block that can be used to create a door?",
+        "answer": "wood planks"
+      },
+      {
+        "question": "What is the name of the block that can be used to create a boat?",
+        "answer": "wood planks"
+      },
+      {
+        "question": "What is the name of the block that can be used to create a crafting table?",
+        "answer": "wood planks"
+      }
+    ]
+  },
+  {
+    "repo": "asiddiqi18/Trivia-Plugin",
+    "commit": "b3a2615c8d397e2c752a377778d156d788ea8948",
+    "url": "https://github.com/asiddiqi18/Trivia-Plugin/tree/b3a2615c8d397e2c752a377778d156d788ea8948",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "Who is the original creator of Minecraft?",
+        "answer": "notch"
+      },
+      {
+        "question": "What do you need to turn powder to concrete?",
+        "answer": "water"
+      },
+      {
+        "question": "A splash potion of what will heal a skeleton?",
+        "answer": "Harming"
+      },
+      {
+        "question": "Notch almost called Minecraft what name?",
+        "answer": "Cavegame"
+      },
+      {
+        "question": "One block in the nether is equal to how many blocks in the overworld?",
+        "answer": "8"
+      },
+      {
+        "question": "Do cats take fall damage?",
+        "answer": "No"
+      },
+      {
+        "question": "It's easier to catch fish in what weather?",
+        "answer": "Rain"
+      },
+      {
+        "question": "Creepers were accidently created when Notch was making what mob?",
+        "answer": "Pig"
+      },
+      {
+        "question": "Creepers are afraid of what animal?",
+        "answer": "Cats"
+      },
+      {
+        "question": "How much gunpowder is required to craft 1 TNT?",
+        "answer": "5"
+      },
+      {
+        "question": "Mojang Studios is based in which country?",
+        "answer": "Sweden"
+      },
+      {
+        "question": "Which country invented tea?",
+        "answer": "China"
+      },
+      {
+        "question": "Groups of lions are known as what?",
+        "answer": "Pride"
+      },
+      {
+        "question": "Name the world's largest ocean.",
+        "answer": "Pacific Ocean"
+      },
+      {
+        "question": "What year was the very first model of the iPhone released?",
+        "answer": "2007"
+      },
+      {
+        "question": "In a website browser address bar, what does 'www' stand for?",
+        "answer": "World Wide Web"
+      },
+      {
+        "question": "How many hearts does an octopus have?",
+        "answer": "3"
+      },
+      {
+        "question": "Which chess piece can only move diagonally?",
+        "answer": "Bishop"
+      },
+      {
+        "question": "What's the most populous city in the United States?",
+        "answer": "New York City"
+      },
+      {
+        "question": "What is the largest lizard?",
+        "answer": "Komodo Dragon"
+      },
+      {
+        "question": "What is the largest planet in our solar system?",
+        "answer": "Jupiter"
+      }
+    ]
+  },
+  {
+    "repo": "Mythical-Games/ChatGames",
+    "commit": "c39f596f040f0beae3b7031d1275d6e7f8d09269",
+    "url": "https://github.com/Mythical-Games/ChatGames/tree/c39f596f040f0beae3b7031d1275d6e7f8d09269",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "What mob drops blaze rods?",
+        "answer": "Blaze"
+      },
+      {
+        "question": "Which block do you need to make a Nether portal?",
+        "answer": "Obsidian"
+      },
+      {
+        "question": "You use it to mine stone",
+        "answer": "Pickaxe"
+      },
+      {
+        "question": "You need this to sleep at night",
+        "answer": "Bed"
+      },
+      {
+        "question": "Explodes when near players",
+        "answer": "Creeper"
+      }
+    ]
+  },
+  {
+    "repo": "Fendernt/Shiny-Quizes",
+    "commit": "8867eb29cf7a53a8325f199c8ce6810a2997101d",
+    "url": "https://github.com/Fendernt/Shiny-Quizes/tree/8867eb29cf7a53a8325f199c8ce6810a2997101d",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "What comes after G in the alphabet?",
+        "answer": "H"
+      },
+      {
+        "question": "What comes after Q in the alphabet?",
+        "answer": "R"
+      },
+      {
+        "question": "How many letters does the alphabet have?",
+        "answer": "26"
+      },
+      {
+        "question": "What is the default screenshot button.",
+        "answer": "F2"
+      },
+      {
+        "question": "How many days are there in a default year?",
+        "answer": "365"
+      },
+      {
+        "question": "How many days does February have in a leap year?",
+        "answer": "29"
+      },
+      {
+        "question": "How many colors are there in a rainbow?",
+        "answer": "7"
+      },
+      {
+        "question": "What is the symbol for Potassium?",
+        "answer": "K"
+      },
+      {
+        "question": "How many seconds are there in a day?",
+        "answer": "86400"
+      },
+      {
+        "question": "How many seconds are there in an hour?",
+        "answer": "3600"
+      },
+      {
+        "question": "What is the symbol for copper?",
+        "answer": "Cu"
+      },
+      {
+        "question": "Which painter reputedly cut off his own ear?",
+        "answer": "Vincent van Gogh"
+      },
+      {
+        "question": "What animal is nkown to be 'man's best friend'?",
+        "answer": "Dog"
+      },
+      {
+        "question": "Which turtle can't retract into their shell?",
+        "answer": "Sea Turtle"
+      }
+    ]
+  },
+  {
+    "repo": "ProjectEdenGG/Nexus",
+    "commit": "211ba34ede9ab0e65a8de973bddba73dab58a9a1",
+    "url": "https://github.com/ProjectEdenGG/Nexus/tree/211ba34ede9ab0e65a8de973bddba73dab58a9a1",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "sourceLicense": "MIT",
+    "bankResource": "public-plugin-answers.json",
+    "entries": [
+      {
+        "question": "What item is used to breed camels?",
+        "answer": "cactus"
+      },
+      {
+        "question": "What do you feed a parrot to tame them?",
+        "answer": "seeds"
+      },
+      {
+        "question": "What color is the music disc 'Mall'?",
+        "answer": "purple"
+      },
+      {
+        "question": "What color is the music disc 'Stal'?",
+        "answer": "black"
+      },
+      {
+        "question": "What color is the music disc 'Cat'?",
+        "answer": "green"
+      },
+      {
+        "question": "What color is the music disc 'Wait'?",
+        "answer": "blue"
+      },
+      {
+        "question": "What is the maximum vanilla enchantment level for Blast Protection?",
+        "answer": "4"
+      },
+      {
+        "question": "What is the maximum vanilla enchantment level for Fire Aspect?",
+        "answer": "2"
+      },
+      {
+        "question": "What is the maximum vanilla enchantment level for Efficiency?",
+        "answer": "5"
+      },
+      {
+        "question": "What is the maximum vanilla enchantment level for Unbreaking?",
+        "answer": "3"
+      },
+      {
+        "question": "How many beetroot do you need to craft beetroot soup?",
+        "answer": "6"
+      },
+      {
+        "question": "What is the maximum amount of blocks a piston can push?",
+        "answer": "12"
+      },
+      {
+        "question": "What mob scares creepers?",
+        "answer": "cat"
+      },
+      {
+        "question": "How many slices does a cake have?",
+        "answer": "7"
+      },
+      {
+        "question": "What was the original name for Villagers?",
+        "answer": "testificates"
+      },
+      {
+        "question": "What indicates the health level of a Wolf?",
+        "answer": "tail"
+      },
+      {
+        "question": "What item drops if lightning strikes a turtle?",
+        "answer": "bowl"
+      },
+      {
+        "question": "Which mob is created when lightning strikes a pig?",
+        "answer": "zombified piglin"
+      },
+      {
+        "question": "Which mob is created when lightning strikes a red mooshroom?",
+        "answer": "brown mooshroom"
+      },
+      {
+        "question": "Which mob is created when lightning strikes a brown mooshroom?",
+        "answer": "red mooshroom"
+      },
+      {
+        "question": "Which mob is created when lightning strikes a villager?",
+        "answer": "witch"
+      },
+      {
+        "question": "What mob can be duplicated using an amethyst shard?",
+        "answer": "allay"
+      },
+      {
+        "question": "What item is used to breed Sniffers?",
+        "answer": "torchflower seeds"
+      },
+      {
+        "question": "What is the minimum number of obsidian needed to make a nether portal?",
+        "answer": "10"
+      },
+      {
+        "question": "What country borders Lithuania to the north?",
+        "answer": "Latvia"
+      },
+      {
+        "question": "What country borders Slovakia to the south?",
+        "answer": "Hungary"
+      },
+      {
+        "question": "What country borders Armenia to the east?",
+        "answer": "Azerbaijan"
+      },
+      {
+        "question": "What country is between France and Spain?",
+        "answer": "Andorra"
+      },
+      {
+        "question": "What country is completely surrounded by South Africa?",
+        "answer": "Lesotho"
+      },
+      {
+        "question": "What country has the most natural lakes?",
+        "answer": "Canada"
+      },
+      {
+        "question": "What country is home to Mount Kilimanjaro?",
+        "answer": "Tanzania"
+      },
+      {
+        "question": "What country has the city of Dubrovnik?",
+        "answer": "Croatia"
+      },
+      {
+        "question": "What country has the city of Budapest?",
+        "answer": "Hungary"
+      },
+      {
+        "question": "What country has the city of Jakarta?",
+        "answer": "Indonesia"
+      },
+      {
+        "question": "What country has the city of Vienna?",
+        "answer": "Austria"
+      },
+      {
+        "question": "What country has the city of Lisbon?",
+        "answer": "Portugal"
+      },
+      {
+        "question": "What country has the city of Copenhagen?",
+        "answer": "Denmark"
+      },
+      {
+        "question": "What country is home to Mount Fuji?",
+        "answer": "Japan"
+      },
+      {
+        "question": "What is the capital of New Zealand?",
+        "answer": "Wellington"
+      },
+      {
+        "question": "What is the capital of Nigeria?",
+        "answer": "Abuja"
+      }
+    ]
+  },
+  {
+    "repo": "bentahsin/AntiAFK",
+    "commit": "01fdf20ff2fb7a5eacc472912ca52c1067b58be3",
+    "license": "MIT",
+    "path": "AntiAFK-Core/src/main/resources/questions.yml",
+    "url": "https://github.com/bentahsin/AntiAFK/blob/01fdf20ff2fb7a5eacc472912ca52c1067b58be3/AntiAFK-Core/src/main/resources/questions.yml",
+    "sourceResource": "plugin-sources/bentahsin__AntiAFK/questions.yml",
+    "note": "Public default Turkish question targets; formatting codes removed. No CAPTCHA interaction is implemented.",
+    "entries": [
+      {
+        "id": "q2",
+        "question": "Minecraft'ta k\u00f6m\u00fcr ne renktir?",
+        "answer": "siyah"
+      },
+      {
+        "id": "q3",
+        "question": "G\u00fcne\u015f nereden do\u011far?",
+        "answer": "do\u011fudan"
+      },
+      {
+        "id": "q5",
+        "question": "'Elma' kelimesinde ka\u00e7 harf vard\u0131r?",
+        "answer": "4"
+      },
+      {
+        "id": "q6",
+        "question": "Buz eriyince neye d\u00f6n\u00fc\u015f\u00fcr?",
+        "answer": "su"
+      }
+    ],
+    "sourceLicense": "MIT",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "bankResource": "expanded-plugin-answers.json"
+  },
+  {
+    "repo": "M0dEx/FunQuiz",
+    "commit": "d8a0661bed87ff6fcd3eae1cdf0a60b59553f25e",
+    "license": "AGPL-3.0",
+    "path": "src/main/resources/questions.yml",
+    "url": "https://github.com/M0dEx/FunQuiz/blob/d8a0661bed87ff6fcd3eae1cdf0a60b59553f25e/src/main/resources/questions.yml",
+    "sourceResource": "plugin-sources/M0dEx__FunQuiz/questions.yml",
+    "note": "Selected stable default trivia; disputed river and broad animal superlatives excluded.",
+    "entries": [
+      {
+        "id": "q1",
+        "question": "What is another word for lexicon?",
+        "answer": "dictionary"
+      },
+      {
+        "id": "q2",
+        "question": "What is the name of the seventh planet from the sun?",
+        "answer": "Uranus"
+      },
+      {
+        "id": "q5",
+        "question": "Who was the first human in space?",
+        "answer": "yuri gagarin"
+      },
+      {
+        "id": "q7",
+        "question": "How many stars are on the American flag?",
+        "answer": "fifty"
+      },
+      {
+        "id": "q9",
+        "question": "In what year did princess diana die?",
+        "answer": "1997"
+      },
+      {
+        "id": "q14",
+        "question": "How many oscars did the Titanic movie got?",
+        "answer": "eleven"
+      }
+    ],
+    "sourceLicense": "AGPL-3.0",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "bankResource": "expanded-plugin-answers.json"
+  },
+  {
+    "repo": "Soapiee/TFQuiz",
+    "commit": "310fed3fff9719686ee66fb121afefd1b7846892",
+    "license": "GPL-3.0",
+    "path": "core/src/main/resources/questions.yml",
+    "url": "https://github.com/Soapiee/TFQuiz/blob/310fed3fff9719686ee66fb121afefd1b7846892/core/src/main/resources/questions.yml",
+    "sourceResource": "plugin-sources/Soapiee__TFQuiz/questions.yml",
+    "note": "Logical true/false targets from the arena quiz. These are data answers, not GUI/arena input support.",
+    "entries": [
+      {
+        "id": "3",
+        "question": "The unicorn is the national animal of Scotland",
+        "answer": "true"
+      },
+      {
+        "id": "4",
+        "question": "Goldfish have a two second memory",
+        "answer": "false"
+      },
+      {
+        "id": "5",
+        "question": "An octopus has two hearts",
+        "answer": "false"
+      },
+      {
+        "id": "6",
+        "question": "An octopus has three hearts",
+        "answer": "true"
+      },
+      {
+        "id": "7",
+        "question": "An octopus has four hearts",
+        "answer": "false"
+      },
+      {
+        "id": "8",
+        "question": "Cinderella was the first Disney princess",
+        "answer": "false"
+      },
+      {
+        "id": "9",
+        "question": "Alexander Fleming discovered penicillin",
+        "answer": "true"
+      },
+      {
+        "id": "10",
+        "question": "The black box in a plane is black",
+        "answer": "false"
+      },
+      {
+        "id": "12",
+        "question": "The United States has the longest coastline in the world",
+        "answer": "false"
+      },
+      {
+        "id": "13",
+        "question": "Spaghetto is the singular word for a piece of spaghetti",
+        "answer": "true"
+      },
+      {
+        "id": "14",
+        "question": "The Olympics are held every five years",
+        "answer": "false"
+      }
+    ],
+    "sourceLicense": "GPL-3.0",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "bankResource": "expanded-plugin-answers.json"
+  },
+  {
+    "repo": "StarTux/Quiz",
+    "commit": "459d14919123a2bfee61fc86d7e12af5d7a0f5a6",
+    "license": "GPL-2.0",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/StarTux/Quiz/blob/459d14919123a2bfee61fc86d7e12af5d7a0f5a6/src/main/resources/config.yml",
+    "sourceResource": "plugin-sources/StarTux__Quiz/config.yml",
+    "note": "Free-text adaptation of the correct default multiple-choice option, not a claim of numeric-choice support.",
+    "entries": [
+      {
+        "id": "questions[1]",
+        "question": "Who invented the redstone repeater?",
+        "answer": "Jeb"
+      }
+    ],
+    "sourceLicense": "GPL-2.0",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "bankResource": "expanded-plugin-answers.json"
+  },
+  {
+    "repo": "United-Lands/UnitedChat",
+    "commit": "b976c4fb16bfa8550ea1b42d8a227f5ace2637a6",
+    "license": "GPL-3.0",
+    "path": "src/main/resources/quiz/questions.yml",
+    "url": "https://github.com/United-Lands/UnitedChat/blob/b976c4fb16bfa8550ea1b42d8a227f5ace2637a6/src/main/resources/quiz/questions.yml",
+    "sourceResource": "plugin-sources/United-Lands__UnitedChat/questions.yml",
+    "note": "Only selected open_text defaults; one accepted answer selected per question.",
+    "entries": [
+      {
+        "id": "4",
+        "question": "Which English rock band released the 1969 album Abbey Road?",
+        "answer": "The Beatles"
+      },
+      {
+        "id": "6",
+        "question": "What is the largest country in the world by land area?",
+        "answer": "Russia"
+      },
+      {
+        "id": "8",
+        "question": "What dimension in Minecraft is home to the Ender Dragon?",
+        "answer": "The End"
+      },
+      {
+        "id": "10",
+        "question": "Who was the first human to walk on the Moon?",
+        "answer": "Neil Armstrong"
+      }
+    ],
+    "sourceLicense": "GPL-3.0",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "bankResource": "expanded-plugin-answers.json"
+  },
+  {
+    "repo": "pump61/AbsolutEvents",
+    "commit": "3e7072fd388f01528c97ee3ddfebc434bdf1aff8",
+    "license": "MIT",
+    "path": "src/main/resources/eventos/quiz.yml",
+    "url": "https://github.com/pump61/AbsolutEvents/blob/3e7072fd388f01528c97ee3ddfebc434bdf1aff8/src/main/resources/eventos/quiz.yml",
+    "sourceResource": "plugin-sources/pump61__AbsolutEvents/quiz.yml",
+    "note": "Selected stable Portuguese physics/Minecraft statements. Boolean targets do not implement arena input.",
+    "entries": [
+      {
+        "id": "Questions[20]",
+        "question": "A velocidade da luz \u00e9 maior que a velocidade do som?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[21]",
+        "question": "Existe gravidade no espa\u00e7o?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[22]",
+        "question": "O ouro \u00e9 mais denso que o ferro?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[23]",
+        "question": "Um ano luz mede tempo?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[26]",
+        "question": "A Lua tem gravidade zero?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[27]",
+        "question": "O som se propaga no v\u00e1cuo?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[28]",
+        "question": "O Sol \u00e9 maior que J\u00fapiter?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[35]",
+        "question": "Um corpo mais pesado cai mais r\u00e1pido que um leve no v\u00e1cuo?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[38]",
+        "question": "\u00c9 poss\u00edvel dividir por zero em matem\u00e1tica convencional?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[42]",
+        "question": "O rel\u00f3gio funciona corretamente no Nether?",
+        "answer": "false"
+      }
+    ],
+    "sourceLicense": "MIT",
+    "kind": "licensed-defaults-or-documented-adaptations",
+    "bankResource": "expanded-plugin-answers.json"
+  },
+  {
+    "repo": "gbl/PoK",
+    "commit": "aad35faafa7bc625f1593cf4a7ba94abb645f941",
+    "path": "src/default1.txt",
+    "url": "https://github.com/gbl/PoK/blob/aad35faafa7bc625f1593cf4a7ba94abb645f941/src/default1.txt",
+    "sha256": "b6b019887c99c8b3d8674ea9def0855651df83ca885ccd64a80e54dbe362ed0f",
+    "sourceLicense": "GPL-3.0",
+    "kind": "factual-example",
+    "note": "Independent geographic wording; obsolete trivia in the source is not imported.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "In which city is O'Hare International Airport located?",
+        "answer": "Chicago"
+      }
+    ]
+  },
+  {
+    "repo": "HansOffice/cyuquiz-reload",
+    "commit": "3aead1cacd8e2435dfd6bc7cc9cdc7f33163dca0",
+    "path": "src/main/resources/quizzes/minecraft.yml",
+    "url": "https://github.com/HansOffice/cyuquiz-reload/blob/3aead1cacd8e2435dfd6bc7cc9cdc7f33163dca0/src/main/resources/quizzes/minecraft.yml",
+    "sha256": "c65d251ae91a89f9a39ba5ed215df42681f7842a3cf6cccb2b17599fa848a3f3",
+    "sourceLicense": "MIT",
+    "kind": "factual-example",
+    "note": "Independent English factual variant of the Chinese mc_smoker default; not Chinese GUI/input support.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Compared with a furnace, what is a smoker's food-cooking speed multiplier?",
+        "answer": "2"
+      }
+    ]
+  },
+  {
+    "repo": "vekotov/quizPlugin",
+    "commit": "be4babc40cab939c8ab7af481579c09085a44b46",
+    "path": "src/main/resources/quests.yml",
+    "url": "https://github.com/vekotov/quizPlugin/blob/be4babc40cab939c8ab7af481579c09085a44b46/src/main/resources/quests.yml",
+    "sha256": "f619a1389f86793dfe6fdb4d7c7b0a9f14a2d7efd9e68af86e0fc5ece969097a",
+    "sourceLicense": "MIT",
+    "kind": "factual-example",
+    "note": "Arithmetic fact from default quest2; not clickable-choice input support.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is the sum of 2 and 7?",
+        "answer": "9"
+      }
+    ]
+  },
+  {
+    "repo": "naforky-dev/KHistoryQuiz",
+    "commit": "3cc7e0c1feeb0b45a9b415baa6422db056d4c0d9",
+    "path": "src/resources/questions.yml",
+    "url": "https://github.com/naforky-dev/KHistoryQuiz/blob/3cc7e0c1feeb0b45a9b415baa6422db056d4c0d9/src/resources/questions.yml",
+    "sha256": "fddb79a4059d85f9bfee6a31d233ca2d878bce093c2c063923ebeab36c3a559c",
+    "sourceLicense": "GPL-3.0",
+    "kind": "factual-example",
+    "note": "Independent English factual variant of the installed Korean sample; sample is a real dated fact, not placeholder answer text.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "In which year was the Republic of Korea founded?",
+        "answer": "1948"
+      }
+    ]
+  },
+  {
+    "repo": "rd806/ServerQuiz",
+    "commit": "8c719fb2f4c9461f80bad50b52debc0757daa497",
+    "path": "src/main/resources/Quiz.yml",
+    "url": "https://github.com/rd806/ServerQuiz/blob/8c719fb2f4c9461f80bad50b52debc0757daa497/src/main/resources/Quiz.yml",
+    "sha256": "206e3580602b38eb10ab5c2f5f5b87f668a125f130ad9af10e975447372bc0d4",
+    "sourceLicense": "MIT",
+    "kind": "factual-example",
+    "note": "Independent yes/no variant of the invalid-address option; octet 256 exceeds 255. Not GUI-choice support.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Is the address 127.256.3.34 valid IPv4?",
+        "answer": "No"
+      }
+    ]
+  },
+  {
+    "repo": "GiansCode/ChatGames",
+    "commit": "389ce46f81a6142f9f75ef11710d61159d545d8a",
+    "path": "src/main/resources/questions.yml",
+    "url": "https://github.com/GiansCode/ChatGames/blob/389ce46f81a6142f9f75ef11710d61159d545d8a/src/main/resources/questions.yml",
+    "sha256": "7bcbd2b6d7234858c5016eb9013d4aed4fd88303460c1b148eab40974bf1918d",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independently formatted arithmetic from the actual default question.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is the value of 5*2+1?",
+        "answer": "11"
+      }
+    ]
+  },
+  {
+    "repo": "Weber588/WbsChatGame",
+    "commit": "917d363f1508882f8b6a2e0312999509a0fc35ec",
+    "path": "src/main/resources/games/trivia.yml",
+    "url": "https://github.com/Weber588/WbsChatGame/blob/917d363f1508882f8b6a2e0312999509a0fc35ec/src/main/resources/games/trivia.yml",
+    "sha256": "d94d2a7f22ac1bcb020d485c71946381840fe3dd84b21d3e4486c9c18a189f99",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent factual paraphrase of an inspected default.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What nickname does Markus Persson use online?",
+        "answer": "Notch"
+      }
+    ]
+  },
+  {
+    "repo": "Waterbroodje/ChatGames",
+    "commit": "2f1985284645f5bbb3c8529db6e49a8855927c8b",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/Waterbroodje/ChatGames/blob/2f1985284645f5bbb3c8529db6e49a8855927c8b/src/main/resources/config.yml",
+    "sha256": "6ea841207e5b6d16aa106fa1777cf261cdc7b89c08073118a12fc11e2877e13e",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Arithmetic from configured game-3; not a fabricated random answer.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 141 * 2 / 4?",
+        "answer": "70.5"
+      }
+    ]
+  },
+  {
+    "repo": "siggiq/MathBreak",
+    "commit": "d1a523f63ab714db90512458a047dfdbc04e60d4",
+    "path": "src/main/java/com/meowserver/mathbreak/MathBreak.java",
+    "url": "https://github.com/siggiq/MathBreak/blob/d1a523f63ab714db90512458a047dfdbc04e60d4/src/main/java/com/meowserver/mathbreak/MathBreak.java",
+    "sha256": "7c34e3e74c5265880b7b89caa2a88404c21918b5629d1f64a112f118732b2cac",
+    "sourceLicense": "MIT",
+    "kind": "generated-math-example",
+    "note": "Reproducible possible round using an inspected operator and input range; not a captured fixed question.",
+    "inputs": {
+      "left": 12,
+      "operator": "*",
+      "right": 11,
+      "bounds": [
+        10,
+        99,
+        10,
+        99
+      ]
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 12 * 11?",
+        "answer": "132"
+      }
+    ]
+  },
+  {
+    "repo": "itsfedor/vocabquiz",
+    "commit": "43cac45f503bbfca32ac0ea837eb53286d371738",
+    "path": "src/main/resources/questions/animals.yml",
+    "url": "https://github.com/itsfedor/vocabquiz/blob/43cac45f503bbfca32ac0ea837eb53286d371738/src/main/resources/questions/animals.yml",
+    "sha256": "2aedf41b3927d937726bf0c56ea987279dfe17a4eed14dff8b78d3b5ae725712",
+    "sourceLicense": "MIT",
+    "kind": "factual-example",
+    "note": "Independent factual paraphrase of an inspected default.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Which farm animal is known for making a moo sound?",
+        "answer": "cow"
+      }
+    ]
+  },
+  {
+    "repo": "funnyboy-roks/ChatGames",
+    "commit": "823f084c37ba94047b12fb4efa43b2ed4dba04fd",
+    "path": "src/main/resources/lists/countries.txt",
+    "url": "https://github.com/funnyboy-roks/ChatGames/blob/823f084c37ba94047b12fb4efa43b2ed4dba04fd/src/main/resources/lists/countries.txt",
+    "sha256": "3af2520cfbc41709862d767403948a6496791293e2fdb60cf23e513bfe85e519",
+    "sourceLicense": "Apache-2.0",
+    "kind": "generated-word-example",
+    "note": "Possible country-word scramble derived from the supplied word asset, not a fixed trivia-bank question.",
+    "inputs": {
+      "word": "Canada",
+      "permutation": "adanac"
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Which country name is made from the letters adanac?",
+        "answer": "Canada"
+      }
+    ]
+  },
+  {
+    "repo": "antbag-pm-pl/ChatGames",
+    "commit": "d5efff39f7c965824d2e0c91e224196fc7da0be5",
+    "path": "resources/config.yml",
+    "url": "https://github.com/antbag-pm-pl/ChatGames/blob/d5efff39f7c965824d2e0c91e224196fc7da0be5/resources/config.yml",
+    "sha256": "04fef6b56430fdf4fb39e17e408d25acf8d71b233db2bab2f790e129b518f496",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "generated-word-example",
+    "note": "Possible scramble of the ordinary default word Bedrock. No unlicensed code, configuration or word pack is redistributed.",
+    "inputs": {
+      "word": "Bedrock",
+      "permutation": "orkedcb"
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Which Minecraft block name is made from orkedcb?",
+        "answer": "bedrock"
+      }
+    ]
+  },
+  {
+    "repo": "EpicDevelopment/EpicChatGames",
+    "commit": "04d113f0ed045aad2d84f997d3eb3a9b0d2c669a",
+    "path": "src/main/java/gg/minecrush/reactions/ReactionManager.java",
+    "url": "https://github.com/EpicDevelopment/EpicChatGames/blob/04d113f0ed045aad2d84f997d3eb3a9b0d2c669a/src/main/java/gg/minecrush/reactions/ReactionManager.java",
+    "sha256": "1ae73e18b3ec28abeb13aa41e748fb280c15bf7729c6f2129daf3f906c7fac71",
+    "sourceLicense": "MIT",
+    "kind": "generated-math-example",
+    "note": "Reproducible possible round using an inspected operator and input range; not a captured fixed question.",
+    "inputs": {
+      "left": 33,
+      "operator": "+",
+      "right": 47,
+      "bounds": [
+        30,
+        250,
+        30,
+        250
+      ]
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 33 + 47?",
+        "answer": "80"
+      }
+    ]
+  },
+  {
+    "repo": "Pan-nav/Project-ChatGames",
+    "commit": "b98e6807d409a4a6f4be421edc8821a3f3275542",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/Pan-nav/Project-ChatGames/blob/b98e6807d409a4a6f4be421edc8821a3f3275542/src/main/resources/config.yml",
+    "sha256": "253368bf36a21254c61f8b83ded1beb9724bbb2f277aa62d7c71565bfe75809b",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent factual variant of configured question 3; legacy pumpkin and incorrect first-mob claims excluded.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What nation hosts Mojang's main studio?",
+        "answer": "Sweden"
+      }
+    ]
+  },
+  {
+    "repo": "UwUAroze/ChatMinigames",
+    "commit": "99e5fd42fb642c59edbbd377bc7cb6f24c8a5e32",
+    "path": "src/main/kotlin/me/aroze/chatminigames/minigame/impl/MathGame.kt",
+    "url": "https://github.com/UwUAroze/ChatMinigames/blob/99e5fd42fb642c59edbbd377bc7cb6f24c8a5e32/src/main/kotlin/me/aroze/chatminigames/minigame/impl/MathGame.kt",
+    "sha256": "5a074c75effbe4e495c33635538c06361806f4a8ce4dd8b2378d55a1bf0f6043",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "generated-math-example",
+    "note": "Reproducible possible round using an inspected operator and input range; not a captured fixed question.",
+    "inputs": {
+      "left": 6,
+      "operator": "*",
+      "right": 7,
+      "bounds": [
+        2,
+        12,
+        2,
+        12
+      ]
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 6 * 7?",
+        "answer": "42"
+      }
+    ]
+  },
+  {
+    "repo": "raymondpattend/ChatGames",
+    "commit": "5ee033b7d820ae473c4fa96f3e5ac965b88b0fc5",
+    "path": "src/main/java/com/reflexian/chatgames/Quickmaths/Commands/Quickmaths.java",
+    "url": "https://github.com/raymondpattend/ChatGames/blob/5ee033b7d820ae473c4fa96f3e5ac965b88b0fc5/src/main/java/com/reflexian/chatgames/Quickmaths/Commands/Quickmaths.java",
+    "sha256": "4fda790256cb0e37e07dc947d19313c786bc1b50f2f09dd4516e09c6551c9086",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "generated-math-example",
+    "note": "Possible addition round within the inspected default 1..100 range; not a captured fixed question.",
+    "inputs": {
+      "left": 8,
+      "operator": "+",
+      "right": 9,
+      "bounds": [
+        1,
+        100,
+        1,
+        100
+      ]
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 8 + 9?",
+        "answer": "17"
+      }
+    ]
+  },
+  {
+    "repo": "hexett/ChatGames",
+    "commit": "23a5081f95bf8b79aa14e6e0e298484e27725093",
+    "path": "src/main/java/com/savage/chatgames/games/Math.java",
+    "url": "https://github.com/hexett/ChatGames/blob/23a5081f95bf8b79aa14e6e0e298484e27725093/src/main/java/com/savage/chatgames/games/Math.java",
+    "sha256": "d319bab2e7a71a9c174a72b79f84488c61ac638fb6098551ec219822f1c0e3f3",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "generated-math-example",
+    "note": "Reproducible possible round using an inspected operator and input range; not a captured fixed question.",
+    "inputs": {
+      "left": 23,
+      "operator": "+",
+      "right": 35,
+      "bounds": [
+        1,
+        100,
+        1,
+        100
+      ]
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 23 + 35?",
+        "answer": "58"
+      }
+    ]
+  },
+  {
+    "repo": "MrReZik/ChatGame",
+    "commit": "d52767dfabb90a84df77535973155cc53f304f42",
+    "path": "src/main/java/com/mrrezik/chatGame/GameTask.java",
+    "url": "https://github.com/MrReZik/ChatGame/blob/d52767dfabb90a84df77535973155cc53f304f42/src/main/java/com/mrrezik/chatGame/GameTask.java",
+    "sha256": "1b390a9e27a25384731245b76ceaae9e8881e01de27f6d3e8956144aaf5ac60d",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "generated-math-example",
+    "note": "Reproducible possible round using an inspected operator and input range; not a captured fixed question.",
+    "inputs": {
+      "left": 42,
+      "operator": "*",
+      "right": 3,
+      "bounds": [
+        10,
+        99,
+        1,
+        9
+      ]
+    },
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is 42 * 3?",
+        "answer": "126"
+      }
+    ]
+  },
+  {
+    "repo": "jascotty2/Quiz",
+    "commit": "17bfa3102dc65a175f522520890e7bab604df646",
+    "path": "src/quiz.txt",
+    "url": "https://github.com/jascotty2/Quiz/blob/17bfa3102dc65a175f522520890e7bab604df646/src/quiz.txt",
+    "sha256": "3dfc753002667343756ca9355d5132f7fcb2a0396c2354fc94b16bcf10c3d03a",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent stable block-property wording; obsolete counts and copied literary prompts excluded.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What hardness value is used for bedrock?",
+        "answer": "-1"
+      }
+    ]
+  },
+  {
+    "repo": "BenjaminPoh/HoloQuiz2",
+    "commit": "e8525d7439d472588e2dd506fbbf1e2d6c2de644",
+    "path": "src/main/resources/QuestionBank.yml",
+    "url": "https://github.com/BenjaminPoh/HoloQuiz2/blob/e8525d7439d472588e2dd506fbbf1e2d6c2de644/src/main/resources/QuestionBank.yml",
+    "sha256": "8cfef11747db7ded95d186e2a3097aa91debb662ebe1952d2ff18646c71eeeb1",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent factual paraphrase of an inspected default.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Does Dijkstra's shortest-path algorithm make greedy choices?",
+        "answer": "yes"
+      }
+    ]
+  },
+  {
+    "repo": "vanes430/ChatGames",
+    "commit": "55a6290782764cd213b4237ccc95b589dc9b12ab",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/vanes430/ChatGames/blob/55a6290782764cd213b4237ccc95b589dc9b12ab/src/main/resources/config.yml",
+    "sha256": "9e58193e96f0a29060fbaa7944a31c49dd90b8359d9250e494088056913057e0",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent numeric fact from the Indonesian dice default. The recoded/translated Novaechiro implementation is not counted separately.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "How many faces does a standard cubic die have?",
+        "answer": "6"
+      }
+    ]
+  },
+  {
+    "repo": "Steve-Tech/SimpleQuizzes",
+    "commit": "8a43be44082dfdf4deed56261b8e1601ef5dc05a",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/Steve-Tech/SimpleQuizzes/blob/8a43be44082dfdf4deed56261b8e1601ef5dc05a/src/main/resources/config.yml",
+    "sha256": "f1bb04438284da308104849a2bd02722cf12664dc13c52ae4e40002ddb723bda",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent factual paraphrase of an inspected default.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "Which city and state contain Microsoft's headquarters?",
+        "answer": "Redmond Washington"
+      }
+    ]
+  },
+  {
+    "repo": "oliviercosquer/PromoteQuizz",
+    "commit": "8d79d67b5b1ad7c9560fa635f4a8d96f1138b0a6",
+    "path": "src/config.yml",
+    "url": "https://github.com/oliviercosquer/PromoteQuizz/blob/8d79d67b5b1ad7c9560fa635f4a8d96f1138b0a6/src/config.yml",
+    "sha256": "d92f287eacd2551a8d6c0320c7ae3164c03326f94c79ed77640c079e885c24bf",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent English arithmetic variant of the actual French default.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is one plus one?",
+        "answer": "2"
+      }
+    ]
+  },
+  {
+    "repo": "Javanti/ChatGame",
+    "commit": "08e0e3c9dcc6239af965beedcfae188938e19c07",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/Javanti/ChatGame/blob/08e0e3c9dcc6239af965beedcfae188938e19c07/src/main/resources/config.yml",
+    "sha256": "b050a1969b1f5b88e88436e75bee1365c2a2d794f2d56b0cb179a688deaf7675",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent arithmetic expansion of the actual short default 2+2 prompt.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is two plus two?",
+        "answer": "4"
+      }
+    ]
+  },
+  {
+    "repo": "leyvameister/Quiz",
+    "commit": "e2b63ad27ba5100e1041669f1c240eb51f5f75f1",
+    "path": "src/main/resources/Questions.yml",
+    "url": "https://github.com/leyvameister/Quiz/blob/e2b63ad27ba5100e1041669f1c240eb51f5f75f1/src/main/resources/Questions.yml",
+    "sha256": "c90be0272ed49b4552717c3e588dfbda5c32e35d503634e827bcd1f5026406da",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent factual paraphrase of an inspected default.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What city serves as Spain's capital?",
+        "answer": "Madrid"
+      }
+    ]
+  },
+  {
+    "repo": "EternalFeather621/EFQuiz",
+    "commit": "61c632d0ea5a3b34188328af90af2bdf35b9aaf2",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/EternalFeather621/EFQuiz/blob/61c632d0ea5a3b34188328af90af2bdf35b9aaf2/src/main/resources/config.yml",
+    "sha256": "752ecdcdddc2b95af433f830983045fc42bd2ce9ac2fc055442fd5ccff433ed3",
+    "sourceLicense": "No reuse license identified; inspection only",
+    "kind": "factual-example",
+    "note": "Independent English factual wording from the iron-pickaxe accepted option; no claim of Chinese prompt or GUI handling.",
+    "bankResource": "plugin-fact-answers.json",
+    "entries": [
+      {
+        "question": "What is the minimum vanilla pickaxe tier needed to mine diamond ore?",
+        "answer": "iron pickaxe"
+      }
+    ]
+  }
+]

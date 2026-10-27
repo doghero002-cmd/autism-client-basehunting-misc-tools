@@ -1,410 +1,247 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package com.autism.seedcracker.modules;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.autism.seedcracker.SeedcrackerAddon;
+import com.autism.seedcracker.compat.ClientNotify;
 import com.autism.seedcracker.netherite.HiddenDebrisScanner;
-
+import com.autism.seedcracker.render.BlockEspRenderer;
+import com.autism.seedcracker.spectre.palette.DebrisProbe;
+import com.autism.seedcracker.spectre.palette.PaletteOverlay;
+import com.autism.seedcracker.util.RelogPersistence;
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.ColorSetting;
+import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.ChunkPos;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * Netherite Finder (port of the Anubis Client logic).
- *
- * Finds ancient debris the server tries to HIDE from you (anti-xray). Instead of trusting
- * mc.level.getBlockState (already server-filtered), it reads the raw chunk-packet buffer and scans
- * each section's block palette: a section whose palette still contains the ancient-debris state id
- * while ZERO packed blocks resolve to it had debris edited out of the block data - so it's there,
- * just hidden. Those sections get flagged.
- *
- * Rendering follows the Anubis style: a wireframe edge outline + corner brackets around each
- * flagged section, a translucent shell fill, and a tracer to the nearest one. Sections pulse with
- * a fade-in so a fresh detection reads as a reveal, not a static box.
- */
+/** Native port of Spectre NetheriteFinder/AdvancedFinder/NetheriteVisuals (d5a7dd3de0be). */
 public final class NetheriteFinderModule extends Module {
-
-    private static final long NOTIFY_COOLDOWN_MS = 8000;
-
-    private final IntSetting range = add(new IntSetting("range", "Range (chunks)", 16, 1, 64, 1)
-        .description("Only render flagged sections within this chunk distance (16 chunks = 256 blocks = your full render distance by default).")
-        .group("General"));
-    private final IntSetting opacity = add(new IntSetting("opacity", "Fill opacity (%)", 18, 0, 100, 2)
-        .description("How solid the translucent section-box fill is (0 = outline only, 100 = fully solid).")
-        .group("Render"));
-    private final ColorSetting color = add(new ColorSetting("color", "Section colour", 0xFFE04030).group("Render"));
-    private final BoolSetting tracer = add(new BoolSetting("tracer", "Tracer", true)
-        .description("Draw a tracer line to the nearest flagged section.").group("Render"));
-    private final BoolSetting shellFill = add(new BoolSetting("shell-fill", "Shell fill", true)
-        .description("Translucent fill inside flagged sections.").group("Render"));
-    private final BoolSetting notify = add(new BoolSetting("notify", "Notify on reveal", true)
-        .description("Chat ping when a hidden-debris section is revealed.").group("General"));
-    private final BoolSetting probe = add(new BoolSetting("probe", "Auto-probe (confirm)", false)
-        .description("Anubis AdvancedFinder: when you're near a flagged section, mine toward the hidden debris to force the server to reveal it (confirms real debris vs a palette artifact). Mines with your held tool.")
-        .group("Probe"));
-    private final IntSetting probeRange = add(new IntSetting("probe-range", "Probe range (blocks)", 6, 2, 12, 1)
-        .description("Only probe flagged sections within this reach of you.")
-        .group("Probe").visibleWhen(() -> probe.get()));
-
-    /** Anubis NetheriteChunkTracker.MAXIMUM_CANDIDATES: cap flagged sections, evict oldest first. */
-    private static final int MAX_FLAGGED = 512;
-
-    /** sectionKey -> reveal timestamp. key packs chunkX, chunkZ, sectionY. Access-ordered LinkedHashMap
-     * that self-evicts the eldest entry past MAX_FLAGGED (the Anubis FIFO candidate cap). Wrapped
-     * synchronized: the netty chunk thread writes while the client tick thread reads/prunes. */
-    private final Map<Long, Long> flagged = java.util.Collections.synchronizedMap(
-        new java.util.LinkedHashMap<Long, Long>(16, 0.75f, true) {
-            @Override protected boolean removeEldestEntry(Map.Entry<Long, Long> eldest) {
-                return size() > MAX_FLAGGED;
-            }
-        });
-    /** Exact debris blocks revealed by block-update packets (the Anubis AdvancedFinder reveal). Once
-     * a block actually becomes ancient_debris in the client's view, the server sends a block update
-     * carrying its real position - we render that EXACT block through walls, not just the section. */
-    private final Set<BlockPos> revealed = ConcurrentHashMap.newKeySet();
-    private long lastNotifyAt = 0;
-    private int probeCooldown = 0;
-    private int exposurePruneTicks = 0;
-    /** Block the probe is currently mining (continueDestroyBlock keeps progress; re-calling
-     * startDestroyBlock every pass reset it, so hard blocks never broke). */
-    private BlockPos probeMining = null;
-    private boolean probeAimedLastTick = false;
-    /** Last dimension we saw, so a nether<->overworld swap (still connected) clears stale flags. */
-    private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lastDimension = null;
+    private static final String ID = SeedcrackerAddon.ID + ":netherite-finder";
+    private enum ProbeStyle { DOTS, CUBES, PULSES }
+    private final IntSetting range = add(new IntSetting("range", "Range (chunks)", 32, 4, 64, 1).group("General"));
+    private final BoolSetting notify = add(new BoolSetting("notify", "Notifications", false).group("General"));
+    private final ColorSetting color = add(new ColorSetting("color", "Near color", -34304).group("Render"));
+    private final ColorSetting farColor = add(new ColorSetting("far-color", "Far color", -11688961).group("Render"));
+    private final IntSetting fade = add(new IntSetting("fade-distance", "Color fade distance", 192, 32, 512, 8).group("Render"));
+    private final BoolSetting shellFill = add(new BoolSetting("shell-fill", "Section fill", true).group("Render"));
+    private final IntSetting opacity = add(new IntSetting("opacity", "Fill opacity (%)", 7, 0, 100, 1).group("Render"));
+    private final BoolSetting tracer = add(new BoolSetting("tracer", "Chunk tracers", true).group("Render"));
+    private final IntSetting tracerCount = add(new IntSetting("tracer-count", "Tracer count", 3, 1, 8, 1).group("Render").visibleWhen(tracer::get));
+    private final BoolSetting advanced = add(new BoolSetting("advanced-finder", "Advanced finder (probe)", false)
+        .description("Opt-in coarse-first START/ABORT probing with a non-tool slot. Sends mining actions; never continues a break.").group("Probe"));
+    private final BoolSetting showProbes = add(new BoolSetting("show-probes", "Show probes", true).group("Probe").visibleWhen(advanced::get));
+    private final EnumSetting<ProbeStyle> probeStyle = add(new EnumSetting<>("probe-style", "Probe style", ProbeStyle.DOTS, ProbeStyle.values())
+        .group("Probe").visibleWhen(() -> advanced.get() && showProbes.get()));
+    private final IntSetting missingFrom = add(new IntSetting("missing-from", "Mark missing from (%)", 60, 30, 100, 5)
+        .group("Probe").visibleWhen(() -> advanced.get() && showProbes.get()));
+    private final Set<DebrisProbe.Section> candidates = new LinkedHashSet<>();
+    private final DebrisProbe probes = new DebrisProbe();
+    private Set<String> renderIds = Set.of();
+    private ClientLevel level;
+    private boolean unloadHook;
+    private long lastNotify;
+    private int pending;
+    private BlockPos nearestPending;
 
     public NetheriteFinderModule() {
-        super(SeedcrackerAddon.ID + ":netherite-finder", "Netherite Finder",
-            "Reveals ancient debris the server hides (anti-xray) by scanning chunk-section palettes.");
+        super(ID, "Netherite Finder", "Spectre palette leaks, exact debris reveals and optional coarse-first probing.");
     }
 
-    @Override
-    public void onEnable() {
-        // BlockEspRenderer must be init()'d before it renders anything (registers the level render
-        // event). Wrapped so a render-event failure can never kill the module's enable/scan.
-        try {
-            com.autism.seedcracker.render.BlockEspRenderer.init();
-            com.autism.seedcracker.compat.ClientNotify.success("[NetheriteFinder] enabled");
-        } catch (Throwable t) {
-            com.autism.seedcracker.compat.ClientNotify.error("[NetheriteFinder] render init failed: " + t);
-        }
-    }
-
-    @Override
-    public void onDisable() {
-        flagged.clear();
-        revealed.clear();
-        com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder");
-        com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder-exact");
-    }
-
-    @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
-        flagged.clear();
-        revealed.clear();
-        com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder");
-        com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder-exact");
-    }
-
-    /** Pack (chunkX, chunkZ, sectionY) into one long. Section Y is biased by +512 so negative
-     * sections (nether band / below Y0) pack as non-negative and round-trip correctly. */
-    private static long key(int chunkX, int chunkZ, int sectionY) {
-        return ((long) (chunkX & 0x1FFFFF) << 43) | ((long) (chunkZ & 0x1FFFFF) << 22) | ((sectionY + 512) & 0x3FFFFF);
-    }
-
-    private static int unpackChunkX(long k) { return signExtend((int) (k >>> 43), 21); }
-    private static int unpackChunkZ(long k) { return signExtend((int) ((k >>> 22) & 0x1FFFFF), 21); }
-    private static int unpackSectionY(long k) { return (int) (k & 0x3FFFFFL) - 512; }
-    private static int signExtend(int v, int bits) { int m = 1 << (bits - 1); return (v ^ m) - m; }
-
-    /** Called by the chunk-packet hook with a FRESH buffer wrapper around the packet's chunk data
-     * (getReadBuffer() returns a new Unpooled wrapper each call - the packet owns the array, so we
-     * don't release it; the wrapper is GC'd). Safe to early-return without touching the buffer. */
-    public void onChunkData(net.minecraft.network.FriendlyByteBuf buffer, int chunkX, int chunkZ,
-                            int sectionCount, int minSectionY) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
-        if (!isNether(mc)) return; // ancient debris only matters in the nether
-
-        List<Integer> hidden = HiddenDebrisScanner.findHiddenSections(
-            buffer, sectionCount, minSectionY, HiddenDebrisScanner.ancientStateId());
-        if (hidden.isEmpty()) return;
-        long now = System.currentTimeMillis();
-        for (int sectionY : hidden) {
-            long k = key(chunkX, chunkZ, sectionY);
-            boolean fresh;
-            // Persistent flags: a flagged section stays marked until it's genuinely far behind you
-            // (out of render distance) or you mine it out, NOT on a short TTL. Short TTLs were the
-            // "de-renders when you get close / only detects when close" cause - flags expired before
-            // you reached them. The access-ordered map self-evicts the eldest past MAX_FLAGGED.
-            synchronized (flagged) {
-                fresh = !flagged.containsKey(k);
-                flagged.put(k, now); // access-order moves it to the tail; eldest auto-evicts at the cap
-            }
-            if (fresh && notify.get() && now - lastNotifyAt >= NOTIFY_COOLDOWN_MS) {
-                lastNotifyAt = now;
-                com.autism.seedcracker.compat.ClientNotify.warning(
-                    "Hidden ancient debris at chunk " + chunkX + "," + chunkZ + " section " + sectionY);
-            }
-        }
-    }
-
-    private static boolean isNether(Minecraft mc) {
-        return mc.level != null && mc.level.dimension().equals(net.minecraft.world.level.Level.NETHER);
-    }
-
-    /** Called by the block-update packet hooks. When a block actually becomes ancient debris in the
-     * client's block view (you mined next to it, an explosion exposed it, lava flowed off it), the
-     * server sends a block update with the REAL position. Record that exact block so we render it
-     * precisely through walls, and stop flagging its section (the debris is found, not hidden). */
-    public void onBlockUpdate(BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null) return;
-        if (!isNether(mc)) return;
-        // Match the same state id the scanner uses (ancient debris in any orientation/state).
-        if (net.minecraft.world.level.block.Block.getId(state) != HiddenDebrisScanner.ancientStateId()) return;
-        BlockPos immutable = pos.immutable();
-        boolean fresh = revealed.add(immutable);
-        // The exact debris is now known - drop the section flag so the big box stops and only the
-        // precise block marker remains.
-        flagged.remove(key(pos.getX() >> 4, pos.getZ() >> 4, pos.getY() >> 4));
-        if (fresh && notify.get()) {
-            com.autism.seedcracker.compat.ClientNotify.success(
-                "Ancient debris at " + immutable.getX() + " " + immutable.getY() + " " + immutable.getZ());
-        }
-    }
-
-    @Override
-    public void tick() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-        if (probeCooldown > 0) probeCooldown--;
-        if (probe.get()) tickProbe(mc);
-
-        // Anubis trackLevel: a dimension swap (nether<->overworld) while still connected leaves stale
-        // flags from the old dimension. Clear everything on the swap so we don't render phantom boxes.
-        net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dim = mc.level.dimension();
-        if (lastDimension != null && !lastDimension.equals(dim)) {
-            flagged.clear();
-            revealed.clear();
-            com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder");
-            com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder-exact");
-        }
-        lastDimension = dim;
-
-        // Prune flags: (a) now well beyond render distance (cheap, every tick), or (b) the debris
-        // is now EXPOSED in the block view. The exposure scan walks a full 16^3 section, so it runs
-        // only once a second - at 512 flagged sections the per-tick version was ~2M block reads/t.
-        if (!flagged.isEmpty()) {
-            ChunkPos centre = mc.player.chunkPosition();
-            int pr = range.get() + 4;
-            boolean doExposureScan = ++exposurePruneTicks >= 20;
-            if (doExposureScan) exposurePruneTicks = 0;
-            synchronized (flagged) {
-                flagged.keySet().removeIf(k -> {
-                    int cx = unpackChunkX(k), cz = unpackChunkZ(k);
-                    if (Math.max(Math.abs(cx - centre.x()), Math.abs(cz - centre.z())) > pr) return true;
-                    return doExposureScan && sectionExposed(mc, cx, cz, unpackSectionY(k));
-                });
-            }
-        }
-
-        // Prune revealed exact blocks: drop ones that are no longer ancient debris (you mined it out)
-        // or that are now beyond range. Cheap check against the live block view.
-        if (!revealed.isEmpty()) {
-            ChunkPos centre = mc.player.chunkPosition();
-            int pr = range.get() + 4;
-            revealed.removeIf(p -> {
-                if (Math.max(Math.abs((p.getX() >> 4) - centre.x()), Math.abs((p.getZ() >> 4) - centre.z())) > pr) return true;
-                return !mc.level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS);
+    @Override public void onEnable() {
+        reset();
+        BlockEspRenderer.init();
+        PaletteOverlay.init();
+        if (!unloadHook) {
+            unloadHook = true;
+            ClientChunkEvents.CHUNK_UNLOAD.register((world, chunk) -> {
+                if (world != level) return;
+                candidates.removeIf(s -> s.chunkX() == chunk.getPos().x() && s.chunkZ() == chunk.getPos().z());
+                for (BlockPos pos : probes.revealed()) {
+                    if ((pos.getX() >> 4) == chunk.getPos().x() && (pos.getZ() >> 4) == chunk.getPos().z()) probes.removeReveal(pos);
+                }
+                clearRender();
             });
         }
-        feedExact(mc);
-
-        if (flagged.isEmpty()) {
-            com.autism.seedcracker.render.BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":netherite-finder");
-            return;
-        }
-        feedRenderer(mc);
+    }
+    @Override public void onDisable() { reset(); }
+    @Override public void onGameLeft() {
+        reset();
+        if (RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
     }
 
-    /** Feed the exact revealed debris blocks to the renderer as 1x1x1 boxes (brighter + more solid
-     * than the section boxes, so the confirmed block stands out through walls). This is the Anubis
-     * "precise debris marker" - the block the server confirmed via a block update. */
-    private void feedExact(Minecraft mc) {
-        String id = SeedcrackerAddon.ID + ":netherite-finder-exact";
-        if (revealed.isEmpty()) {
-            com.autism.seedcracker.render.BlockEspRenderer.clearBox(id);
-            return;
+    private void reset() {
+        candidates.clear();
+        probes.reset();
+        pending = 0;
+        nearestPending = null;
+        lastNotify = 0;
+        level = null;
+        clearRender();
+    }
+    private void clearRender() {
+        for (String id : renderIds) BlockEspRenderer.clear(id);
+        renderIds = Set.of();
+        PaletteOverlay.clear(ID);
+    }
+    private void sync(Minecraft mc) {
+        if (mc.level != level) {
+            reset();
+            level = mc.level;
+            probes.maintain(level, candidates);
         }
-        ChunkPos centre = mc.player.chunkPosition();
-        int r = range.get();
-        java.util.List<AABB> boxes = new java.util.ArrayList<>();
-        for (BlockPos p : revealed) {
-            if (Math.max(Math.abs((p.getX() >> 4) - centre.x()), Math.abs((p.getZ() >> 4) - centre.z())) > r) continue;
-            boxes.add(new AABB(p.getX(), p.getY(), p.getZ(), p.getX() + 1.0, p.getY() + 1.0, p.getZ() + 1.0));
-        }
-        if (boxes.isEmpty()) {
-            com.autism.seedcracker.render.BlockEspRenderer.clearBox(id);
-            return;
-        }
-        // Bright, near-solid exact marker (independent of the section opacity setting).
-        com.autism.seedcracker.render.BlockEspRenderer.feedBoxes(id, boxes, 0xFF50FF50, 120);
     }
 
-    /** True if ancient debris is now VISIBLE in the section's block view (you've mined/uncovered
-     * it), so the section should stop rendering as "hidden". Scans the section's exposed faces for
-     * ancient debris the client can now actually see. Cheap: only checks blocks near the surface. */
-    private static boolean sectionExposed(Minecraft mc, int chunkX, int chunkZ, int secY) {
-        if (mc.level == null) return false;
-        // Section-palette fast-skip: if the section's palette has no debris at all, skip the
-        // 4096-block walk entirely (the common case for hidden sections).
-        net.minecraft.world.level.chunk.LevelChunk chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, false);
-        if (chunk != null) {
-            int idx = chunk.getSectionIndexFromSectionY(secY);
-            var sections = chunk.getSections();
-            if (idx < 0 || idx >= sections.length) return false;
-            var sec = sections[idx];
-            if (sec == null || sec.hasOnlyAir()
-                || !sec.maybeHas(st -> st.is(net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS))) {
-                return false;
-            }
-        }
-        int minY = secY << 4;
-        int baseX = chunkX << 4, baseZ = chunkZ << 4;
-        for (int y = minY; y < minY + 16; y++) {
-            for (int x = 0; x < 16; x++) {
-                for (int z = 0; z < 16; z++) {
-                    net.minecraft.core.BlockPos p = new net.minecraft.core.BlockPos(baseX + x, y, baseZ + z);
-                    if (mc.level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS)) return true;
+    /** Takes ownership of the fresh packet getReadBuffer() wrapper, including all early-return paths. */
+    public void onChunkData(FriendlyByteBuf buffer, int chunkX, int chunkZ, int sectionCount, int minSectionY) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (!mc.isSameThread()) throw new IllegalStateException("Palette packets must be applied on the client thread");
+            if (!isEnabled()) return;
+            sync(mc);
+            if (!isNether(level) || !com.autism.seedcracker.spectre.palette.PaletteScan.validChunk(chunkX, chunkZ)
+                || !level.getChunkSource().hasChunk(chunkX, chunkZ)) return;
+            List<Integer> hidden = HiddenDebrisScanner.findHiddenSections(buffer, sectionCount, minSectionY, HiddenDebrisScanner.ancientStateId());
+            Set<DebrisProbe.Section> previous = new HashSet<>(candidates);
+            candidates.removeIf(s -> s.chunkX() == chunkX && s.chunkZ() == chunkZ);
+            for (int y : hidden) {
+                DebrisProbe.Section section = new DebrisProbe.Section(chunkX, chunkZ, y);
+                candidates.add(section);
+                if (candidates.size() > 512) candidates.remove(candidates.iterator().next());
+                if (!previous.contains(section) && notify.get()) {
+                    pending++;
+                    BlockPos pos = new BlockPos(chunkX * 16 + 8, y * 16 + 8, chunkZ * 16 + 8);
+                    if (nearestPending == null || (mc.player != null && pos.distToCenterSqr(mc.player.position()) < nearestPending.distToCenterSqr(mc.player.position()))) nearestPending = pos;
                 }
             }
+        } finally {
+            buffer.release();
         }
-        return false;
     }
 
-    // ---- AdvancedFinder probe-confirm (Anubis port) ----
+    public void onBlockUpdate(BlockPos pos, BlockState state) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!mc.isSameThread()) throw new IllegalStateException("Block updates must be applied on the client thread");
+        if (!isEnabled()) return;
+        sync(mc);
+        if (!isNether(level)) return;
+        if (state.is(Blocks.ANCIENT_DEBRIS)) {
+            boolean fresh = probes.reveal(pos);
+            candidates.remove(DebrisProbe.Section.at(pos));
+            if (fresh && notify.get()) ClientNotify.success("[NetheriteFinder] Ancient debris at " + pos.getX() + " " + pos.getY() + " " + pos.getZ());
+        } else probes.removeReveal(pos);
+    }
 
-    /**
-     * Probe the nearest flagged section within reach: aim at the hidden debris's likely cell and
-     * start mining toward it. The section's palette said "debris is here but hidden" - the debris
-     * sits somewhere in the 16x16x16 section, so we mine into the section from our side. When the
-     * server sees us break toward it, it reveals the real block (the block update confirms it).
-     * One probe per few ticks so it reads as deliberate digging, not a bot burst.
-     */
-    private void tickProbe(Minecraft mc) {
-        if (probeCooldown > 0 || mc.gameMode == null) return;
-        if (flagged.isEmpty()) return;
-        ChunkPos centre = mc.player.chunkPosition();
-        double reach = probeRange.get();
+    private static boolean isNether(ClientLevel level) {
+        return level != null && (level.dimension().equals(Level.NETHER)
+            || level.dimensionTypeRegistration().is(BuiltinDimensionTypes.NETHER)
+            || level.dimension().equals(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION,
+                net.minecraft.resources.Identifier.fromNamespaceAndPath("worlds", "smp_nether"))));
+    }
 
-        // Nearest flagged section within reach.
-        long bestKey = -1;
-        double bestDist = Double.MAX_VALUE;
-        int bestX = 0, bestZ = 0, bestSecY = 0;
-        synchronized (flagged) {
-            for (Long k : flagged.keySet()) {
-                int chunkX = unpackChunkX(k);
-                int chunkZ = unpackChunkZ(k);
-                int secY = unpackSectionY(k);
-                // Section centre in world coords.
-                double cx = (chunkX << 4) + 8.0;
-                double cz = (chunkZ << 4) + 8.0;
-                double cy = (secY << 4) + 8.0;
-                double dx = cx - mc.player.getX();
-                double dy = cy - mc.player.getEyeY();
-                double dz = cz - mc.player.getZ();
-                double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (dist < bestDist) { bestDist = dist; bestKey = k; bestX = chunkX; bestZ = chunkZ; bestSecY = secY; }
+    @Override public void tick() {
+        Minecraft mc = Minecraft.getInstance();
+        sync(mc);
+        if (mc.player == null || !isNether(level)) { clearRender(); return; }
+        candidates.removeIf(s -> !level.getChunkSource().hasChunk(s.chunkX(), s.chunkZ()));
+        probes.maintain(level, candidates);
+        probes.tick(mc, candidates, advanced.get());
+        long now = System.currentTimeMillis();
+        if (!notify.get()) { pending = 0; nearestPending = null; }
+        if (pending > 0 && now - lastNotify >= 2000) {
+            ClientNotify.warning("[NetheriteFinder] " + pending + " hidden-debris sections; nearest "
+                + nearestPending.getX() + " " + nearestPending.getY() + " " + nearestPending.getZ());
+            pending = 0;
+            nearestPending = null;
+            lastNotify = now;
+        }
+        render(mc);
+    }
+
+    private void render(Minecraft mc) {
+        Vec3 eye = mc.player.getEyePosition();
+        double max = range.get() * 16.0;
+        List<DebrisProbe.Section> shown = candidates.stream().filter(s -> !probes.done(s))
+            .filter(s -> DebrisProbe.distanceSq(s.box(), eye) <= max * max)
+            .sorted(Comparator.comparingDouble(s -> DebrisProbe.distanceSq(s.box(), eye))).limit(128).toList();
+        Map<Integer, List<AABB>> boxes = new HashMap<>();
+        List<PaletteOverlay.Line> lines = new ArrayList<>();
+        List<PaletteOverlay.Label> labels = new ArrayList<>();
+        Set<String> nextIds = new HashSet<>();
+        int traced = 0;
+        for (var section : shown) {
+            double distance = Math.sqrt(DebrisProbe.distanceSq(section.box(), eye));
+            int bucket = Math.min(15, (int) (distance / fade.get() * 15));
+            boxes.computeIfAbsent(bucket, ignored -> new ArrayList<>()).add(section.box());
+            float progress = probes.progress(section);
+            if (progress >= 0) {
+                AABB b = section.box();
+                double y = b.minY + 16 * progress;
+                feed(nextIds, ID + ":progress:" + section, List.of(new AABB(b.minX, y, b.minZ, b.maxX, y + 0.03, b.maxZ)), color.get(), 36);
+            }
+            if (tracer.get() && distance >= 1 && traced < tracerCount.get()) {
+                int tint = PaletteOverlay.mix(color.get(), farColor.get(), distance / fade.get());
+                lines.add(new PaletteOverlay.Line(null, section.box().getCenter(), tint, 1.5f));
+                labels.add(new PaletteOverlay.Label(section.box().getCenter(), null, Math.round(distance) + "m",
+                    progress < 0 ? "Hidden-debris section" : Math.round(progress * 100) + "% probed", tint, 1));
+                traced++;
             }
         }
-        if (bestKey < 0 || bestDist > reach) return;
-
-        // Aim at the section centre (where the hidden debris likely is) and mine toward it.
-        double tx = (bestX << 4) + 8.0, ty = (bestSecY << 4) + 8.0, tz = (bestZ << 4) + 8.0;
-        double dx = tx - mc.player.getX();
-        double dz = tz - mc.player.getZ();
-        double dy = ty - mc.player.getEyeY();
-        double dist = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
-        float pitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
-        // Ease instead of snapping; keep easing until converged, then dig next tick as before.
-        boolean converged = com.autism.seedcracker.motion.RotationEngine.request(id(),
-            com.autism.seedcracker.motion.RotationEngine.PRIORITY_INTERACT, yaw, pitch);
-        if (!converged) {
-            probeAimedLastTick = false;
-            return;
+        for (var group : boxes.entrySet()) feed(nextIds, ID + ":section:" + group.getKey(), group.getValue(),
+            PaletteOverlay.mix(color.get(), farColor.get(), group.getKey() / 15.0), shellFill.get() ? Math.round(opacity.get() * 2.55f) : 0);
+        List<BlockPos> revealed = probes.revealed().stream().filter(p -> p.distToCenterSqr(eye) <= max * max)
+            .sorted(Comparator.comparingDouble(p -> p.distToCenterSqr(eye))).toList();
+        feed(nextIds, ID + ":exact", revealed.stream().map(AABB::new).toList(), color.get(), 100);
+        for (int i = 0; i < Math.min(8, revealed.size()); i++) {
+            BlockPos pos = revealed.get(i);
+            double distance = Math.sqrt(pos.distToCenterSqr(eye));
+            if (tracer.get() && i < 3) lines.add(new PaletteOverlay.Line(null, Vec3.atCenterOf(pos), color.get(), 1.5f));
+            labels.add(new PaletteOverlay.Label(Vec3.atCenterOf(pos).add(0, 0.9, 0), pos, "Ancient debris", Math.round(distance) + "m", color.get(), 1));
         }
-
-        // Aim this tick, dig NEXT tick: mc.hitResult still holds the pre-rotation ray this tick,
-        // so digging immediately mined the block under the old crosshair.
-        if (!probeAimedLastTick) {
-            probeAimedLastTick = true;
-            return;
-        }
-        probeAimedLastTick = false;
-
-        // Mine the block under the (now updated) crosshair. start once, then CONTINUE on the same
-        // block - re-starting every pass reset destroy progress so hard blocks never broke.
-        if (mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit
-            && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
-            BlockPos hitPos = hit.getBlockPos();
-            if (hitPos.equals(probeMining)) {
-                mc.gameMode.continueDestroyBlock(hitPos, hit.getDirection());
-            } else {
-                mc.gameMode.startDestroyBlock(hitPos, hit.getDirection());
-                probeMining = hitPos.immutable();
+        if (advanced.get() && showProbes.get()) {
+            List<AABB> sent = new ArrayList<>(), missing = new ArrayList<>();
+            for (var mark : probes.marks(eye, missingFrom.get() / 100f, probeStyle.get() == ProbeStyle.CUBES ? 450 : 1800)) {
+                double age = Math.min(1, mark.age() / 14.0);
+                double half = mark.missing() ? 0.08 : switch (probeStyle.get()) {
+                    case DOTS -> 0.065 - 0.03 * age;
+                    case CUBES -> 0.2 - 0.1 * age;
+                    case PULSES -> 0.08 + 0.25 * age;
+                };
+                Vec3 p = Vec3.atCenterOf(mark.pos());
+                (mark.missing() ? missing : sent).add(new AABB(p.x - half, p.y - half, p.z - half, p.x + half, p.y + half, p.z + half));
             }
-            mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-            probeCooldown = 1; // continueDestroyBlock must run near-every-tick to hold progress
-        } else {
-            probeMining = null;
+            feed(nextIds, ID + ":probes", sent, color.get(), 110);
+            feed(nextIds, ID + ":missing", missing, 0xffeeeeff, 100);
         }
+        for (String id : renderIds) if (!nextIds.contains(id)) BlockEspRenderer.clear(id);
+        renderIds = nextIds;
+        PaletteOverlay.feed(ID, level, lines, labels);
     }
 
-    /** Feed every in-range flagged section to the through-wall renderer as its own 16x16x16 box
-     * (Anubis NetheriteVisuals renders each section box individually - no merging - so a big flagged
-     * field shows every marked section). Each box is a wireframe + translucent shell fill, through
-     * walls and lava. */
-    private void feedRenderer(Minecraft mc) {
-        ChunkPos centre = mc.player.chunkPosition();
-        int r = range.get();
-        // Collect in-range flagged sections as (x,y,z) section coords.
-        java.util.List<int[]> sections = new java.util.ArrayList<>();
-        synchronized (flagged) {
-            for (Long k : flagged.keySet()) {
-                int chunkX = unpackChunkX(k);
-                int chunkZ = unpackChunkZ(k);
-                int secY = unpackSectionY(k);
-                int dx = chunkX - centre.x(), dz = chunkZ - centre.z();
-                if (Math.max(Math.abs(dx), Math.abs(dz)) > r) continue;
-                sections.add(new int[]{chunkX, secY, chunkZ});
-            }
-        }
-        // One 16x16x16 box per flagged section (Anubis renders each section box individually - no
-        // merging - so a big flagged field shows every marked section, not one giant merged blob).
-        java.util.List<AABB> boxes = new java.util.ArrayList<>();
-        for (int[] s : sections) {
-            boxes.add(new AABB(s[0] * 16.0, s[1] * 16.0, s[2] * 16.0,
-                s[0] * 16.0 + 16.0, s[1] * 16.0 + 16.0, s[2] * 16.0 + 16.0));
-        }
-        // Opacity setting -> fill alpha (0-100% -> 0-255).
-        int fillAlpha = shellFill.get() ? (int) Math.round(opacity.get() * 2.55) : 0;
-        com.autism.seedcracker.render.BlockEspRenderer.feedBoxes(
-            SeedcrackerAddon.ID + ":netherite-finder", boxes, color.get(), fillAlpha);
+    private static void feed(Set<String> ids, String id, List<AABB> boxes, int color, int alpha) {
+        if (boxes.isEmpty()) return;
+        ids.add(id);
+        BlockEspRenderer.feedBoxes(id, boxes, color, alpha);
     }
 
-    @Override
-    public String info() {
-        return flagged.isEmpty() ? "watching" : flagged.size() + " sections";
-    }
+    @Override public String info() { return candidates.isEmpty() ? "watching" : candidates.size() + " sections"; }
 }

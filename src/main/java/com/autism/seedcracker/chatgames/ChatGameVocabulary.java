@@ -15,7 +15,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.levelgen.structure.BuiltinStructures;
 
 public final class ChatGameVocabulary {
-    private static final int MAX_EXTRA_WORD_CHARS = 40;
+    private static final int MAX_EXTRA_WORD_CHARS = 64;
     private static final List<String> DEFAULT_EXTRA_WORDS = loadDefaultExtraWords();
 
     private ChatGameVocabulary() {}
@@ -47,6 +47,22 @@ public final class ChatGameVocabulary {
             "end city", "nether fortress", "bastion remnant", "ocean monument", "woodland mansion",
             "pillager outpost", "buried treasure", "mineshaft", "desert pyramid", "jungle temple",
             "igloo", "shipwreck", "ruined portal", "village", "experience"));
+        words.addAll(List.of(
+            "enchantment table", "crafting bench", "workbench", "wooden planks", "wooden door",
+            "wooden pressure plate", "wooden button", "wooden slab", "wooden stairs", "wooden fence",
+            "wooden trapdoor", "mob spawner", "monster spawner", "monster egg", "spawn egg",
+            "notch apple", "enchanted apple", "god apple", "gapple", "totem", "shulker",
+            "quartz ore", "nether brick block", "red nether brick", "stone brick", "mossy stone brick",
+            "cracked stone brick", "chiseled stone brick", "smooth brick", "stone monster egg",
+            "silverfish block", "grass block", "long grass", "water lily", "ink sack", "speckled melon",
+            "raw pork", "raw porkchop", "grilled pork", "raw beef", "raw chicken", "raw mutton",
+            "raw rabbit", "raw fish", "raw salmon", "cooked fish", "clownfish", "sugar canes",
+            "gold record", "green record", "zombie pigman", "pig zombie", "mushroom cow", "snowman",
+            "iron golem", "ender crystal", "ender dragon", "snowy tundra", "ice plains", "ice mountains",
+            "ice plains spikes", "extreme hills", "extreme hills plus", "roofed forest", "roofed forest hills",
+            "mega taiga", "mega spruce taiga", "giant tree taiga", "cold taiga", "stone beach", "cold beach",
+            "mushroom island", "mushroom island shore", "mesa", "mesa plateau", "mesa plateau forest",
+            "swampland", "jungle edge", "modified jungle edge", "tall birch forest"));
         ChatGameAnswerKey.defaults().values().stream().sorted().forEach(words::add);
         for (String resource : List.of("/chatgames/public-plugin-words.txt", "/chatgames/public-country-words.txt")) {
             try (var input = ChatGameVocabulary.class.getResourceAsStream(resource)) {
@@ -91,11 +107,14 @@ public final class ChatGameVocabulary {
                 words.add(Component.translatable("item.minecraft." + item + ".effect." + potion.name()).getString());
             }
         }
-        for (var field : BuiltinStructures.class.getFields()) {
-            try {
-                if (field.get(null) instanceof ResourceKey<?> key) words.add(key.identifier().getPath().replace('_', ' '));
-            } catch (IllegalAccessException inaccessible) {
-                throw new IllegalStateException("Could not read vanilla structure names", inaccessible);
+        for (Class<?> keys : List.of(BuiltinStructures.class, net.minecraft.world.level.biome.Biomes.class,
+            net.minecraft.world.item.enchantment.Enchantments.class, net.minecraft.world.level.dimension.BuiltinDimensionTypes.class)) {
+            for (var field : keys.getFields()) {
+                try {
+                    if (field.get(null) instanceof ResourceKey<?> key) words.add(key.identifier().getPath().replace('_', ' '));
+                } catch (IllegalAccessException inaccessible) {
+                    throw new IllegalStateException("Could not read vanilla registry names", inaccessible);
+                }
             }
         }
         return words;

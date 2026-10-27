@@ -1,263 +1,315 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Native port of Spectre SusChunkFinderModule, d5a7dd3de0be67bea273d4ed74d2c76c11e0f6da.
 package com.autism.seedcracker.modules;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import com.autism.seedcracker.SeedcrackerAddon;
 import com.autism.seedcracker.finder.ChunkFlagRenderer;
 import com.autism.seedcracker.finder.ChunkScanHelper;
+import com.autism.seedcracker.finder.FinderNotify;
+import com.autism.seedcracker.finder.FinderReport;
+import com.autism.seedcracker.finder.StoneStackScanner;
+import com.autism.seedcracker.render.BlockEspRenderer;
+import com.autism.seedcracker.spectre.chunks.ActivityClues;
+import com.autism.seedcracker.spectre.chunks.ChunkSignals;
+import com.autism.seedcracker.spectre.chunks.SusChunkScan;
+import com.autism.seedcracker.spectre.chunks.SuspectObjects;
+import com.autism.seedcracker.spectre.chunks.SuspectObjects.Category;
+import com.autism.seedcracker.spectre.chunks.SuspectPanel;
 import com.autism.seedcracker.util.pure.SusScore;
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.ColorSetting;
 import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
-import autismclient.util.AutismClientMessaging;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLightUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 public final class SusChunkFinderModule extends Module {
     public enum Mode {
-        CLASSIC, ANBS_PLUS;
-        @Override public String toString() { return this == CLASSIC ? "Classic" : "Dog+"; }
+        CLASSIC, ANBS_PLUS, ACTIVITY_CLUES;
+        @Override public String toString() { return switch (this) { case CLASSIC -> "Classic"; case ANBS_PLUS -> "Dog+"; case ACTIVITY_CLUES -> "Activity clues"; }; }
         public static String migrate(String token, Enum<?>[] choices) {
-            return "ANBS+ Scan".equals(token) && choices.length == 2 && choices[0].getDeclaringClass() == Mode.class ? "ANBS_PLUS" : token;
+            return "ANBS+ Scan".equals(token) && choices.length > 0 && choices[0].getDeclaringClass() == Mode.class ? "ANBS_PLUS" : token;
         }
     }
-    private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Detection mode", Mode.CLASSIC,
-        Mode.values(), Mode::toString).group("Detection"));
+    private static final int MAX_DETAILS = 8192, MAX_MARKERS = 2048;
+    private static final Identifier HUD_ID = Identifier.fromNamespaceAndPath(SeedcrackerAddon.ID, "sus-observations");
+    private final EnumSetting<Mode> mode = add(new EnumSetting<>("mode", "Detection mode", Mode.CLASSIC, Mode.values(), Mode::toString).group("Detection"));
     private final IntSetting threshold = add(new IntSetting("geode-heat", "Heat to flag", 6, 1, 64, 1).group("Detection"));
-    private final IntSetting spread = add(new IntSetting("geode-spread", "Spread radius", 5, 0, 16, 1).group("Detection"));
+    private final IntSetting spread = add(new IntSetting("geode-spread", "Simulation distance", 5, 0, 16, 1).group("Detection"));
     private final IntSetting radius = add(new IntSetting("scan-radius", "Scan radius", 12, 2, 32, 1).group("Performance"));
     private final IntSetting budget = add(new IntSetting("chunks-per-tick", "Chunks per tick", 2, 1, 128, 1).group("Performance"));
     private final BoolSetting notify = add(new BoolSetting("notify", "Notification", true).group("Alerts"));
-    private final BoolSetting detectMined = add(new BoolSetting("detect-mined-clusters", "Detect mined clusters", false).group("Detection"));
-    private final ColorSetting minedColor = add(new ColorSetting("mined-color", "Mined colour", 0x60A64AFF).group("Render").visibleWhen(detectMined::get));
-    private final com.autism.seedcracker.finder.MinedGeodeTracker mined = new com.autism.seedcracker.finder.MinedGeodeTracker();
-    private Set<ChunkPos> minedChunks = Set.of();
+    private final BoolSetting detectMined = add(new BoolSetting("detect-mined-clusters", "Bare formation hypotheses", false)
+        .description("Large budding formations without visible crystals; natural generation or hidden blocks can look the same.").group("Detection"));
+    private final ColorSetting minedColor = add(new ColorSetting("mined-color", "Bare formation colour", 0x60A64AFF).group("Render").visibleWhen(detectMined::get));
     private final ColorSetting color = add(new ColorSetting("color", "Chunk colour", 0x96FF4444).group("Render"));
     private final BoolSetting tracer = add(new BoolSetting("tracer", "Tracer", false).group("Render"));
-    private record Sample(int heat, boolean veto) {}
-    private record Update(ClientLevel world, ChunkPos pos, boolean lightOnly) {}
-    private final ArrayBlockingQueue<Update> updates = new ArrayBlockingQueue<>(256);
-    private final Map<ChunkPos, Sample> samples = new HashMap<>();
-    private final Map<ChunkPos, Boolean> terrain = new HashMap<>();
-    private final Set<ChunkPos> flagged = new HashSet<>();
-    private final Set<ChunkPos> alerted = new HashSet<>();
+    private final IntSetting clueThreshold = add(new IntSetting("clue-threshold", "Bee clue points", 2, 1, 8, 1).group("Activity clues"));
+    private final BoolSetting naturalContext = add(new BoolSetting("natural-context", "Include short / immature growth", false).group("Activity clues"));
+    private final IntSetting kelpLength = add(new IntSetting("kelp-length", "Minimum kelp length", 16, 2, 64, 1).group("Activity clues"));
+    private final IntSetting vineLength = add(new IntSetting("vine-length", "Minimum vine length", 16, 2, 64, 1).group("Activity clues"));
+    private final IntSetting caveVineLength = add(new IntSetting("cave-vine-length", "Minimum cave vine length", 20, 2, 64, 1).group("Activity clues"));
+    private final IntSetting bambooLength = add(new IntSetting("bamboo-length", "Minimum bamboo height", 14, 2, 32, 1).group("Activity clues"));
+    private final IntSetting matureClusters = add(new IntSetting("mature-clusters", "Minimum mature crystals", 12, 2, 128, 1).group("Activity clues"));
+    private final IntSetting maturePercent = add(new IntSetting("mature-percent", "Minimum mature crystal %", 75, 10, 100, 5).group("Activity clues"));
+    private final IntSetting objectRange = add(new IntSetting("object-range", "Object / inspect range", 128, 16, 256, 16).group("Render"));
+    private final BoolSetting inspectPanel = add(new BoolSetting("inspect-panel", "Look-to-inspect panel", true).group("Render"));
+    private final EnumMap<ActivityClues.Kind, BoolSetting> clueKinds = new EnumMap<>(ActivityClues.Kind.class);
+    private final EnumMap<Category, BoolSetting> objectKinds = new EnumMap<>(Category.class);
+    private final EnumMap<Category, ColorSetting> objectColors = new EnumMap<>(Category.class);
+    private final Map<ChunkPos, SusChunkScan.Sample> samples = new LinkedHashMap<>();
+    private final Map<ChunkPos, Integer> scannedAt = new HashMap<>();
+    private final LinkedHashSet<ChunkPos> queue = new LinkedHashSet<>();
+    private final Set<ChunkPos> flagged = new HashSet<>(), alerted = new HashSet<>();
+    private final FinderReport reporter = new FinderReport("Sus", 45);
     private ClientLevel world;
-    private List<LevelChunk> queue = List.of();
-    private int cursor;
-    private int ticks;
-    private long refreshAt;
+    private SusChunkScan active;
+    private ChunkPos activePos;
+    private int ticks, storedDetails;
+    private boolean hudRegistered, detailLimited;
+    private List<SuspectObjects.Marker> markers = List.of();
+    private final EnumMap<Category, List<AABB>> boxes = new EnumMap<>(Category.class);
 
     public SusChunkFinderModule() {
         super(SeedcrackerAddon.ID + ":z-sus-chunk-finder", "Sus Chunk Finder",
-            "Classic amethyst growth or Dog+ block-light edges. Scouting signals, not confirmed bases.");
-    }
-
-    private void clear() {
-        updates.clear();
-        samples.clear();
-        terrain.clear();
-        mined.clear(); minedChunks = Set.of();
-        flagged.clear();
-        alerted.clear();
-        queue = List.of();
-        cursor = 0;
-        ticks = 0;
-        refreshAt = 0;
-        ChunkFlagRenderer.clear(id());
-        ChunkFlagRenderer.clear(id() + ":mined");
-    }
-    @Override public void onEnable() { clear(); world = null; }
-    @Override public void onDisable() { clear(); world = null; }
-    @Override public void onGameLeft() {
-        clear();
-        world = null;
-        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
-    }
-    @Override protected void onOptionValueChanged(String settingId) {
-        if ("mode".equals(settingId) || "detect-mined-clusters".equals(settingId)) clear();
-    }
-
-    @Override public boolean onPacketReceive(Packet<?> packet) {
-        if (packet instanceof ClientboundLevelChunkWithLightPacket chunk) {
-            updates.offer(new Update(Minecraft.getInstance().level, new ChunkPos(chunk.getX(), chunk.getZ()), false));
-        } else if (packet instanceof ClientboundLightUpdatePacket light) {
-            updates.offer(new Update(Minecraft.getInstance().level, new ChunkPos(light.getX(), light.getZ()), true));
+            "Spectre object outlines, grouped observations and amethyst/growth clues. Not proof of a base.");
+        for (var kind : ActivityClues.Kind.values()) clueKinds.put(kind, add(new BoolSetting("clue-" + kind.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'), kind.label, true).group("Activity clues")));
+        for (var category : Category.values()) {
+            if (category == Category.BARE_GEODES) { objectKinds.put(category, detectMined); objectColors.put(category, minedColor); continue; }
+            objectKinds.put(category, add(new BoolSetting("objects-" + category.id(), category.label, true).group("Objects")));
+            objectColors.put(category, add(new ColorSetting("color-" + category.id(), category.label + " colour", category.color).group("Object colours")));
         }
-        return false;
+    }
+
+    private void clear(ClientLevel level) {
+        samples.clear(); scannedAt.clear(); queue.clear(); flagged.clear(); alerted.clear(); reporter.clear();
+        markers = List.of(); boxes.clear(); active = null; activePos = null; storedDetails = 0; ticks = 0; detailLimited = false; world = level;
+        ChunkFlagRenderer.clear(id()); ChunkFlagRenderer.clear(id() + ":mined");
+        for (var category : Category.values()) BlockEspRenderer.clear(id() + ":" + category.id());
+    }
+    @Override public void onEnable() {
+        clear(Minecraft.getInstance().level); BlockEspRenderer.init(); ChunkFlagRenderer.init();
+        if (!hudRegistered) {
+            HudElementRegistry.attachElementAfter(VanillaHudElements.MISC_OVERLAYS, HUD_ID, (g, delta) -> renderHud(g));
+            hudRegistered = true;
+        }
+    }
+    @Override public void onDisable() { clear(null); HudElementRegistry.removeElement(HUD_ID); hudRegistered = false; }
+    @Override public void onGameLeft() {
+        clear(null);
+        if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) { onDisable(); setEnabledSilently(false); }
+    }
+    @Override protected void onSettingsReset() { clear(isEnabled() ? Minecraft.getInstance().level : null); }
+    @Override protected void onOptionValueChanged(String id) {
+        if ("mode".equals(id) || "detect-mined-clusters".equals(id) || "object-range".equals(id)
+            || id.startsWith("clue-") && !"clue-threshold".equals(id) || id.startsWith("objects-")) clear(isEnabled() ? Minecraft.getInstance().level : null);
+    }
+
+    /** Call from ClientPacketListener TAIL hooks on the client thread, never Netty. */
+    public void onPacketApplied(ClientLevel level, Packet<?> packet) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!isEnabled() || !mc.isSameThread() || level == null || level != mc.level) return;
+        if (world != level) clear(level);
+        if (packet instanceof ClientboundLevelChunkWithLightPacket chunk) {
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) enqueue(new ChunkPos(chunk.getX() + dx, chunk.getZ() + dz));
+        } else if (packet instanceof ClientboundLightUpdatePacket light && mode.get() == Mode.ANBS_PLUS) {
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) enqueue(new ChunkPos(light.getX() + dx, light.getZ() + dz));
+        } else if (packet instanceof ClientboundForgetLevelChunkPacket forget) forget(forget.pos());
+        else if (packet instanceof ClientboundBlockUpdatePacket block) blockChanged(block.getPos());
+        else if (packet instanceof ClientboundSectionBlocksUpdatePacket section) section.runUpdates((pos, state) -> blockChanged(pos));
+    }
+    private void blockChanged(BlockPos pos) {
+        for (int cx = (pos.getX() - 1) >> 4; cx <= (pos.getX() + 1) >> 4; cx++)
+            for (int cz = (pos.getZ() - 1) >> 4; cz <= (pos.getZ() + 1) >> 4; cz++) enqueue(new ChunkPos(cx, cz));
+    }
+    private void enqueue(ChunkPos pos) { if (nearby(pos) && queue.size() < 4225) queue.add(pos); }
+    private boolean nearby(ChunkPos pos) {
+        var mc = Minecraft.getInstance();
+        return world != null && mc.player != null && distance(mc.player.chunkPosition(), pos) <= radius.get()
+            && world.getChunkSource().getChunkNow(pos.x(), pos.z()) != null;
+    }
+    private static int distance(ChunkPos a, ChunkPos b) { return Math.max(Math.abs(a.x() - b.x()), Math.abs(a.z() - b.z())); }
+    private void forget(ChunkPos pos) {
+        var old = samples.remove(pos); if (old != null) storedDetails -= details(old);
+        scannedAt.remove(pos); queue.remove(pos); flagged.remove(pos); alerted.remove(pos);
+        if (pos.equals(activePos)) { active = null; activePos = null; }
+    }
+    private static int details(SusChunkScan.Sample sample) { return sample.objects().size() + sample.lightEdges().size(); }
+    private static SusChunkScan.Sample limit(SusChunkScan.Sample s, int capacity) {
+        int objects = Math.min(capacity, s.objects().size()), edges = Math.min(capacity - objects, s.lightEdges().size());
+        return new SusChunkScan.Sample(s.heat(), s.veto(), s.terrain(), s.complete(), s.activity(),
+            List.copyOf(s.objects().subList(0, objects)), List.copyOf(s.lightEdges().subList(0, edges)), s.limited() || objects + edges < details(s));
+    }
+    private void store(ChunkPos pos, SusChunkScan.Sample sample) {
+        var old = samples.remove(pos); if (old != null) storedDetails -= details(old);
+        if (storedDetails + details(sample) > MAX_DETAILS) {
+            ChunkPos center = Minecraft.getInstance().player.chunkPosition();
+            var distant = new ArrayList<>(samples.keySet());
+            distant.sort(Comparator.comparingInt((ChunkPos p) -> distance(center, p)).reversed());
+            for (ChunkPos other : distant) {
+                if (storedDetails + details(sample) <= MAX_DETAILS || distance(center, other) <= distance(center, pos)) break;
+                var prior = samples.get(other); storedDetails -= details(prior); samples.put(other, limit(prior, 0));
+            }
+        }
+        sample = limit(sample, Math.max(0, MAX_DETAILS - storedDetails));
+        samples.put(pos, sample); storedDetails += details(sample); scannedAt.put(pos, ticks);
     }
 
     @Override public void tick() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
-        if (world != mc.level) { clear(); world = mc.level; }
-        if (!world.dimensionType().hasSkyLight()) { clear(); return; }
-        long now = System.currentTimeMillis();
-        if (cursor >= queue.size() && now >= refreshAt) {
-            queue = ChunkScanHelper.loadedChunksAround(mc, radius.get());
-            cursor = 0;
-            refreshAt = now + 5000;
-        }
-        long deadline = System.nanoTime() + 3_000_000;
-        int remaining = budget.get();
-        Set<ChunkPos> scannedPositions = new HashSet<>();
-        for (int drained = 0; drained < 128 && remaining > 0 && System.nanoTime() < deadline; drained++) {
-            Update update = updates.poll();
-            if (update == null) break;
-            if (update.world != world || (update.lightOnly && mode.get() == Mode.CLASSIC)
-                || distance(mc.player.chunkPosition(), update.pos) > radius.get()
-                || samples.containsKey(update.pos)
-                || !world.hasChunk(update.pos.x(), update.pos.z()) || !scannedPositions.add(update.pos)) continue;
-            if (scan(mc, world.getChunk(update.pos.x(), update.pos.z()))) remaining--;
-            if (System.nanoTime() >= deadline) break;
-        }
-        while (remaining > 0 && cursor < queue.size() && System.nanoTime() < deadline) {
-            LevelChunk chunk = queue.get(cursor++);
-            if (!samples.containsKey(chunk.getPos()) && distance(mc.player.chunkPosition(), chunk.getPos()) <= radius.get()
-                && world.hasChunk(chunk.getPos().x(), chunk.getPos().z()) && scannedPositions.add(chunk.getPos())) {
-                if (scan(mc, world.getChunk(chunk.getPos().x(), chunk.getPos().z()))) remaining--;
+        if (world != mc.level) clear(mc.level);
+        if (world == null || mc.player == null) return;
+        ticks++;
+        if (ticks % 20 == 1) for (ChunkPos pos : List.copyOf(samples.keySet())) if (!nearby(pos)) forget(pos);
+        if (ticks % 100 == 1) {
+            queue.removeIf(pos -> !nearby(pos));
+            var loaded = ChunkScanHelper.loadedChunksAround(mc, radius.get());
+            loaded.sort(Comparator.comparingInt(chunk -> distance(mc.player.chunkPosition(), chunk.getPos())));
+            for (var chunk : loaded) {
+                var sample = samples.get(chunk.getPos());
+                if (sample == null || !sample.complete() || ticks - scannedAt.getOrDefault(chunk.getPos(), 0) >= 200) enqueue(chunk.getPos());
             }
-            if (System.nanoTime() >= deadline) break;
         }
-        if (++ticks % 20 == 0) {
-            rebuild();
-            if (detectMined.get()) minedChunks = mined.shown(world, ticks, mc.player.chunkPosition(), radius.get());
+        long deadline = System.nanoTime() + 3_000_000L;
+        int completed = 0;
+        while (completed < budget.get() && System.nanoTime() < deadline) {
+            if (active == null) {
+                if (queue.isEmpty()) break;
+                activePos = queue.removeFirst(); if (!nearby(activePos)) continue;
+                var clues = EnumSet.noneOf(ActivityClues.Kind.class); clueKinds.forEach((kind, setting) -> { if (setting.get()) clues.add(kind); });
+                var categories = EnumSet.noneOf(Category.class); objectKinds.forEach((kind, setting) -> { if (setting.get()) categories.add(kind); });
+                if (detectMined.get()) categories.add(Category.GEODES);
+                String brand = mc.getConnection() == null ? null : mc.getConnection().serverBrand();
+                active = new SusChunkScan(world, world.getChunkSource().getChunkNow(activePos.x(), activePos.z()),
+                    brand != null && brand.contains("DonutFolia"), mode.get() == Mode.ANBS_PLUS, clues, categories, mc.player.getEyePosition(), objectRange.get());
+            }
+            if (!nearby(activePos)) { active = null; activePos = null; continue; }
+            if (!active.step(deadline)) break;
+            store(activePos, active.result()); active = null; activePos = null; completed++;
         }
-        ChunkFlagRenderer.feed(id(), flagged, color.get(), tracer.get());
-        ChunkFlagRenderer.feed(id() + ":mined", minedChunks, minedColor.get(), tracer.get());
+        if (ticks % 20 == 1) rebuild(mc);
+        if (ticks % 5 == 1) refreshObjects(mc);
+        flagged.removeIf(pos -> !nearby(pos));
+        ChunkFlagRenderer.feed(id(), flagged, color.get(), tracer.get()); reporter.tick(mc, flagged);
+        for (var category : Category.values()) BlockEspRenderer.feedBoxes(id() + ":" + category.id(), boxes.getOrDefault(category, List.of()), objectColors.get(category).get() | 0xFF000000, 0);
     }
 
-    private boolean scan(Minecraft mc, LevelChunk chunk) {
-        if (samples.containsKey(chunk.getPos())) return false;
-        if (detectMined.get() && world.dimension().equals(net.minecraft.world.level.Level.OVERWORLD) && !mined.collect(world, chunk, ticks)) return false;
-        Sample result;
-        if (mode.get() == Mode.CLASSIC) result = classic(mc, chunk);
-        else {
-            Integer edges = com.autism.seedcracker.finder.GeodeGlowSnapshot.scan(mc.level, chunk);
-            result = edges == null ? null : new Sample(edges / 12, false);
+    private void rebuild(Minecraft mc) {
+        flagged.clear(); ChunkPos center = mc.player.chunkPosition();
+        if (mode.get() == Mode.ACTIVITY_CLUES) {
+            samples.forEach((pos, sample) -> { if (nearby(pos) && (sample.activity().score() >= clueThreshold.get() || naturalContext.get() && !sample.activity().empty())) flagged.add(pos); });
+        } else if (world.dimensionType().hasSkyLight()) {
+            var scores = new HashMap<ChunkPos, Integer>(); var vetoes = new HashMap<ChunkPos, Integer>();
+            samples.forEach((pos, sample) -> { if (sample.complete() && nearby(pos)) { scores.put(pos, sample.heat()); if (sample.veto()) vetoes.put(pos, 1); } });
+            var heat = StoneStackScanner.spreadHeat(scores, center, radius.get(), spread.get());
+            var veto = StoneStackScanner.spreadHeat(vetoes, center, radius.get(), spread.get());
+            heat.keySet().removeIf(pos -> veto.containsKey(pos) || !nearby(pos) || scannedNeighbours(pos) < 3);
+            int side = radius.get() * 2 + 1, minX = center.x() - radius.get(), minZ = center.z() - radius.get();
+            int[] field = new int[side * side];
+            heat.forEach((pos, value) -> field[(pos.x() - minX) * side + pos.z() - minZ] = value);
+            int[] maximum = ChunkSignals.neighborhoodMax(field, side, spread.get());
+            heat.forEach((pos, value) -> {
+                var sample = samples.get(pos); boolean terrain = sample == null || sample.terrain();
+                if (SusScore.geodePeakEligible(value, terrain, threshold.get(), maximum[(pos.x() - minX) * side + pos.z() - minZ])) flagged.add(pos);
+            });
         }
-        if (result == null) return false;
-        boolean terrainPresent = terrainInBand(chunk);
-        samples.put(chunk.getPos(), result);
-        terrain.put(chunk.getPos(), terrainPresent);
-        return true;
-    }
-
-    private static boolean terrainInBand(LevelChunk chunk) {
-        for (int sectionY = -1; sectionY <= 1; sectionY++) {
-            int index = chunk.getSectionIndex(sectionY << 4);
-            if (index < 0 || index >= chunk.getSectionsCount()) continue;
-            var section = chunk.getSection(index);
-            if (section.hasOnlyAir()) continue;
-            for (int y = Math.max(-16, sectionY << 4); y <= Math.min(30, (sectionY << 4) + 15); y++) {
-                for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) {
-                    if (!section.getBlockState(x, y & 15, z).isAir()) return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private void rebuild() {
-        ChunkPos center = Minecraft.getInstance().player.chunkPosition();
-        Map<ChunkPos, Sample> activeSamples = new HashMap<>();
-        for (int deltaX = -radius.get(); deltaX <= radius.get(); deltaX++) for (int deltaZ = -radius.get(); deltaZ <= radius.get(); deltaZ++) {
-            ChunkPos pos = new ChunkPos(center.x() + deltaX, center.z() + deltaZ);
-            Sample sample = samples.get(pos);
-            if (sample != null && world.hasChunk(pos.x(), pos.z())) activeSamples.put(pos, sample);
-        }
-        Map<ChunkPos, Integer> heat = new HashMap<>();
-        Set<ChunkPos> veto = new HashSet<>();
-        for (var entry : activeSamples.entrySet()) {
-            ChunkPos source = entry.getKey();
-            Sample sample = entry.getValue();
-            if (sample.heat == 0 && !sample.veto) continue;
-            for (int dx = -spread.get(); dx <= spread.get(); dx++) for (int dz = -spread.get(); dz <= spread.get(); dz++) {
-                ChunkPos target = new ChunkPos(source.x() + dx, source.z() + dz);
-                if (!world.hasChunk(target.x(), target.z()) || distance(center, target) > radius.get()) continue;
-                heat.merge(target, sample.heat, Integer::sum);
-                if (sample.veto) veto.add(target);
-            }
-        }
-        heat.entrySet().removeIf(entry -> veto.contains(entry.getKey()) || scannedNeighbours(entry.getKey()) < 3);
-        flagged.clear();
-        for (var entry : heat.entrySet()) {
-            ChunkPos pos = entry.getKey();
-            int strongest = 0;
-            for (int dx = -spread.get(); dx <= spread.get(); dx++) for (int dz = -spread.get(); dz <= spread.get(); dz++) {
-                if (dx == 0 && dz == 0) continue;
-                ChunkPos other = new ChunkPos(pos.x() + dx, pos.z() + dz);
-                int value = heat.getOrDefault(other, 0);
-                strongest = Math.max(strongest, value);
-            }
-            if (!SusScore.geodePeakEligible(entry.getValue(), terrain.getOrDefault(pos, true), threshold.get(), strongest)) continue;
-            flagged.add(pos);
-            if (alerted.add(pos) && notify.get()) AutismClientMessaging.sendPrefixed("[Sus Finder] " + mode.get()
-                + " signal at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ());
-        }
+        alerted.removeIf(pos -> !nearby(pos));
+        for (ChunkPos pos : flagged) if (alerted.add(pos) && notify.get())
+            FinderNotify.flag("[Sus Finder]", mode.get() + " hypothesis at X:" + pos.getMinBlockX() + " Z:" + pos.getMinBlockZ(), false);
     }
     private int scannedNeighbours(ChunkPos pos) {
         int count = 0;
         for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
-            if ((dx != 0 || dz != 0) && world.hasChunk(pos.x() + dx, pos.z() + dz)
-                && samples.containsKey(new ChunkPos(pos.x() + dx, pos.z() + dz))) count++;
+            if (dx == 0 && dz == 0) continue;
+            var other = new ChunkPos(pos.x() + dx, pos.z() + dz); var sample = samples.get(other);
+            if (sample != null && sample.complete() && nearby(other)) count++;
         }
         return count;
     }
-    private static int distance(ChunkPos first, ChunkPos second) {
-        return Math.max(Math.abs(first.x() - second.x()), Math.abs(first.z() - second.z()));
-    }
 
-    private static Sample classic(Minecraft mc, LevelChunk chunk) {
-        int mature = 0, detached = 0, young = 0, unknown = 0;
-        String brand = mc.getConnection() == null ? null : mc.getConnection().serverBrand();
-        boolean paletteOnly = brand != null && brand.contains("DonutFolia");
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        var sections = chunk.getSections();
-        for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
-            var section = sections[sectionIndex];
-            if (section == null || section.hasOnlyAir() || !section.maybeHas(SusChunkFinderModule::growth)) continue;
-            if (paletteOnly) {
-                if (section.maybeHas(state -> growth(state) && !state.is(Blocks.AMETHYST_CLUSTER))) young = 1;
-                if (section.maybeHas(state -> state.is(Blocks.AMETHYST_CLUSTER))) mature = 1;
-                continue;
+    private void refreshObjects(Minecraft mc) {
+        Vec3 eye = mc.player.getEyePosition(); double rangeSq = (double) objectRange.get() * objectRange.get();
+        var candidates = new ArrayList<SuspectObjects.Found>(); var geodes = new HashMap<BlockPos, SuspectObjects.Found>(); var plants = new HashMap<BlockPos, SuspectObjects.Found>();
+        detailLimited = false;
+        for (var entry : samples.entrySet()) {
+            if (!nearby(entry.getKey())) continue;
+            var sample = entry.getValue(); detailLimited |= sample.limited();
+            for (var found : sample.objects()) {
+                if (Vec3.atCenterOf(found.pos()).distanceToSqr(eye) > rangeSq
+                    || !objectKinds.get(found.category()).get() && !(found.category() == Category.GEODES && detectMined.get())) continue;
+                if (found.category() == Category.GEODES) { geodes.put(found.pos(), found); continue; }
+                if (found.category() == Category.GROWTH) {
+                    var kind = ActivityClues.kind(found.state());
+                    if (kind == ActivityClues.Kind.KELP || kind == ActivityClues.Kind.VINES || kind == ActivityClues.Kind.CAVE_VINES || kind == ActivityClues.Kind.BAMBOO) { plants.put(found.pos(), found); continue; }
+                    var clue = new ActivityClues.Summary(); clue.add(found.state());
+                    if (!naturalContext.get() && (clue.score() == 0 || sample.activity().score() < clueThreshold.get())) continue;
+                }
+                candidates.add(found);
             }
-            int baseY = chunk.getMinY() + (sectionIndex << 4);
-            for (int localY = 0; localY < 16; localY++) for (int localX = 0; localX < 16; localX++) for (int localZ = 0; localZ < 16; localZ++) {
-                BlockState state = section.getBlockState(localX, localY, localZ);
-                if (state.is(Blocks.AMETHYST_CLUSTER)) mature++;
-                else if (growth(state)) {
-                    BlockPos support = cursor.set(chunk.getPos().getMinBlockX() + localX, baseY + localY,
-                        chunk.getPos().getMinBlockZ() + localZ).relative(state.getValue(BlockStateProperties.FACING).getOpposite());
-                    if (!mc.level.hasChunk(support.getX() >> 4, support.getZ() >> 4)) unknown++;
-                    else if (mc.level.getBlockState(support).is(Blocks.BUDDING_AMETHYST)) young++;
-                    else detached++;
+        }
+        candidates.sort(Comparator.comparingDouble(found -> Vec3.atCenterOf(found.pos()).distanceToSqr(eye)));
+        var next = new ArrayList<SuspectObjects.Marker>();
+        for (int i = 0; i < Math.min(MAX_MARKERS, candidates.size()); i++) next.add(SuspectObjects.block(candidates.get(i), world));
+        detailLimited |= candidates.size() > MAX_MARKERS;
+        for (var formation : SuspectObjects.geodes(geodes, matureClusters.get(), maturePercent.get(), naturalContext.get(), detectMined.get() && !detailLimited))
+            if (objectKinds.get(formation.category()).get()) next.add(formation);
+        next.addAll(SuspectObjects.plants(plants, kind -> switch (kind) { case KELP -> kelpLength.get(); case VINES -> vineLength.get(); case CAVE_VINES -> caveVineLength.get(); case BAMBOO -> bambooLength.get(); default -> Integer.MAX_VALUE; }, naturalContext.get()));
+        if (objectKinds.get(Category.DISPLAYS).get()) {
+            int examined = 0;
+            for (var entity : world.entitiesForRendering()) {
+                if (++examined > 512) { detailLimited = true; break; }
+                var item = entity instanceof net.minecraft.world.entity.decoration.ArmorStand ? Items.ARMOR_STAND : entity instanceof net.minecraft.world.entity.decoration.ItemFrame ? Items.ITEM_FRAME : null;
+                if (item != null && entity.isAlive() && entity.distanceToSqr(eye) <= rangeSq) {
+                    var box = entity.getBoundingBox(); var icon = SuspectObjects.Icon.item(item);
+                    next.add(new SuspectObjects.Marker(box, List.of(box), Category.DISPLAYS, Map.of(icon, 1), icon.label()));
                 }
             }
         }
-        SusScore.GeodeGrowth result = new SusScore.GeodeGrowth(mature, detached, young, unknown);
-        if (!result.complete()) return null;
-        return new Sample(result.heat(), result.veto());
+        if (mode.get() == Mode.ANBS_PLUS && objectKinds.get(Category.ANOMALIES).get()) for (var entry : samples.entrySet()) {
+            if (!flagged.contains(entry.getKey())) continue;
+            for (BlockPos pos : entry.getValue().lightEdges()) if (Vec3.atCenterOf(pos).distanceToSqr(eye) <= rangeSq) {
+                var box = new AABB(pos); next.add(new SuspectObjects.Marker(box, List.of(box), Category.ANOMALIES, Map.of(SuspectObjects.Icon.item(Items.AMETHYST_SHARD), 1), "Observed light edge"));
+            }
+        }
+        next.sort(Comparator.comparingDouble(marker -> marker.bounds().distanceToSqr(eye)));
+        if (next.size() > MAX_MARKERS) { detailLimited = true; next.subList(MAX_MARKERS, next.size()).clear(); }
+        markers = List.copyOf(next); boxes.clear();
+        for (var marker : markers) boxes.computeIfAbsent(marker.category(), ignored -> new ArrayList<>()).addAll(marker.shapes());
     }
-    private static boolean growth(BlockState state) {
-        return state.is(Blocks.AMETHYST_CLUSTER) || state.is(Blocks.LARGE_AMETHYST_BUD)
-            || state.is(Blocks.MEDIUM_AMETHYST_BUD) || state.is(Blocks.SMALL_AMETHYST_BUD);
+
+    private void renderHud(GuiGraphicsExtractor g) {
+        var mc = Minecraft.getInstance();
+        if (!isEnabled() || world == null || world != mc.level || mc.player == null || mc.gui.screen() != null || mc.gui.hud.isHidden() || !inspectPanel.get()) return;
+        var camera = mc.gameRenderer.mainCamera(); var direction = camera.forwardVector();
+        var focus = SuspectObjects.focus(markers, camera.position(), new Vec3(direction.x(), direction.y(), direction.z()), objectRange.get());
+        if (focus != null) SuspectPanel.draw(g, focus, category -> objectColors.get(category).get(), detailLimited);
     }
-    @Override public String info() { return mode.get() + " / " + flagged.size(); }
+    @Override public String info() { return mode.get() + " / " + flagged.size() + " clues / " + markers.size() + " objects"; }
 }

@@ -13,6 +13,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
+import net.minecraft.network.protocol.game.ClientboundLightUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
@@ -22,6 +25,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -33,11 +37,28 @@ public abstract class ClientPacketListenerMixin {
 
     @Shadow public abstract Connection getConnection();
 
+    @Unique private boolean spectre$captureFailed;
+
+    @Inject(method = {"handleLevelChunkWithLight", "handleBlockEntityData", "handleBlockUpdate",
+        "handleChunkBlocksUpdate", "handleForgetLevelChunk", "handleLogin", "handleRespawn"}, at = @At("RETURN"))
+    private void spectre$captureBlockEntities(@Coerce Packet<?> packet, CallbackInfo ci) {
+        if (spectre$captureFailed || this.level != Minecraft.getInstance().level) return;
+        try {
+            com.autism.seedcracker.spectre.palette.BlockEntityCapture.onPacketApplied(this.level, packet);
+        } catch (RuntimeException error) {
+            spectre$captureFailed = true;
+            com.autism.seedcracker.spectre.palette.BlockEntityCapture.clear();
+            org.slf4j.LoggerFactory.getLogger("DogsTools/Spectre").warn("Block entity capture stopped until reconnect", error);
+        }
+    }
+
     @Inject(method = "handleLevelChunkWithLight", at = @At(value = "TAIL"))
     private void onChunkData(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
+        spectre$packetApplied(packet);
         int chunkX = packet.getX();
         int chunkZ = packet.getZ();
         FinderQueue.get().onChunkData(this.level, new ChunkPos(chunkX, chunkZ));
+        if (this.level == null || this.level != Minecraft.getInstance().level) return;
         // Netherite Finder: hand the raw chunk buffer to the palette scanner so it can reveal
         // ancient debris the server hid from the client's block view.
         com.autism.seedcracker.modules.NetheriteFinderModule module =
@@ -47,7 +68,7 @@ public abstract class ClientPacketListenerMixin {
             try {
                 module.onChunkData(packet.getChunkData().getReadBuffer(), chunkX, chunkZ,
                     this.level.getSectionsCount(), this.level.getMinSectionY());
-            } catch (Throwable ignored) {}
+            } catch (RuntimeException error) { spectre$detectorFailed(module, error); }
         }
         // Amethyst bypass: same palette-leak trick for hidden geodes.
         com.autism.seedcracker.modules.AmethystEspModule amethyst =
@@ -57,34 +78,92 @@ public abstract class ClientPacketListenerMixin {
             try {
                 amethyst.onChunkData(packet.getChunkData().getReadBuffer(), chunkX, chunkZ,
                     this.level.getSectionsCount(), this.level.getMinSectionY());
-            } catch (Throwable ignored) {}
+            } catch (RuntimeException error) { spectre$detectorFailed(amethyst, error); }
         }
     }
 
-    /** Single block update: when a block actually BECOMES ancient debris, the server reveals its
-     * exact position here. Hand it to NetheriteFinder so it renders the precise block (Anubis
-     * AdvancedFinder reveal behaviour), not just the 16x16x16 section. */
-    @Inject(method = "handleBlockUpdate", at = @At(value = "TAIL"))
+    @Inject(method = "handleBlockUpdate", at = @At("TAIL"))
     private void onBlockUpdate(net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket packet, CallbackInfo ci) {
-        com.autism.seedcracker.modules.NetheriteFinderModule module =
-            (com.autism.seedcracker.modules.NetheriteFinderModule) com.autism.seedcracker.compat.ModuleLookup.get(
-                com.autism.seedcracker.SeedcrackerAddon.ID + ":netherite-finder");
-        if (module == null || !module.isEnabled() || this.level == null) return;
-        try {
-            module.onBlockUpdate(packet.getPos(), packet.getBlockState());
-        } catch (Throwable ignored) {}
+        spectre$packetApplied(packet);
+        spectre$revealedBlock(packet.getPos(), packet.getBlockState());
     }
 
-    /** Multi block update (section blocks update): same reveal path for batched changes. */
-    @Inject(method = "handleChunkBlocksUpdate", at = @At(value = "TAIL"))
+    @Inject(method = "handleChunkBlocksUpdate", at = @At("TAIL"))
     private void onChunkBlocksUpdate(net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket packet, CallbackInfo ci) {
-        com.autism.seedcracker.modules.NetheriteFinderModule module =
-            (com.autism.seedcracker.modules.NetheriteFinderModule) com.autism.seedcracker.compat.ModuleLookup.get(
-                com.autism.seedcracker.SeedcrackerAddon.ID + ":netherite-finder");
-        if (module == null || !module.isEnabled() || this.level == null) return;
-        try {
-            packet.runUpdates((pos, state) -> module.onBlockUpdate(pos, state));
-        } catch (Throwable ignored) {}
+        spectre$packetApplied(packet);
+        packet.runUpdates(this::spectre$revealedBlock);
+    }
+
+    @Unique
+    private void spectre$revealedBlock(net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+        if (this.level == null || this.level != Minecraft.getInstance().level) return;
+        var debris = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":netherite-finder");
+        if (debris instanceof com.autism.seedcracker.modules.NetheriteFinderModule finder && finder.isEnabled()) {
+            try { finder.onBlockUpdate(pos, state); }
+            catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+        }
+        var amethyst = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":amethyst-esp");
+        if (amethyst instanceof com.autism.seedcracker.modules.AmethystEspModule finder && finder.isEnabled()) {
+            try { finder.onBlockUpdate(pos, state); }
+            catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+        }
+    }
+
+    @Inject(method = "handleLightUpdatePacket", at = @At("TAIL"))
+    private void spectre$lightApplied(ClientboundLightUpdatePacket packet, CallbackInfo ci) {
+        spectre$packetApplied(packet);
+    }
+
+    @Inject(method = "handleForgetLevelChunk", at = @At("TAIL"))
+    private void spectre$chunkUnloaded(ClientboundForgetLevelChunkPacket packet, CallbackInfo ci) {
+        spectre$packetApplied(packet);
+    }
+
+    @Unique
+    private void spectre$packetApplied(Packet<?> packet) {
+        if (this.level == null || this.level != Minecraft.getInstance().level) return;
+        if (!(packet instanceof ClientboundLightUpdatePacket)) {
+            var chunk = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":z-chunk-finder");
+            if (chunk instanceof com.autism.seedcracker.modules.ChunkFinderModule finder && finder.isEnabled()) {
+                try { finder.onPacketApplied(this.level, packet); }
+                catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+            }
+        }
+        var sus = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":z-sus-chunk-finder");
+        if (sus instanceof com.autism.seedcracker.modules.SusChunkFinderModule finder && finder.isEnabled()) {
+            try { finder.onPacketApplied(this.level, packet); }
+            catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+        }
+        if (packet instanceof ClientboundLevelChunkWithLightPacket || packet instanceof ClientboundLightUpdatePacket
+            || packet instanceof ClientboundForgetLevelChunkPacket) {
+            var prime = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":prime-chunk-finder");
+            if (prime instanceof com.autism.seedcracker.modules.PrimeChunkFinderModule finder && finder.isEnabled()) {
+                try { finder.onPacketApplied(this.level, packet); }
+                catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+            }
+        }
+        var player = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":player-chunks");
+        if (player instanceof com.autism.seedcracker.modules.PlayerChunksModule finder && finder.isEnabled()) {
+            try { finder.onPacketApplied(packet); }
+            catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+        }
+        var quantum = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":quantum");
+        if (quantum instanceof com.autism.seedcracker.modules.QuantumModule finder && finder.isEnabled()) {
+            try { finder.onPacketApplied(packet); }
+            catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+        }
+        var light = com.autism.seedcracker.compat.ModuleLookup.get(com.autism.seedcracker.SeedcrackerAddon.ID + ":light-finder");
+        if (light instanceof com.autism.seedcracker.modules.LightSourceFinderModule finder && finder.isEnabled()) {
+            try { finder.onPacketApplied(packet); }
+            catch (RuntimeException error) { spectre$detectorFailed(finder, error); }
+        }
+    }
+
+    @Unique
+    private static void spectre$detectorFailed(autismclient.modules.Module module, RuntimeException error) {
+        try { module.setEnabled(false); }
+        catch (RuntimeException cleanup) { error.addSuppressed(cleanup); }
+        org.slf4j.LoggerFactory.getLogger("DogsTools/Spectre").warn("Packet detector {} failed", module.id(), error);
     }
 
     @Inject(method = "handleLogin", at = @At(value = "TAIL"))

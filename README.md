@@ -9,7 +9,7 @@
 [![Minecraft](https://img.shields.io/badge/Minecraft-26.2-52a535?style=flat-square&logo=minecraft&logoColor=white)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Fabric-0.19.3%2B-dbd0b3?style=flat-square)](https://fabricmc.net/)
 [![Java](https://img.shields.io/badge/Java-25%2B-e76f51?style=flat-square&logo=openjdk&logoColor=white)](https://adoptium.net/)
-[![License](https://img.shields.io/badge/license-The%20Unlicense-f4a261?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/distribution-GPL--3.0--only-f4a261?style=flat-square)](src/main/resources/SPECTRE-NOTICES.txt)
 
 </div>
 
@@ -17,7 +17,82 @@ A client-side addon for the AUTISM Client that bundles base-finding tools for Do
 seed cracking, coordinate finding, RTP stash hunting, an auction-house flipper, and a broader set of
 utility modules. It loads as its own jar alongside the AUTISM client.
 
-## v2.4.5 — Which jar do I download?
+## v3.0.0 — Spectre DonutSMP ports
+
+Version 3.0.0 adapts the Donut and Base Raid modules from
+[cody-raves/Spectre](https://github.com/cody-raves/Spectre/tree/d5a7dd3de0be67bea273d4ed74d2c76c11e0f6da),
+plus its Donut region map and spawner nametags. They use the native AUTISM addon
+settings, rendering and lifecycle; Spectre itself is **not** required.
+
+Install **one** jar alongside its matching client:
+
+| Jar | AUTISM Client | API |
+| --- | --- | --- |
+| [3.0.0](dist/autism-base-finding-tools-3.0.0.jar) | V4 / `5.1-26.2` | v4 |
+| [3.0.0+client5.0](dist/autism-base-finding-tools-3.0.0+client5.0.jar) | `5.0-26.2` | v3 |
+
+Both variants pass 643 automated checks. Isolated startup checks verified all
+27 port registrations, all 11 new/modified mixins and clean shutdown on both
+clients. Release packaging differs from those runtime-tested binaries only in
+mod-version metadata. Active module gameplay was not authenticated or live-server
+tested; server-specific behavior remains unverified.
+
+| Spectre module | Addon destination |
+| --- | --- |
+| Anti Vanish | Replaces Spectator Detector |
+| Player Detection | Replaces Visual Range |
+| Staff List | New staff list and alerts |
+| Anti Trap | Replaces Anti Trap |
+| Spawner Protect | Replaces Spawner Protect |
+| Netherite Finder | Replaces Netherite Finder |
+| Spawner Notifier | Replaces Spawner Finder |
+| Amethyst Bypass | Replaces Amethyst ESP |
+| Block Entity Debug | New leaked-block-entity overlay |
+| Spawner Nametags | New spawner labels |
+| Chunk Scanner | Replaces Chunk Finder |
+| Sus Chunk Finder | Replaces Sus Chunk Finder |
+| Prime Chunk Finder | Replaces Prime Chunk Finder |
+| Player Bypass | Replaces Player Finder light-data mode; simulation mode retained |
+| Light ESP | Replaces Light Source Finder |
+| Quantum | New resent-chunk activity detector |
+| Render Util | New Quantum detection renderer |
+| Render Distance Toggle | Replaces Auto Render |
+| Home Meta | Replaces Home Setter META behavior; SET mode retained |
+| Auto Relog | New depth-triggered relog; the distinct Relog Loader workflow remains |
+| Air Stuck | New movement utility |
+| Donut NoFall | New server-dependent fall-damage mitigation |
+| Donut Speed Mine | New mining utility |
+| Trident Util | New trident settings |
+| Riptide | Additional manual-use module present in Spectre's source |
+| Fake Stats | Replaces the old Fake Scoreboard HUD; Fake Identity remains |
+| Region Map | Replaces the map layout/rendering with Spectre's region IDs and colors |
+
+Replacement modules retain their existing addon identifiers. Unrelated tools,
+including seed cracking, trading, chat games and Base Scout, remain in the addon.
+New modules are opt-in; the six new movement/relog/trident tools are in **Donut**.
+Finder and staff detections are heuristics, not proof of a base or a vanished
+player; movement/mining behavior depends on the server. Seed-aware Chunk Finder
+prediction is limited to vanilla world generation, eight chunks and coordinates
+within ±250,000 blocks. Sus Chunk Finder's bare formations are hypotheses, not
+proof that a geode was mined.
+
+**Fake Stats:** local sidebar values and your tab balance can be overridden or
+scrambled. The optional payment-balance setting uses Fake Identity's existing
+local balance. A private render scoreboard leaves genuine client/server values
+available to other modules. Disable Scoreboard Hider to see the sidebar. The old
+separate Fake Scoreboard HUD is no longer registered.
+
+**Region Map:** Spectre's 9×9 region layout replaces the old baked palette. Region
+IDs, cell gaps, opacity, text/player scale and indicator color are configurable.
+Existing RTP dots, base heatmap, Nether coordinate projection and custom PNGs are
+retained. Out-of-map coordinates are not labeled as an edge region. The layout is
+a source snapshot, not a live server-topology feed.
+
+Spectre's custom client GUI, updater, media player and unrelated combat/building
+modules are outside this port. No Spectre telemetry or Discord integration is
+included. See [source attribution and licenses](src/main/resources/SPECTRE-NOTICES.txt).
+
+## v2.4.5 — previous release
 
 Install **one** jar that matches the AUTISM Client version:
 
@@ -183,9 +258,15 @@ Use your configured client command prefix. With a `#` prefix these are `#goto <p
 
 ### Auction buying, maps and clearing records
 
-- **AH Flipper:** alerts and paper trading are the default. For purchases, enable **Auto-buy flips**, set a positive **Buy budget**, and leave **AH Sniper** off so the flipper can use its purchase executor. Only fresh sales-backed deals qualify; ask-only estimates never buy. The default limit is **one attempt per enable**. Attempts reserve their full price even when unconfirmed, so failed verification cannot cause repeated spending. Re-enable the flipper to reset the limits. Auto-buy does not automatically sell the purchased item.
+AH Flipper currently excludes spawners, shulker boxes (including empty boxes), bundles, potions/tipped arrows, player heads, suspicious stew and fireworks: its price key does not yet represent their value-changing metadata or contents. They are excluded from GUI/API ingestion and cached-book ranking rather than valued as interchangeable items. Ordinary item/enchantment markets remain supported; non-vanilla namespaces stay distinct. These checks do not establish profitability, and live testing should use alerts/paper mode unless a spending budget is explicitly authorized.
+
+- **AH Flipper:** alerts and paper trading are the default. Enable the module under **Trading**, then open `/ah <item>` or set **Re-scan watchlist**. A blank watchlist does not open auctions merely because the module is enabled. The panel's **Open /ah** button also works before any deals exist. For purchases, enable **Auto-buy flips**, set a positive **Buy budget**, and leave **AH Sniper** off so the flipper can use its purchase executor. Only fresh sales-backed deals qualify; ask-only estimates never buy. The default limit is **one attempt per enable**. Attempts reserve their full price even when unconfirmed, so failed verification cannot cause repeated spending. Re-enable the flipper to reset the limits. Auto-buy does not automatically sell the purchased item.
+- **Flipper appears idle:** use `flip status` with your configured client prefix (e.g. `.flip status`) **without closing the auction page**. It reports the scan state, current listing count, sales history, filter-rejection reasons, API errors and whether buying is off. The empty panel shows the same diagnostics. A raw legacy-coloured seller line is normalized before listing identity is formed, so different sellers do not collapse into a single unknown-seller ask. While fewer than **Min sales** exist, enabled **Ask-only fallback** remains alert-only instead of disappearing after the first sale. It still requires at least six comparable other asks and your profit/ROI limits; a complete scan does not guarantee a profitable deal.
+- **Keyless passes:** automatic paging retains the whole pass and page limit when the server opens a replacement menu. Page counters are excluded from the scan identity, while search/filter text and observed `/ah` queries stay separate. A missing page times out rather than waiting forever; capped/interrupted passes and passes first opened on page 2 or later cannot infer sales. Watchlist-owned menus close on completion so later idle scans can run; manually opened or replaced screens are not closed. Two complete passes of the same search, under 20 minutes apart, are needed to infer vanished listings. Disappearance is not proof of a sale.
 - **AH Sniper:** set the target item and maximum full-stack price, then enable it. It checks the live listing again before clicking and handles the purchase confirmation. Unconfirmed purchases stop the sniper rather than retrying blindly.
+- **Price Check:** auto-paging stays stopped after movement, the last page or the page-turn limit; close/reopen the auction screen or re-enable the module to start again. A server opening a new menu for an automatic page turn does not reset that limit. Disconnecting clears scan and idle-reopen state. Recording is passive by default; **TRACK_ITEM** may reopen `/ah` while idle when **Re-scan every** is nonzero.
 - **Region Map:** the built-in image requires no file setup. Custom PNGs are optional; unreadable files fall back to the built-in map and warn once. Toggle the module off/on to retry a repaired file at the same path.
+- **Shared heatmaps:** the optional URL must be HTTP(S). Responses are limited to 64 KiB and must contain nonnegative integer counts for cells 1–81, e.g. `{"cells":{"41":3},"cellBlocks":50000}`; flat cell/count objects also work. If supplied, `cellBlocks` must match the configured grid size. Invalid data leaves the last valid map intact. Changing/blanking the URL or changing the grid size cancels the old request and clears its global overlay, without uploading local findings. Clearing the tracker also discards pending confirmations.
 - **Storage Recorder:** **Record → Clear key** is an optional keybind, unbound by default. It runs the same action as **Clear record**, only during gameplay with no screen open. Clearing affects the current server/dimension, not the module toggle. Already-cleared positions stay hidden until observed absent or the session ends; new positions continue recording.
 
 ### DonutSMP stash tools
@@ -199,6 +280,7 @@ Use your configured client command prefix. With a `#` prefix these are `#goto <p
 - **Player Finder:** replaces Player Chunks under the same saved module ID, with **Light Data** and **Simulation Activity** modes. Light Data checks explicitly transmitted zero-filled skylight sections near cave air; empty masks and missing payloads do not count. Simulation Activity requires several distinct block/entity sources outside your server simulation distance plus one chunk, excluding visible players' nearby areas. Memory expires after 45 seconds by default. Enable Light Data before travelling into new chunks; it cannot reconstruct packets received while disabled. Both modes require a skylit dimension and suppress results while you are below Y0.
 - **Migration:** removed Sus mode names reset to Classic; old **ANBS+ Scan** labels migrate specifically to Dog+. Old mixed-detector flags are not imported. Prime now detects underground light/redstone changes; Light Source Finder renders underground block-light cells; Chunk Finder uses the reference basic stone-stack detector. Seed, ore, stash and other unmatched specialists remain separate. See the [current validation and limitations](docs/BASE-DETECTION-VALIDATION.md).
 - **Tunnel Base Finder:** recovery tracks horizontal movement within blocks instead of waiting for a block-coordinate change. Screens opened during mining pause movement. Base thresholds apply within a local 3x3-chunk area; **Require spawner** now requires an underground spawner in that same area. **Spawner critical** still alerts on any loaded spawner. Alert-only discoveries are deduplicated by location until the module is re-enabled.
+- **Combined base alerts:** qualifying multi-finder candidates are checked before limiting announcements, so weak nearby signals cannot hide a stronger, slightly farther candidate. The per-location deduplication and ten-second alert cooldown remain; these are still candidate alerts, not proof of a base.
 - **Settings:** Sus and Player Finder each expose one two-mode selector. Tunnel controls remain grouped into movement, supplies, safety, and base detection. Existing module IDs are preserved; obsolete Sus settings no longer affect detection.
 - **Camera-follow steering:** the deadband extends beyond the 45-degree cardinal boundary. Small camera jitter near a boundary keeps the current tunnel heading; deliberate turns still change it immediately. The rule handles yaw wraparound at +/-180 degrees.
 - **Gravel and lava recovery:** gravel uses one short backward retreat without flipping yaw, followed by stationary clearing. Unsafe retreats or a column that never clears stop the module. Lava releases movement before routing to a new lane. Recovery turns stop after 200 active rotation ticks if they cannot finish. These changes do not guarantee anticheat compatibility.
@@ -211,6 +293,7 @@ The [catalogue-wide Anubis comparison](docs/2026-10-11_reverse-anubis-report.md#
 - **AH Sniper:** Target settings support name include/exclude and minimum stack count; live listing and confirmation checks still apply.
 - **AH Sell:** configure an Items list, or deliberately enable **Sell all hotbar items**. Unfiltered selling is off by default. Unconfirmed listings stop without retries.
 - **Auto Eat/Tool/Replenish:** risky or rare foods are excluded by default, manual slot changes are respected, and replenishment uses an atomic inventory swap with depleted-stack tracking.
+- **Auto Store:** acts only on the displayed container's menu, identifies player slots by inventory ownership rather than menu order, and always leaves armor/offhand slots alone. **Keep hotbar** also works with reordered slots. Deposits respect destination input rules and stack limits; an item that cannot fit does not block other matching items that can.
 - **Panic Pay:** recipient and amount are validated; disconnect follows a matching payment acknowledgement. Unknown replies time out without retrying payment or automatically disconnecting.
 - **Coord Snapper:** CENTER remains the default; COPY_OWN/COPY_TARGET copy locally to the clipboard. No coordinate webhook is added.
 
@@ -311,7 +394,7 @@ $task = & '.\tools\client-ai.ps1' -Action Submit -Prompt 'Summarize enabled find
 
 Submission returns a task ID, not proof of completion. Check Status for rejection, progress, approval-waiting or completion; approve plans only in the client's AI panel. Enabling the module initializes the host normally if needed. The script reads the short-lived bearer token from the game directory's `run` folder without printing it. `/ai/status`, `/ai/task` and `/ai/cancel` require that token and reject browser-origin requests. Unsupported controller builds fail closed. Offline live QA verified genuine read-only delegation: the host answered with the actual dimension ID and the final API returned it in `result`. Safe rejection, completed-task cancellation and token cleanup also passed; existing plans/settings were restored unchanged. For simultaneous instances, use JVM option `-Dautism.seedcracker.bridge.port=25661` and script argument `-Port 25661`.
 
-Finder reference metadata declares GPL-3.0-only while this project's existing license is Unlicense. Review redistribution licensing before publishing these behavior adaptations; no public release was made in this pass.
+Spectre-containing builds carry GPL-3.0-only distribution terms; see [License](#license) before redistributing them.
 
 ## Build
 
@@ -349,11 +432,14 @@ The runtime dependency is `autism: "*"`; the addon's API handshake still checks 
 ## Credits
 
 - **SeedCrackerX** by KaptainWutax and 19MisterX98 (MIT) — seed-cracking engine.
+- **Spectre** by cody-raves (GPL-3.0-only) — DonutSMP and Base Raid module ports, supporting algorithms, Fake Stats and Region Map. GoNuts-derived parts retain their MIT notice.
 
 ## License
 
-This repository is licensed under [The Unlicense](LICENSE).
-
----
-
-The project is released under The Unlicense, which means you are free to use, modify, and redistribute it however you want, as long as the software is provided as-is without warranty.
+The combined addon containing the Spectre ports is distributed under
+[GPL-3.0-only](src/main/resources/SPECTRE-LICENSE.txt). The original project code
+retains [The Unlicense](LICENSE); bundled third-party components retain their own
+notices, including the [GoNuts MIT notice](src/main/resources/GONUTS-LICENSE.txt).
+See [SPECTRE-NOTICES.txt](src/main/resources/SPECTRE-NOTICES.txt) for the pinned
+source revision and adaptation details. Provide corresponding source when
+redistributing the combined binary as required by GPLv3.

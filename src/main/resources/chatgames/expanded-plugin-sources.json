@@ -1,0 +1,248 @@
+[
+  {
+    "repo": "bentahsin/AntiAFK",
+    "commit": "01fdf20ff2fb7a5eacc472912ca52c1067b58be3",
+    "license": "MIT",
+    "path": "AntiAFK-Core/src/main/resources/questions.yml",
+    "url": "https://github.com/bentahsin/AntiAFK/blob/01fdf20ff2fb7a5eacc472912ca52c1067b58be3/AntiAFK-Core/src/main/resources/questions.yml",
+    "sourceResource": "plugin-sources/bentahsin__AntiAFK/questions.yml",
+    "note": "Public default Turkish question targets; formatting codes removed. No CAPTCHA interaction is implemented.",
+    "entries": [
+      {
+        "id": "q2",
+        "question": "Minecraft'ta k\u00f6m\u00fcr ne renktir?",
+        "answer": "siyah"
+      },
+      {
+        "id": "q3",
+        "question": "G\u00fcne\u015f nereden do\u011far?",
+        "answer": "do\u011fudan"
+      },
+      {
+        "id": "q5",
+        "question": "'Elma' kelimesinde ka\u00e7 harf vard\u0131r?",
+        "answer": "4"
+      },
+      {
+        "id": "q6",
+        "question": "Buz eriyince neye d\u00f6n\u00fc\u015f\u00fcr?",
+        "answer": "su"
+      }
+    ]
+  },
+  {
+    "repo": "M0dEx/FunQuiz",
+    "commit": "d8a0661bed87ff6fcd3eae1cdf0a60b59553f25e",
+    "license": "AGPL-3.0",
+    "path": "src/main/resources/questions.yml",
+    "url": "https://github.com/M0dEx/FunQuiz/blob/d8a0661bed87ff6fcd3eae1cdf0a60b59553f25e/src/main/resources/questions.yml",
+    "sourceResource": "plugin-sources/M0dEx__FunQuiz/questions.yml",
+    "note": "Selected stable default trivia; disputed river and broad animal superlatives excluded.",
+    "entries": [
+      {
+        "id": "q1",
+        "question": "What is another word for lexicon?",
+        "answer": "dictionary"
+      },
+      {
+        "id": "q2",
+        "question": "What is the name of the seventh planet from the sun?",
+        "answer": "Uranus"
+      },
+      {
+        "id": "q5",
+        "question": "Who was the first human in space?",
+        "answer": "yuri gagarin"
+      },
+      {
+        "id": "q7",
+        "question": "How many stars are on the American flag?",
+        "answer": "fifty"
+      },
+      {
+        "id": "q9",
+        "question": "In what year did princess diana die?",
+        "answer": "1997"
+      },
+      {
+        "id": "q14",
+        "question": "How many oscars did the Titanic movie got?",
+        "answer": "eleven"
+      }
+    ]
+  },
+  {
+    "repo": "Soapiee/TFQuiz",
+    "commit": "310fed3fff9719686ee66fb121afefd1b7846892",
+    "license": "GPL-3.0",
+    "path": "core/src/main/resources/questions.yml",
+    "url": "https://github.com/Soapiee/TFQuiz/blob/310fed3fff9719686ee66fb121afefd1b7846892/core/src/main/resources/questions.yml",
+    "sourceResource": "plugin-sources/Soapiee__TFQuiz/questions.yml",
+    "note": "Logical true/false targets from the arena quiz. These are data answers, not GUI/arena input support.",
+    "entries": [
+      {
+        "id": "3",
+        "question": "The unicorn is the national animal of Scotland",
+        "answer": "true"
+      },
+      {
+        "id": "4",
+        "question": "Goldfish have a two second memory",
+        "answer": "false"
+      },
+      {
+        "id": "5",
+        "question": "An octopus has two hearts",
+        "answer": "false"
+      },
+      {
+        "id": "6",
+        "question": "An octopus has three hearts",
+        "answer": "true"
+      },
+      {
+        "id": "7",
+        "question": "An octopus has four hearts",
+        "answer": "false"
+      },
+      {
+        "id": "8",
+        "question": "Cinderella was the first Disney princess",
+        "answer": "false"
+      },
+      {
+        "id": "9",
+        "question": "Alexander Fleming discovered penicillin",
+        "answer": "true"
+      },
+      {
+        "id": "10",
+        "question": "The black box in a plane is black",
+        "answer": "false"
+      },
+      {
+        "id": "12",
+        "question": "The United States has the longest coastline in the world",
+        "answer": "false"
+      },
+      {
+        "id": "13",
+        "question": "Spaghetto is the singular word for a piece of spaghetti",
+        "answer": "true"
+      },
+      {
+        "id": "14",
+        "question": "The Olympics are held every five years",
+        "answer": "false"
+      }
+    ]
+  },
+  {
+    "repo": "StarTux/Quiz",
+    "commit": "459d14919123a2bfee61fc86d7e12af5d7a0f5a6",
+    "license": "GPL-2.0",
+    "path": "src/main/resources/config.yml",
+    "url": "https://github.com/StarTux/Quiz/blob/459d14919123a2bfee61fc86d7e12af5d7a0f5a6/src/main/resources/config.yml",
+    "sourceResource": "plugin-sources/StarTux__Quiz/config.yml",
+    "note": "Free-text adaptation of the correct default multiple-choice option, not a claim of numeric-choice support.",
+    "entries": [
+      {
+        "id": "questions[1]",
+        "question": "Who invented the redstone repeater?",
+        "answer": "Jeb"
+      }
+    ]
+  },
+  {
+    "repo": "United-Lands/UnitedChat",
+    "commit": "b976c4fb16bfa8550ea1b42d8a227f5ace2637a6",
+    "license": "GPL-3.0",
+    "path": "src/main/resources/quiz/questions.yml",
+    "url": "https://github.com/United-Lands/UnitedChat/blob/b976c4fb16bfa8550ea1b42d8a227f5ace2637a6/src/main/resources/quiz/questions.yml",
+    "sourceResource": "plugin-sources/United-Lands__UnitedChat/questions.yml",
+    "note": "Only selected open_text defaults; one accepted answer selected per question.",
+    "entries": [
+      {
+        "id": "4",
+        "question": "Which English rock band released the 1969 album Abbey Road?",
+        "answer": "The Beatles"
+      },
+      {
+        "id": "6",
+        "question": "What is the largest country in the world by land area?",
+        "answer": "Russia"
+      },
+      {
+        "id": "8",
+        "question": "What dimension in Minecraft is home to the Ender Dragon?",
+        "answer": "The End"
+      },
+      {
+        "id": "10",
+        "question": "Who was the first human to walk on the Moon?",
+        "answer": "Neil Armstrong"
+      }
+    ]
+  },
+  {
+    "repo": "pump61/AbsolutEvents",
+    "commit": "3e7072fd388f01528c97ee3ddfebc434bdf1aff8",
+    "license": "MIT",
+    "path": "src/main/resources/eventos/quiz.yml",
+    "url": "https://github.com/pump61/AbsolutEvents/blob/3e7072fd388f01528c97ee3ddfebc434bdf1aff8/src/main/resources/eventos/quiz.yml",
+    "sourceResource": "plugin-sources/pump61__AbsolutEvents/quiz.yml",
+    "note": "Selected stable Portuguese physics/Minecraft statements. Boolean targets do not implement arena input.",
+    "entries": [
+      {
+        "id": "Questions[20]",
+        "question": "A velocidade da luz \u00e9 maior que a velocidade do som?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[21]",
+        "question": "Existe gravidade no espa\u00e7o?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[22]",
+        "question": "O ouro \u00e9 mais denso que o ferro?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[23]",
+        "question": "Um ano luz mede tempo?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[26]",
+        "question": "A Lua tem gravidade zero?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[27]",
+        "question": "O som se propaga no v\u00e1cuo?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[28]",
+        "question": "O Sol \u00e9 maior que J\u00fapiter?",
+        "answer": "true"
+      },
+      {
+        "id": "Questions[35]",
+        "question": "Um corpo mais pesado cai mais r\u00e1pido que um leve no v\u00e1cuo?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[38]",
+        "question": "\u00c9 poss\u00edvel dividir por zero em matem\u00e1tica convencional?",
+        "answer": "false"
+      },
+      {
+        "id": "Questions[42]",
+        "question": "O rel\u00f3gio funciona corretamente no Nether?",
+        "answer": "false"
+      }
+    ]
+  }
+]

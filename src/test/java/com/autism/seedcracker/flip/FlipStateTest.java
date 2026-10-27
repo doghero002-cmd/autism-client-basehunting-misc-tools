@@ -43,6 +43,59 @@ class FlipStateTest {
     }
 
     @Test
+    void collectingTheFirstSaleMustNotMakeAskOnlyDealsDisappear() {
+        FlipEngine engine = new FlipEngine(dir);
+        engine.tuning.minProfit = 1;
+        engine.tuning.minRoi = 1;
+        List<Listing> book = new ArrayList<>();
+        book.add(listing("cheap", 10));
+        for (int i = 0; i < 8; i++) book.add(listing("ask" + i, 100));
+        engine.addPage(book);
+        assertEquals(1, engine.rank(NOW).size());
+        engine.ingestApiSales(List.of(new Sale("first-sale", NOW - 1000, "Bob", "diamond", 1, 100, false)));
+        var opportunities = engine.rank(NOW + 1);
+        assertEquals(1, opportunities.size(), "thin sale history must still use the enabled ask-only fallback");
+        assertEquals(com.autism.seedcracker.flip.core.FlipModel.Basis.ASKS, opportunities.getFirst().basis());
+        assertFalse(com.autism.seedcracker.market.AhGui.canAutoBuy(opportunities.getFirst(), "Me", NOW + 1, 1000));
+        engine.tuning.askFallback = false;
+        engine.invalidateRank();
+        assertTrue(engine.rank(NOW + 2).isEmpty(), "fallback off must still require the configured sale count");
+    }
+
+    @Test
+    void enoughSalesDoNotBypassConfidenceFiltersByFallingBackToAsks() {
+        FlipEngine engine = new FlipEngine(dir);
+        engine.tuning.minProfit = 1;
+        engine.tuning.minRoi = 1;
+        engine.tuning.minConfidence = 0.95;
+        List<Listing> book = new ArrayList<>();
+        book.add(listing("cheap", 10));
+        for (int i = 0; i < 8; i++) book.add(listing("ask" + i, 100));
+        engine.addPage(book);
+        List<Sale> sales = new ArrayList<>();
+        for (int i = 0; i < engine.tuning.minSamples; i++) {
+            sales.add(new Sale("sale" + i, NOW - 1000 - i, "SameSeller", "diamond", 1, 100, false));
+        }
+        engine.ingestApiSales(sales);
+        assertTrue(engine.rank(NOW).isEmpty(), "established but low-confidence history must stay rejected");
+    }
+
+    @Test
+    void anEmptyListExplainsWhetherDataIsMissingOrFiltersRejectedIt() {
+        FlipEngine engine = new FlipEngine(dir);
+        assertTrue(engine.rank(NOW).isEmpty());
+        assertEquals(0, engine.liveListings());
+        engine.addPage(List.of(listing("one", 100)));
+        assertTrue(engine.rank(NOW + 1).isEmpty());
+        assertEquals(1, engine.liveListings());
+        assertTrue(engine.rejections().stream().anyMatch(reason -> reason.contains("other asks")));
+        engine.resetBook();
+        engine.rank(NOW + 2);
+        assertEquals(0, engine.liveListings());
+        assertTrue(engine.rejections().isEmpty());
+    }
+
+    @Test
     void reconnectDropsTransientBookAndIncompletePassesButKeepsSales() {
         FlipEngine engine = new FlipEngine(dir);
         engine.ingestApiSales(List.of(new Sale("sale", NOW - 1000, "Alice", "diamond", 1, 100, false)));

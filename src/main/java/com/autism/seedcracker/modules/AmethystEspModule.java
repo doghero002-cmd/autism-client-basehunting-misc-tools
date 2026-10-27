@@ -1,299 +1,211 @@
+// SPDX-License-Identifier: GPL-3.0-only
 package com.autism.seedcracker.modules;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.autism.seedcracker.SeedcrackerAddon;
+import com.autism.seedcracker.finder.ScanCursor;
 import com.autism.seedcracker.render.BlockEspRenderer;
-
+import com.autism.seedcracker.spectre.palette.AmethystScan;
+import com.autism.seedcracker.spectre.palette.PaletteScan;
+import com.autism.seedcracker.util.RelogPersistence;
 import autismclient.api.module.BoolSetting;
 import autismclient.api.module.ColorSetting;
+import autismclient.api.module.EnumSetting;
 import autismclient.api.module.IntSetting;
 import autismclient.modules.Module;
 import autismclient.util.AutismClientMessaging;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 
-/**
- * Amethyst ESP.
- *
- * Scans the chunks around you for amethyst geodes - clusters of amethyst blocks / budding
- * amethyst - and highlights the amethyst blocks, marks the chunk, draws a tracer, and pings chat
- * when a new geode is found.
- *
- * Clean-room port of the obfuscated Zelith "AmethystESP" module against the AUTISM module API.
- * Detection looks for amethyst-cluster blocks with geode blocks nearby, matching the original's
- * cluster heuristic, but uses the shared chunk scanner + block ESP renderer instead of the
- * original's custom GL renderer.
- */
+/** Spectre AmethystBypass (d5a7dd3de0be), preserving the existing amethyst-esp registry id. */
 public final class AmethystEspModule extends Module {
-
-    private static final int MAX_Y = 50;
-
-    private final IntSetting simDistance = add(new IntSetting(
-            "sim-distance", "Sim distance (chunks)", 8, 1, 32, 1)
-        .description("Chunk bubble scanned for amethyst geodes.")
-        .group("General"));
-    private final IntSetting minCluster = add(new IntSetting(
-            "min-cluster", "Min cluster size", 3, 1, 20, 1)
-        .description("Amethyst blocks needed in a chunk to flag it as a geode.")
-        .group("General"));
-    private final BoolSetting chatAlert = add(new BoolSetting("chat-alert", "Chat alert", true)
-        .description("Chat message when a new geode is found.").group("General"));
-    private final BoolSetting blockEsp = add(new BoolSetting("block-esp", "Block ESP", true)
-        .description("Highlight each amethyst block.").group("Render"));
-    private final BoolSetting tracer = add(new BoolSetting("tracer", "Show tracers", true)
-        .description("Draw a tracer line to the nearest amethyst block.").group("Render"));
-    private final ColorSetting color = add(new ColorSetting("color", "ESP colour", 0xFFB464FF)
-        .description("Colour of the amethyst markers.").group("Render"));
-
-    // Advanced: off by default so the panel stays short; flip on to reveal the niche options.
-    private final BoolSetting showAdvanced = add(new BoolSetting("advanced", "Show advanced", false)
-        .description("Reveal extra render/scan options below.").group("General"));
-    private final IntSetting rescanMs = add(new IntSetting(
-            "rescan-ms", "Rescan delay (ms)", 0, 0, 10000, 100)
-        .description("Delay after enabling before scanning starts (lets chunks load). 0 = scan immediately.")
-        .group("Advanced").visibleWhen(showAdvanced::get));
-    private final BoolSetting geodeBox = add(new BoolSetting("geode-box", "Geode box", false)
-        .description("Draw a single bounding box around the whole detected geode.")
-        .group("Advanced").visibleWhen(showAdvanced::get));
-    private final BoolSetting fill = add(new BoolSetting("fill", "Fill boxes", false)
-        .description("Translucent fill on the amethyst blocks.")
-        .group("Advanced").visibleWhen(showAdvanced::get));
-    private final BoolSetting bypass = add(new BoolSetting("bypass", "Amethyst bypass (anti-xray)", true)
-        .description("DEFAULT: Anubis AmethystBypass - reveal geodes the server HIDES by scanning chunk-section palettes for amethyst the server declared but stripped (palette leak). Works even when no amethyst is visible in your block view.")
-        .group("Advanced").visibleWhen(showAdvanced::get));
-
-    /** chunkKey -> set of amethyst block positions in that chunk. */
-    private final Map<Long, Set<BlockPos>> flagged = new ConcurrentHashMap<>();
-    /** Anti-xray bypass markers (packet palette leak). SEPARATE from the scan map: scanChunk
-     * put/removes whole chunk entries, and hidden blocks are invisible to it - sharing the map
-     * meant every rescan pass erased the bypass's hidden-geode markers. */
-    private final Map<Long, Set<BlockPos>> bypassFlagged = new ConcurrentHashMap<>();
-    private final Set<Long> notified = ConcurrentHashMap.newKeySet();
-    private int cursor = 0;
-    private long enableTimeMs = 0;
-    private long nextPassAtMs = 0;
-    private java.util.List<net.minecraft.world.phys.AABB> cachedBoxes = java.util.List.of();
-    private int boxRebuildTicks = 0;
+    private static final String ID = SeedcrackerAddon.ID + ":amethyst-esp";
+    private enum Method { BYPASS, LIGHT, ANBS_SCAN }
+    private final EnumSetting<Method> method = add(new EnumSetting<>("method", "Method", Method.BYPASS, Method.values(),
+        value -> switch (value) { case BYPASS -> "Bypass"; case LIGHT -> "Light"; case ANBS_SCAN -> "ANBS+ Scan"; }).group("Detection"));
+    private final IntSetting simDistance = add(new IntSetting("sim-distance", "Scan radius (chunks)", 8, 1, 32, 1).group("Detection"));
+    private final IntSetting minCells = add(new IntSetting("min-cells", "Minimum glow cells", 12, 1, 100, 1)
+        .group("Detection").visibleWhen(() -> method.get() == Method.ANBS_SCAN));
+    private final IntSetting chunksPerTick = add(new IntSetting("chunks-per-tick", "Chunks per tick", 4, 1, 16, 1).group("Performance"));
+    private final BoolSetting chatAlert = add(new BoolSetting("chat-alert", "Chat alert", false).group("General"));
+    private final BoolSetting blockEsp = add(new BoolSetting("block-esp", "Render markers", true).group("Render"));
+    private final BoolSetting tracer = add(new BoolSetting("tracer", "Tracer", false).group("Render"));
+    private final BoolSetting fill = add(new BoolSetting("fill", "Fill markers", true).group("Render"));
+    private final ColorSetting color = add(new ColorSetting("color", "Marker color", -3636481).group("Render"));
+    private final ScanCursor scan = new ScanCursor();
+    private final AmethystScan detector = new AmethystScan();
+    private final Map<ChunkPos, List<Integer>> rawPalettes = new LinkedHashMap<>();
+    private final Map<ChunkPos, Set<BlockPos>> found = new LinkedHashMap<>();
+    private final Set<ChunkPos> checked = new HashSet<>();
+    private final Set<ChunkPos> dirty = new LinkedHashSet<>();
+    private final Set<ChunkPos> notified = new HashSet<>();
+    private ClientLevel level;
+    private Method lastMethod;
+    private int lastRadius;
+    private int lastMinimum;
+    private boolean unloadHook;
 
     public AmethystEspModule() {
-        super(SeedcrackerAddon.ID + ":amethyst-esp", "Amethyst ESP",
-            "Highlights amethyst geodes (cluster blocks) around you.");
+        super(ID, "Amethyst ESP", "Spectre geode palette leaks, hidden bud light peaks and ANBS+ glow edges.");
     }
 
-    @Override
-    public void onEnable() {
+    @Override public void onEnable() {
+        reset();
         BlockEspRenderer.init();
-        flagged.clear();
-        bypassFlagged.clear();
-        notified.clear();
-        cursor = 0;
-        enableTimeMs = System.currentTimeMillis();
-        nextPassAtMs = 0;
-        cachedBoxes = java.util.List.of();
-        boxRebuildTicks = 0;
-    }
-
-    @Override
-    public void onDisable() {
-        flagged.clear();
-        bypassFlagged.clear();
-        notified.clear();
-        BlockEspRenderer.clear(SeedcrackerAddon.ID + ":amethyst-esp");
-    }
-
-    @Override
-    public void onGameLeft() { if (com.autism.seedcracker.util.RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
-    }
-
-    @Override
-    public void tick() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
-
-        // Respect the configurable rescan delay (lets chunks finish loading before scanning).
-        if (System.currentTimeMillis() - enableTimeMs < rescanMs.get()) return;
-
-        // Spread the chunk scan across ticks (round-robin over the bubble); after a completed
-        // pass, idle 5s - geodes don't move, so continuous re-sweeping was pure FPS waste.
-        int range = simDistance.get();
-        ChunkPos centre = mc.player.chunkPosition();
-        int side = range * 2 + 1;
-        int total = side * side;
-        if (cursor != 0 || System.currentTimeMillis() >= nextPassAtMs) {
-            for (int i = 0; i < 4; i++) {
-                int idx = cursor % total;
-                cursor = (idx + 1) % total;
-                int dx = idx % side - range;
-                int dz = idx / side - range;
-                int cx = centre.x() + dx, cz = centre.z() + dz;
-                if (mc.level.hasChunk(cx, cz)) scanChunk(mc.level.getChunk(cx, cz));
-                if (cursor == 0) { nextPassAtMs = System.currentTimeMillis() + 5000; break; }
-            }
+        if (!unloadHook) {
+            unloadHook = true;
+            ClientChunkEvents.CHUNK_UNLOAD.register((world, chunk) -> {
+                if (world != level) return;
+                ChunkPos pos = chunk.getPos();
+                rawPalettes.remove(pos);
+                found.remove(pos);
+                checked.remove(pos);
+                dirty.remove(pos);
+                notified.remove(pos);
+                BlockEspRenderer.clear(ID);
+            });
         }
+    }
+    @Override public void onDisable() { reset(); }
+    @Override public void onGameLeft() {
+        reset();
+        if (RelogPersistence.shouldDisableOnGameLeft()) setEnabledSilently(false);
+    }
+    private void reset() {
+        rawPalettes.clear();
+        clearScan();
+        level = null;
+        lastMethod = null;
+    }
+    private void clearScan() {
+        found.clear();
+        checked.clear();
+        dirty.clear();
+        notified.clear();
+        scan.reset();
+        detector.clear();
+        BlockEspRenderer.clear(ID);
+    }
+    private void sync(Minecraft mc) {
+        if (level != mc.level) {
+            reset();
+            level = mc.level;
+        }
+        if (lastMethod != method.get() || lastRadius != simDistance.get() || lastMinimum != minCells.get()) {
+            clearScan();
+            lastMethod = method.get();
+            lastRadius = simDistance.get();
+            lastMinimum = minCells.get();
+        }
+    }
 
-        // Prune out-of-range chunks (and their chat-alert keys, so re-entering range re-alerts
-        // and the set doesn't grow unbounded over a long session).
-        int pr = range + 2;
-        java.util.function.Predicate<Long> tooFar = key -> {
-            int kx = (int) (key >> 32);
-            int kz = (int) (key & 0xffffffffL);
-            return Math.abs(kx - centre.x()) > pr || Math.abs(kz - centre.z()) > pr;
-        };
-        flagged.keySet().removeIf(tooFar);
-        bypassFlagged.keySet().removeIf(tooFar);
-        notified.removeIf(tooFar);
+    /** Takes ownership of a fresh packet read-buffer wrapper; releases it on every path. */
+    public void onChunkData(FriendlyByteBuf buffer, int chunkX, int chunkZ, int sectionCount, int minSectionY) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (!mc.isSameThread()) throw new IllegalStateException("Palette packets must be applied on the client thread");
+            if (!isEnabled()) return;
+            sync(mc);
+            if (level == null || !PaletteScan.validChunk(chunkX, chunkZ) || !level.getChunkSource().hasChunk(chunkX, chunkZ)) return;
+            var result = PaletteScan.read(buffer.nioBuffer(buffer.readerIndex(), buffer.readableBytes()), sectionCount, minSectionY,
+                id -> AmethystScan.bud(Block.stateById(id)));
+            ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+            if (result.valid() && !result.sections().isEmpty()) rawPalettes.put(pos, result.sections().stream().map(PaletteScan.Section::y).toList());
+            else rawPalettes.remove(pos);
+            trimRaw();
+            invalidate(pos);
+        } finally {
+            buffer.release();
+        }
+    }
 
-        // Feed the renderer with the union of scan + bypass markers.
+    public void onBlockUpdate(BlockPos pos, BlockState state) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!mc.isSameThread()) throw new IllegalStateException("Block updates must be applied on the client thread");
+        if (!isEnabled()) return;
+        sync(mc);
+        invalidate(new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4));
+    }
+    private void invalidate(ChunkPos pos) {
+        checked.remove(pos);
+        found.remove(pos);
+        if (dirty.size() < 1024) dirty.add(pos);
+    }
+    private void trimRaw() {
+        while (rawPalettes.size() > 1024) rawPalettes.remove(rawPalettes.keySet().iterator().next());
+    }
+
+    @Override public void tick() {
+        Minecraft mc = Minecraft.getInstance();
+        sync(mc);
+        if (level == null || mc.player == null) { BlockEspRenderer.clear(ID); return; }
+        ChunkPos center = mc.player.chunkPosition();
+        java.util.function.Predicate<ChunkPos> stale = pos -> !level.getChunkSource().hasChunk(pos.x(), pos.z())
+            || Math.abs((long) pos.x() - center.x()) > simDistance.get() || Math.abs((long) pos.z() - center.z()) > simDistance.get();
+        rawPalettes.keySet().removeIf(stale);
+        found.keySet().removeIf(stale);
+        checked.removeIf(stale);
+        dirty.removeIf(stale);
+        notified.removeIf(stale);
+        long deadline = System.nanoTime() + 2_000_000;
+        int remaining = chunksPerTick.get();
+        while (!dirty.isEmpty() && remaining > 0 && System.nanoTime() < deadline) {
+            ChunkPos pos = dirty.iterator().next();
+            dirty.remove(pos);
+            var chunk = level.getChunkSource().getChunkNow(pos.x(), pos.z());
+            if (chunk != null) scanChunk(chunk);
+            remaining--;
+        }
+        // ponytail: the 2 ms budget is checked between chunks; split sections if one chunk becomes costly.
+        while (remaining-- > 0 && System.nanoTime() < deadline) {
+            var batch = scan.nextBatch(mc, simDistance.get(), 1000, 1);
+            if (batch.isEmpty()) break;
+            LevelChunk chunk = batch.getFirst();
+            if (level.getChunkSource().getChunkNow(chunk.getPos().x(), chunk.getPos().z()) == chunk) scanChunk(chunk);
+        }
         if (blockEsp.get()) {
-            Set<BlockPos> all = new HashSet<>();
-            for (Set<BlockPos> s : flagged.values()) all.addAll(s);
-            for (Set<BlockPos> s : bypassFlagged.values()) all.addAll(s);
-            BlockEspRenderer.feed(SeedcrackerAddon.ID + ":amethyst-esp", all, color.get(), tracer.get(), fill.get());
-        }
-
-        // Geode boxes: one bounding box per connected amethyst cluster (flood fill - cached,
-        // recomputed twice a second instead of every tick).
-        if (geodeBox.get()) {
-            if (--boxRebuildTicks <= 0) {
-                boxRebuildTicks = 10;
-                cachedBoxes = computeGeodeBoxes();
-            }
-            if (!cachedBoxes.isEmpty()) {
-                BlockEspRenderer.feedBoxes(SeedcrackerAddon.ID + ":amethyst-esp", cachedBoxes, color.get());
-            } else {
-                BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":amethyst-esp");
-            }
-        } else {
-            BlockEspRenderer.clearBox(SeedcrackerAddon.ID + ":amethyst-esp");
-        }
-    }
-
-    /** Group all flagged blocks into connected clusters, one AABB each (inflated a little). */
-    private java.util.List<net.minecraft.world.phys.AABB> computeGeodeBoxes() {
-        java.util.List<net.minecraft.world.phys.AABB> boxes = new java.util.ArrayList<>();
-        Set<BlockPos> remaining = new HashSet<>();
-        for (Set<BlockPos> s : flagged.values()) remaining.addAll(s);
-        for (Set<BlockPos> s : bypassFlagged.values()) remaining.addAll(s);
-        while (!remaining.isEmpty()) {
-            // Flood-fill one cluster.
-            java.util.List<BlockPos> cluster = new java.util.ArrayList<>();
-            java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
-            BlockPos seed = remaining.iterator().next();
-            remaining.remove(seed);
-            queue.add(seed);
-            cluster.add(seed);
-            while (!queue.isEmpty()) {
-                BlockPos cur = queue.poll();
-                // 26 neighbours (faces + edges + corners) so diagonally-touching geodes merge.
-                for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue;
-                    BlockPos nb = cur.offset(dx, dy, dz);
-                    if (remaining.remove(nb)) { queue.add(nb); cluster.add(nb); }
-                }
-            }
-            if (cluster.size() < minCluster.get()) continue;
-            int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-            int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-            for (BlockPos p : cluster) {
-                if (p.getX() < minX) minX = p.getX();
-                if (p.getY() < minY) minY = p.getY();
-                if (p.getZ() < minZ) minZ = p.getZ();
-                if (p.getX() + 1 > maxX) maxX = p.getX() + 1;
-                if (p.getY() + 1 > maxY) maxY = p.getY() + 1;
-                if (p.getZ() + 1 > maxZ) maxZ = p.getZ() + 1;
-            }
-            boxes.add(new net.minecraft.world.phys.AABB(minX, minY, minZ, maxX, maxY, maxZ).inflate(1.0));
-        }
-        return boxes;
-    }
-
-    /** Amethyst bypass (Anubis palette leak): called by the chunk-packet hook with the raw buffer.
-     * Flags sections whose palette declares amethyst the server stripped from the block data. */
-    public void onChunkData(net.minecraft.network.FriendlyByteBuf buffer, int chunkX, int chunkZ,
-                            int sectionCount, int minSectionY) {
-        if (!bypass.get()) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) return;
-        java.util.List<Integer> hidden = com.autism.seedcracker.netherite.HiddenAmethystScanner
-            .findHiddenSections(buffer, sectionCount, minSectionY);
-        if (hidden.isEmpty()) return;
-        // The blocks are hidden, so we don't know exact positions - flag the section's chunk with a
-        // marker block at the section centre so the geode box/ESP still shows where to dig.
-        ChunkPos pos = new ChunkPos(chunkX, chunkZ);
-        long key = ((long) pos.x() << 32) | (pos.z() & 0xffffffffL);
-        Set<BlockPos> found = bypassFlagged.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
-        for (int secY : hidden) {
-            found.add(new BlockPos((chunkX << 4) + 8, (secY << 4) + 8, (chunkZ << 4) + 8));
-        }
-        if (chatAlert.get() && notified.add(key)) {
-            AutismClientMessaging.sendPrefixed("§d[AmethystESP] §fHidden geode at X:" + pos.getMinBlockX()
-                + " Z:" + pos.getMinBlockZ() + " §7(" + hidden.size() + " sections)");
-        }
+            Set<BlockPos> markers = new HashSet<>();
+            for (var set : found.values()) markers.addAll(set);
+            BlockEspRenderer.feed(ID, Set.copyOf(markers), color.get(), tracer.get(), fill.get());
+        } else BlockEspRenderer.clear(ID);
     }
 
     private void scanChunk(LevelChunk chunk) {
-        if (chunk == null) return;
         ChunkPos pos = chunk.getPos();
-        long key = ((long) pos.x() << 32) | (pos.z() & 0xffffffffL);
-        Set<BlockPos> found = new HashSet<>();
-        // Section palette walk with maybeHas fast-skip: amethyst is rare, so nearly every
-        // section skips without a single block read (the old walk was ~29k reads + BlockPos
-        // allocations per chunk, repeated forever).
-        com.autism.seedcracker.finder.ChunkScanHelper.forEachBlockInChunk(chunk,
-            st -> isAmethystBlock(st) || isAmethystCluster(st),
-            p -> {
-                if (p.getY() > MAX_Y) return;
-                BlockState st = chunk.getBlockState(p);
-                // Detect the amethyst blocks themselves (amethyst block / budding amethyst),
-                // which DonutSMP still sends, not just the buds/clusters it hides at distance.
-                if (isAmethystBlock(st) || (isAmethystCluster(st) && hasGeodeNearby(chunk, p))) {
-                    found.add(p);
-                }
-            });
-        if (found.size() >= minCluster.get()) {
-            flagged.put(key, found);
-            if (chatAlert.get() && notified.add(key)) {
-                AutismClientMessaging.sendPrefixed("§d[AmethystESP] §fAmethyst cluster at X:" + pos.getMinBlockX()
-                    + " Z:" + pos.getMinBlockZ() + " §7(" + found.size() + " blocks)");
-            }
-        } else {
-            flagged.remove(key);
+        Set<BlockPos> hits;
+        if (method.get() == Method.BYPASS) {
+            if (!checked.add(pos)) return;
+            BlockPos marker = AmethystScan.paletteMarker(chunk, rawPalettes.getOrDefault(pos, List.of()));
+            hits = marker == null ? Set.of() : Set.of(marker);
+        } else if (method.get() == Method.LIGHT) hits = detector.lightPeaks(level, chunk);
+        else hits = detector.glowEdges(level, chunk, minCells.get());
+        if (hits.isEmpty()) {
+            found.remove(pos);
+            return;
         }
-    }
-
-    private static boolean isAmethystCluster(BlockState st) {
-        return st.is(Blocks.AMETHYST_CLUSTER)
-            || st.is(Blocks.LARGE_AMETHYST_BUD)
-            || st.is(Blocks.MEDIUM_AMETHYST_BUD)
-            || st.is(Blocks.SMALL_AMETHYST_BUD);
-    }
-
-    /** The geode's amethyst blocks themselves (always sent by the server, even at distance). */
-    private static boolean isAmethystBlock(BlockState st) {
-        return st.is(Blocks.AMETHYST_BLOCK) || st.is(Blocks.BUDDING_AMETHYST);
-    }
-
-    /** True if any geode block (amethyst block / budding amethyst / calcite / smooth basalt) is within 1 of pos. */
-    private static boolean hasGeodeNearby(LevelChunk chunk, BlockPos pos) {
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    BlockState st = chunk.getBlockState(pos.offset(dx, dy, dz));
-                    if (st.is(Blocks.AMETHYST_BLOCK) || st.is(Blocks.BUDDING_AMETHYST)
-                        || st.is(Blocks.CALCITE) || st.is(Blocks.SMOOTH_BASALT)) {
-                        return true;
-                    }
-                }
-            }
+        found.put(pos, hits);
+        int count = found.values().stream().mapToInt(Set::size).sum();
+        while (found.size() > 1024 || count > 8192) {
+            var oldest = found.keySet().iterator().next();
+            count -= found.remove(oldest).size();
+            notified.remove(oldest);
         }
-        return false;
+        if (notified.add(pos) && chatAlert.get()) AutismClientMessaging.sendPrefixed("§d[AmethystESP] §fGeode signal at "
+            + pos.getMinBlockX() + ", " + pos.getMinBlockZ() + " §7(" + method.displayString() + "; not proof of a base)");
     }
+
+    @Override public String info() { return found.size() + " geode signals"; }
 }

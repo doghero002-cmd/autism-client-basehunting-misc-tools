@@ -1,0 +1,6001 @@
+- id: 1
+  type: multiple_choice
+  question: Which chemical element has the symbol 'Au'?
+  choices:
+  - Silver
+  - Gold
+  - Copper
+  - Iron
+  correct: Gold
+- id: 2
+  type: open_text
+  question: What is the capital city of France?
+  correct:
+  - Paris
+- id: 3
+  type: multiple_choice
+  question: In which year did the ocean liner Titanic sink?
+  choices:
+  - '1905'
+  - '1912'
+  - '1918'
+  - '1923'
+  correct: '1912'
+- id: 4
+  type: open_text
+  question: Which English rock band released the 1969 album Abbey Road?
+  correct:
+  - The Beatles
+  - Beatles
+- id: 5
+  type: multiple_choice
+  question: What is the name of the main protagonist in 'The Legend of Zelda' game
+    series?
+  choices:
+  - Zelda
+  - Ganon
+  - Link
+  - Epona
+  correct: Link
+- id: 6
+  type: open_text
+  question: What is the largest country in the world by land area?
+  correct:
+  - Russia
+  - Russian Federation
+- id: 7
+  type: multiple_choice
+  question: What item is dropped by Shulkers in End Cities in Minecraft?
+  choices:
+  - Shulker Shell
+  - Ender Pearl
+  - Chorus Fruit
+  - End Stone
+  correct: Shulker Shell
+- id: 8
+  type: open_text
+  question: What dimension in Minecraft is home to the Ender Dragon?
+  correct:
+  - The End
+  - End
+- id: 9
+  type: multiple_choice
+  question: What gas do plants absorb from the atmosphere during photosynthesis?
+  choices:
+  - Oxygen
+  - Nitrogen
+  - Carbon dioxide
+  - Hydrogen
+  correct: Carbon dioxide
+- id: 10
+  type: open_text
+  question: Who was the first human to walk on the Moon?
+  correct:
+  - Neil Armstrong
+  - Armstrong
+- id: 11
+  type: multiple_choice
+  question: Which pop star released the hit album '1989' in 2014?
+  choices:
+  - Katy Perry
+  - Taylor Swift
+  - Ariana Grande
+  - Rihanna
+  correct: Taylor Swift
+- id: 12
+  type: open_text
+  question: What is the capital city of Japan?
+  correct:
+  - Tokyo
+  - Tokio
+- id: 13
+  type: multiple_choice
+  question: Which video game company created the 'Super Mario' franchise?
+  choices:
+  - Nintendo
+  - Sega
+  - Sony
+  - Capcom
+  correct: Nintendo
+- id: 14
+  type: open_text
+  question: What is the hardest naturally occurring mineral found on Earth?
+  correct:
+  - Diamond
+  - Diamonds
+- id: 15
+  type: multiple_choice
+  question: Which mob won the 2020 Minecraft Mob Vote?
+  choices:
+  - Iceologer
+  - Moobloom
+  - Glow Squid
+  - Rascal
+  correct: Glow Squid
+- id: 16
+  type: open_text
+  question: What is the lowest pickaxe tier required to mine Obsidian in Minecraft?
+  correct:
+  - Diamond
+  - Diamond Pickaxe
+  - Netherite
+  - Netherite Pickaxe
+- id: 17
+  type: multiple_choice
+  question: Which ancient civilization built the Pyramids of Giza?
+  choices:
+  - Greeks
+  - Egyptians
+  - Romans
+  - Mayans
+  correct: Egyptians
+- id: 18
+  type: open_text
+  question: Who sang the iconic 1982 pop album title track Thriller?
+  correct:
+  - Michael Jackson
+  - Jackson
+- id: 19
+  type: multiple_choice
+  question: What is the longest river in South America?
+  choices:
+  - Amazon River
+  - Nile River
+  - Mississippi River
+  - Yangtze River
+  correct: Amazon River
+- id: 20
+  type: open_text
+  question: What company developed the battle royale video game Fortnite?
+  correct:
+  - Epic Games
+  - Epic
+- id: 21
+  type: multiple_choice
+  question: Which planet in our solar system is known as the Red Planet?
+  choices:
+  - Venus
+  - Mars
+  - Jupiter
+  - Mercury
+  correct: Mars
+- id: 22
+  type: open_text
+  question: What is the national capital city of Australia?
+  correct:
+  - Canberra
+- id: 23
+  type: multiple_choice
+  question: What block is used to set a spawn point in the Nether in Minecraft?
+  choices:
+  - Lodestone
+  - Beacon
+  - Respawn Anchor
+  - Crying Obsidian
+  correct: Respawn Anchor
+- id: 24
+  type: open_text
+  question: What pyramid-topped structure block grants status effects in Minecraft?
+  correct:
+  - Beacon
+  - Beacon Block
+- id: 25
+  type: multiple_choice
+  question: In what year was the original PlayStation console released in Japan?
+  choices:
+  - '1992'
+  - '1994'
+  - '1996'
+  - '1998'
+  correct: '1994'
+- id: 26
+  type: open_text
+  question: What German city is famous for hosting the annual Oktoberfest festival?
+  correct:
+  - Munich
+  - München
+  - Muenchen
+  - Munchen
+- id: 27
+  type: multiple_choice
+  question: Which English singer sang the hit song 'Shape of You'?
+  choices:
+  - Ed Sheeran
+  - Sam Smith
+  - Harry Styles
+  - Lewis Capaldi
+  correct: Ed Sheeran
+- id: 28
+  type: open_text
+  question: Which organ in the human body pumps blood through the circulatory system?
+  correct:
+  - Heart
+  - The heart
+- id: 29
+  type: multiple_choice
+  question: Which country became the world's most populous nation in 2023?
+  choices:
+  - China
+  - India
+  - United States
+  - Indonesia
+  correct: India
+- id: 30
+  type: open_text
+  question: What is the maximum standard stack size for most items in Minecraft?
+  correct:
+  - '64'
+- id: 31
+  type: multiple_choice
+  question: Which status effect is granted by eating a standard Golden Apple in Minecraft?
+  choices:
+  - Absorption
+  - Haste
+  - Strength
+  - Invisibility
+  correct: Absorption
+- id: 32
+  type: open_text
+  question: Which hostile mob in Minecraft shoots arrows and burns in daylight?
+  correct:
+  - Skeleton
+  - Skeletons
+- id: 33
+  type: multiple_choice
+  question: How many teeth does an adult human typically have, including wisdom teeth?
+  choices:
+  - '28'
+  - '30'
+  - '32'
+  - '36'
+  correct: '32'
+- id: 34
+  type: open_text
+  question: Which Swedish pop group recorded the hit song Dancing Queen?
+  correct:
+  - ABBA
+  - Abba
+- id: 35
+  type: multiple_choice
+  question: Who was the first President of the United States?
+  choices:
+  - Thomas Jefferson
+  - George Washington
+  - Abraham Lincoln
+  - John Adams
+  correct: George Washington
+- id: 36
+  type: open_text
+  question: Which ocean separates Europe and Africa from North and South America?
+  correct:
+  - Atlantic Ocean
+  - Atlantic
+- id: 37
+  type: multiple_choice
+  question: In 'Tetris', how many individual small squares make up each falling block
+    shape?
+  choices:
+  - '3'
+  - '4'
+  - '5'
+  - '6'
+  correct: '4'
+- id: 38
+  type: open_text
+  question: What natural speed is approximately 300,000 kilometers per second in a
+    vacuum?
+  correct:
+  - Speed of light
+  - Light speed
+  - Light
+- id: 39
+  type: multiple_choice
+  question: What item is used to breed turtles in Minecraft?
+  choices:
+  - Kelp
+  - Raw Fish
+  - Seagrass
+  - Sea Pickle
+  correct: Seagrass
+- id: 40
+  type: open_text
+  question: What boss mob in Minecraft is constructed using Soul Sand and skulls?
+  correct:
+  - Wither
+  - The Wither
+- id: 41
+  type: multiple_choice
+  question: What is the smallest independent country in the world by land area?
+  choices:
+  - Monaco
+  - Vatican City
+  - Nauru
+  - San Marino
+  correct: Vatican City
+- id: 42
+  type: open_text
+  question: What famous wall divided the city of Berlin from 1961 to 1989?
+  correct:
+  - Berlin Wall
+  - The Berlin Wall
+- id: 43
+  type: multiple_choice
+  question: Which pop singer recorded the 2009 hit 'Bad Romance'?
+  choices:
+  - Lady Gaga
+  - Katy Perry
+  - Madonna
+  - Beyoncé
+  correct: Lady Gaga
+- id: 44
+  type: open_text
+  question: What is the name of the main plumber protagonist in the Mario game series?
+  correct:
+  - Mario
+- id: 45
+  type: multiple_choice
+  question: What type of rock is formed from cooled magma or lava?
+  choices:
+  - Sedimentary
+  - Metamorphic
+  - Igneous
+  - Limestone
+  correct: Igneous
+- id: 46
+  type: open_text
+  question: What is the capital city of Canada?
+  correct:
+  - Ottawa
+- id: 47
+  type: multiple_choice
+  question: What food item is used to tame stray cats in Minecraft?
+  choices:
+  - Raw Cod
+  - Bone
+  - Wheat
+  - Carrot
+  correct: Raw Cod
+- id: 48
+  type: open_text
+  question: Who is the original creator of Minecraft, known online as Notch?
+  correct:
+  - Markus Persson
+  - Notch
+  - Markus Notch Persson
+- id: 49
+  type: multiple_choice
+  question: In which city were the first modern Olympic Games held in 1896?
+  choices:
+  - Paris
+  - Athens
+  - London
+  - Rome
+  correct: Athens
+- id: 50
+  type: open_text
+  question: Which Canadian artist released the hit rap albums Views and Scorpion?
+  correct:
+  - Drake
+- id: 51
+  type: multiple_choice
+  question: Which character serves as the mascot for Sega?
+  choices:
+  - Sonic the Hedgehog
+  - Tails
+  - Knuckles
+  - Shadow
+  correct: Sonic the Hedgehog
+- id: 52
+  type: open_text
+  question: Which chemical element is represented by the chemical symbol O?
+  correct:
+  - Oxygen
+- id: 53
+  type: multiple_choice
+  question: On which continent is the Sahara Desert located?
+  choices:
+  - Asia
+  - Africa
+  - South America
+  - Australia
+  correct: Africa
+- id: 54
+  type: open_text
+  question: What ship brought the Pilgrims to North America in 1620?
+  correct:
+  - Mayflower
+  - The Mayflower
+- id: 55
+  type: multiple_choice
+  question: What color is the collar on a newly tamed wolf by default?
+  choices:
+  - Blue
+  - Red
+  - Green
+  - Yellow
+  correct: Red
+- id: 56
+  type: open_text
+  question: What block is created when water touches a stationary lava source block
+    in Minecraft?
+  correct:
+  - Obsidian
+- id: 57
+  type: multiple_choice
+  question: Which rock band recorded the song 'Bohemian Rhapsody'?
+  choices:
+  - The Beatles
+  - Led Zeppelin
+  - Queen
+  - Pink Floyd
+  correct: Queen
+- id: 58
+  type: open_text
+  question: What baked dessert is famously declared to be 'a lie' in the game Portal?
+  correct:
+  - Cake
+  - The cake
+- id: 59
+  type: multiple_choice
+  question: What unit is used to measure electrical resistance?
+  choices:
+  - Volt
+  - Ohm
+  - Ampere
+  - Watt
+  correct: Ohm
+- id: 60
+  type: open_text
+  question: What is the highest mountain peak above sea level on Earth?
+  correct:
+  - Mount Everest
+  - Everest
+  - Mt Everest
+  - Mt. Everest
+- id: 61
+  type: multiple_choice
+  question: Which empire was ruled by Julius Caesar?
+  choices:
+  - Roman Empire
+  - Greek Empire
+  - Ottoman Empire
+  - Persian Empire
+  correct: Roman Empire
+- id: 62
+  type: open_text
+  question: What is the real first and last name of the rapper Eminem?
+  correct:
+  - Marshall Mathers
+  - Marshall Mathers III
+- id: 63
+  type: multiple_choice
+  question: Which enchantment creates ice blocks under a player's feet when walking
+    over water in Minecraft?
+  choices:
+  - Depth Strider
+  - Frost Walker
+  - Feather Falling
+  - Aqua Affinity
+  correct: Frost Walker
+- id: 64
+  type: open_text
+  question: What friendly aquatic mob leads players to ocean ruins when fed raw fish
+    in Minecraft?
+  correct:
+  - Dolphin
+  - Dolphins
+- id: 65
+  type: multiple_choice
+  question: Which city-building simulation series was created by Will Wright and released
+    in 1989?
+  choices:
+  - SimCity
+  - The Sims
+  - Civilization
+  - 'Cities: Skylines'
+  correct: SimCity
+- id: 66
+  type: open_text
+  question: Which layer of the Earth's atmosphere protects surface life from UV rays?
+  correct:
+  - Ozone layer
+  - Ozone
+  - The ozone layer
+- id: 67
+  type: multiple_choice
+  question: Which country is commonly known as the 'Land of the Rising Sun'?
+  choices:
+  - China
+  - Japan
+  - South Korea
+  - Thailand
+  correct: Japan
+- id: 68
+  type: open_text
+  question: In what year did World War II end?
+  correct:
+  - '1945'
+- id: 69
+  type: multiple_choice
+  question: Which pop singer was famously crowned the 'King of Pop'?
+  choices:
+  - Elvis Presley
+  - Michael Jackson
+  - Prince
+  - David Bowie
+  correct: Michael Jackson
+- id: 70
+  type: open_text
+  question: What arcade classic features four ghosts named Blinky, Pinky, Inky, and
+    Clyde?
+  correct:
+  - Pac-Man
+  - Pacman
+  - Pac Man
+- id: 71
+  type: multiple_choice
+  question: What is the standard SI unit of physical force?
+  choices:
+  - Joule
+  - Pascal
+  - Newton
+  - Watt
+  correct: Newton
+- id: 72
+  type: open_text
+  question: What is the capital city of Italy?
+  correct:
+  - Rome
+  - Roma
+- id: 73
+  type: multiple_choice
+  question: What item is dropped by a Creeper when killed by a player in Minecraft?
+  choices:
+  - Gunpowder
+  - TNT
+  - Redstone
+  - Fire Charge
+  correct: Gunpowder
+- id: 74
+  type: open_text
+  question: What is the capital city of Austria?
+  correct:
+  - Vienna
+  - Wien
+- id: 75
+  type: multiple_choice
+  question: Which Renaissance artist painted the Mona Lisa?
+  choices:
+  - Vincent van Gogh
+  - Pablo Picasso
+  - Leonardo da Vinci
+  - Michelangelo
+  correct: Leonardo da Vinci
+- id: 76
+  type: open_text
+  question: Which British female artist sang the hit song Rolling in the Deep?
+  correct:
+  - Adele
+- id: 77
+  type: multiple_choice
+  question: Which Nintendo game released in March 2020 became a massive social hit
+    on the Switch?
+  choices:
+  - 'Animal Crossing: New Horizons'
+  - Super Mario Odyssey
+  - Splatoon 2
+  - Luigi's Mansion 3
+  correct: 'Animal Crossing: New Horizons'
+- id: 78
+  type: open_text
+  question: What gas makes up roughly 78 percent of Earth's atmosphere?
+  correct:
+  - Nitrogen
+- id: 79
+  type: multiple_choice
+  question: Which island nation is located off the southeastern coast of mainland
+    Africa?
+  choices:
+  - Sri Lanka
+  - Madagascar
+  - Iceland
+  - New Zealand
+  correct: Madagascar
+- id: 80
+  type: open_text
+  question: Who was Prime Minister of Great Britain during most of World War II?
+  correct:
+  - Winston Churchill
+  - Churchill
+- id: 81
+  type: multiple_choice
+  question: Which song by Luis Fonsi and Daddy Yankee became a global music hit in
+    2017?
+  choices:
+  - Despacito
+  - Macarena
+  - Bailando
+  - Mi Gente
+  correct: Despacito
+- id: 82
+  type: open_text
+  question: What prehistoric survival game features taming dinosaurs on 'The Island'?
+  correct:
+  - Ark
+  - ARK
+  - 'Ark: Survival Evolved'
+  - 'ARK: Survival Evolved'
+- id: 83
+  type: multiple_choice
+  question: Which fundamental force keeps planets in orbit around the Sun?
+  choices:
+  - Friction
+  - Electromagnetism
+  - Gravity
+  - Nuclear force
+  correct: Gravity
+- id: 84
+  type: open_text
+  question: What is the capital city of Germany?
+  correct:
+  - Berlin
+- id: 85
+  type: multiple_choice
+  question: Which historic conflict between England and France lasted from 1337 to
+    1453?
+  choices:
+  - Thirty Years' War
+  - Hundred Years' War
+  - Seven Years' War
+  - Napoleonic Wars
+  correct: Hundred Years' War
+- id: 86
+  type: open_text
+  question: Which rock band recorded the 1987 hit song Sweet Child O' Mine?
+  correct:
+  - Guns N' Roses
+  - Guns N Roses
+  - Guns and Roses
+- id: 87
+  type: multiple_choice
+  question: Which popular action RPG features the fantasy region of Skyrim?
+  choices:
+  - 'The Elder Scrolls V: Skyrim'
+  - The Witcher 3
+  - Dark Souls
+  - 'Dragon Age: Inquisition'
+  correct: 'The Elder Scrolls V: Skyrim'
+- id: 88
+  type: open_text
+  question: What Swiss city's name is spelled Zürich in German?
+  correct:
+  - Zürich
+  - Zuerich
+  - Zurich
+- id: 89
+  type: open_text
+  question: What ancient network of trade routes linked East Asia with the Mediterranean?
+  correct:
+  - Silk Road
+  - The Silk Road
+- id: 90
+  type: multiple_choice
+  question: Which subatomic particle carries a negative electrical charge?
+  choices:
+  - Proton
+  - Neutron
+  - Electron
+  - Photon
+  correct: Electron
+- id: 91
+  type: open_text
+  question: What ingredient must be brewed with a Water Bottle to create an Awkward
+    Potion in Minecraft?
+  correct:
+  - Nether Wart
+  - Netherwart
+- id: 92
+  type: multiple_choice
+  question: Which empire built the ancient mountain citadel of Machu Picchu in Peru?
+  choices:
+  - Aztec Empire
+  - Inca Empire
+  - Maya Empire
+  - Olmec Empire
+  correct: Inca Empire
+- id: 93
+  type: open_text
+  question: What is the capital city of Portugal?
+  correct:
+  - Lisbon
+  - Lisboa
+- id: 94
+  type: multiple_choice
+  question: Which river flows through the center of London, England?
+  choices:
+  - River Seine
+  - River Danube
+  - River Thames
+  - River Rhine
+  correct: River Thames
+- id: 95
+  type: open_text
+  question: Which French military leader and emperor was defeated at the Battle of
+    Waterloo in 1815?
+  correct:
+  - Napoleon
+  - Napoleon Bonaparte
+- id: 96
+  type: multiple_choice
+  question: Which band released the classic 1973 album 'The Dark Side of the Moon'?
+  choices:
+  - Pink Floyd
+  - The Rolling Stones
+  - Led Zeppelin
+  - The Who
+  correct: Pink Floyd
+- id: 97
+  type: open_text
+  question: What is the largest ocean on Earth by surface area?
+  correct:
+  - Pacific Ocean
+  - Pacific
+  - The Pacific Ocean
+- id: 98
+  type: multiple_choice
+  question: What is the primary setting city for the video game 'Grand Theft Auto
+    V'?
+  choices:
+  - Liberty City
+  - Vice City
+  - San Fierro
+  - Los Santos
+  correct: Los Santos
+- id: 99
+  type: open_text
+  question: What chemical element is represented by the symbol 'Na' on the periodic
+    table?
+  correct:
+  - Sodium
+- id: 100
+  type: multiple_choice
+  question: What item is used to breed axolotls in Minecraft?
+  choices:
+  - Bucket of Tropical Fish
+  - Raw Cod
+  - Seagrass
+  - Raw Salmon
+  correct: Bucket of Tropical Fish
+- id: 101
+  type: open_text
+  question: What underwater structure in Minecraft is guarded by Elder Guardians?
+  correct:
+  - Ocean Monument
+  - Ocean Temple
+- id: 102
+  type: multiple_choice
+  question: In which year did the French Revolution begin?
+  choices:
+  - '1776'
+  - '1789'
+  - '1804'
+  - '1815'
+  correct: '1789'
+- id: 103
+  type: multiple_choice
+  question: What is the capital city of Spain?
+  choices:
+  - Barcelona
+  - Seville
+  - Madrid
+  - Valencia
+  correct: Madrid
+- id: 104
+  type: open_text
+  question: What iconic video game series features a stealth assassin named Ezio Auditore
+    da Firenze?
+  correct:
+  - Assassin's Creed
+  - Assassins Creed
+- id: 105
+  type: multiple_choice
+  question: Which pop singer released the 2020 global hit single 'Blinding Lights'?
+  choices:
+  - The Weeknd
+  - Drake
+  - Bruno Mars
+  - Post Malone
+  correct: The Weeknd
+- id: 106
+  type: open_text
+  question: What passive mob in Minecraft produces milk when right-clicked with a
+    bucket?
+  correct:
+  - Cow
+  - Cows
+  - Mooshroom
+  - Mooshrooms
+- id: 107
+  type: multiple_choice
+  question: Which company created the original 'Half-Life' and 'Counter-Strike' video
+    games?
+  choices:
+  - Epic Games
+  - Valve
+  - Blizzard Entertainment
+  - id Software
+  correct: Valve
+- id: 108
+  type: open_text
+  question: What is the closest planet to the Sun in our solar system?
+  correct:
+  - Mercury
+- id: 109
+  type: multiple_choice
+  question: How many sides does a geometric heptagon have?
+  choices:
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  correct: '7'
+- id: 110
+  type: open_text
+  question: What fuel is used to power a Brewing Stand in Minecraft?
+  correct:
+  - Blaze Powder
+- id: 111
+  type: multiple_choice
+  question: Which mob in Minecraft drops Ghast Tears upon defeat?
+  choices:
+  - Blaze
+  - Magma Cube
+  - Ghast
+  - Wither Skeleton
+  correct: Ghast
+- id: 112
+  type: open_text
+  question: What is the capital city of Norway?
+  correct:
+  - Oslo
+- id: 113
+  type: multiple_choice
+  question: Who was the first emperor of China, famous for unifying the country in
+    221 BC?
+  choices:
+  - Han Wudi
+  - Qin Shi Huang
+  - Kublai Khan
+  - Emperor Taizong
+  correct: Qin Shi Huang
+- id: 114
+  type: open_text
+  question: What famous ancient Roman amphitheater was used for gladiatorial contests?
+  correct:
+  - Colosseum
+  - Coliseum
+- id: 115
+  type: multiple_choice
+  question: What is the largest island in the world by land area?
+  choices:
+  - Madagascar
+  - Borneo
+  - New Guinea
+  - Greenland
+  correct: Greenland
+- id: 116
+  type: open_text
+  question: In which country did the Industrial Revolution begin during the 18th century?
+  correct:
+  - Great Britain
+  - England
+  - UK
+  - United Kingdom
+  - Britain
+- id: 117
+  type: multiple_choice
+  question: Which pop star released the hit album 'Future Nostalgia' in 2020?
+  choices:
+  - Dua Lipa
+  - Ariana Grande
+  - Billie Eilish
+  - Doja Cat
+  correct: Dua Lipa
+- id: 118
+  type: open_text
+  question: What item in Minecraft is used to activate an End Portal?
+  correct:
+  - Eye of Ender
+  - Eyes of Ender
+- id: 119
+  type: multiple_choice
+  question: What is the primary sword wielded by Link in most games of 'The Legend
+    of Zelda' series?
+  choices:
+  - Buster Sword
+  - Master Sword
+  - Keyblade
+  - Falchion
+  correct: Master Sword
+- id: 120
+  type: open_text
+  question: What branch of mathematics deals with shapes, sizes, and properties of
+    figures in space?
+  correct:
+  - Geometry
+- id: 121
+  type: multiple_choice
+  question: What is the official national currency of Japan?
+  choices:
+  - Yuan
+  - Won
+  - Yen
+  - Ringgit
+  correct: Yen
+- id: 122
+  type: open_text
+  question: Which American pop star released the hit debut album 'Sour' in 2021?
+  correct:
+  - Olivia Rodrigo
+- id: 123
+  type: multiple_choice
+  question: Which dimension in Minecraft contains Bastion Remnants?
+  choices:
+  - The Overworld
+  - The Nether
+  - The End
+  - The Deep Dark
+  correct: The Nether
+- id: 124
+  type: open_text
+  question: What hostile flying mob spawns in the Nether and shoots exploding fireballs?
+  correct:
+  - Ghast
+  - Ghasts
+- id: 125
+  type: multiple_choice
+  question: Which organelle is widely referred to as the powerhouse of the biological
+    cell?
+  choices:
+  - Ribosome
+  - Golgi apparatus
+  - Mitochondrion
+  - Nucleolus
+  correct: Mitochondrion
+- id: 126
+  type: open_text
+  question: What is the capital city of Egypt?
+  correct:
+  - Cairo
+- id: 127
+  type: multiple_choice
+  question: What civil rights leader delivered the iconic 'I Have a Dream' speech
+    in 1963?
+  choices:
+  - Malcolm X
+  - Martin Luther King Jr.
+  - John Lewis
+  - Thurgood Marshall
+  correct: Martin Luther King Jr.
+- id: 128
+  type: open_text
+  question: Who wrote the famous play 'Romeo and Juliet' around 1595?
+  correct:
+  - William Shakespeare
+  - Shakespeare
+- id: 129
+  type: multiple_choice
+  question: Which African mountain is the highest peak on the entire continent?
+  choices:
+  - Mount Kenya
+  - Mount Kilimanjaro
+  - Mount Elgon
+  - Ras Dashen
+  correct: Mount Kilimanjaro
+- id: 130
+  type: open_text
+  question: What mountain range forms the traditional boundary between Europe and
+    Asia?
+  correct:
+  - Ural Mountains
+  - Urals
+  - Ural
+- id: 131
+  type: multiple_choice
+  question: Which rock band released the iconic 1991 song 'Smells Like Teen Spirit'?
+  choices:
+  - Pearl Jam
+  - Soundgarden
+  - Nirvana
+  - Alice in Chains
+  correct: Nirvana
+- id: 132
+  type: open_text
+  question: What rock band was Freddie Mercury the legendary lead vocalist for?
+  correct:
+  - Queen
+- id: 133
+  type: multiple_choice
+  question: Which character serves as the main protagonist of the 'Halo' video game
+    series?
+  choices:
+  - Marcus Fenix
+  - Master Chief
+  - Commander Shepard
+  - Gordon Freeman
+  correct: Master Chief
+- id: 134
+  type: open_text
+  question: What multiplayer party game features Crewmates and Impostors working on
+    a spaceship?
+  correct:
+  - Among Us
+- id: 135
+  type: multiple_choice
+  question: Which chess piece can move only diagonally across the board?
+  choices:
+  - Rook
+  - Knight
+  - Bishop
+  - Pawn
+  correct: Bishop
+- id: 136
+  type: open_text
+  question: What passive mob in Minecraft can be tamed using bones?
+  correct:
+  - Wolf
+  - Wolves
+  - Dog
+  - Dogs
+- id: 137
+  type: multiple_choice
+  question: Which villager job site block is used to give a villager the Fletcher
+    profession in Minecraft?
+  choices:
+  - Fletching Table
+  - Cartography Table
+  - Smithing Table
+  - Loom
+  correct: Fletching Table
+- id: 138
+  type: open_text
+  question: What entity in Minecraft is created by placing a carved pumpkin on top
+    of two snow blocks?
+  correct:
+  - Snow Golem
+  - Snowman
+- id: 139
+  type: multiple_choice
+  question: What process describes liquid water converting to water vapor below its
+    boiling point?
+  choices:
+  - Condensation
+  - Sublimation
+  - Evaporation
+  - Deposition
+  correct: Evaporation
+- id: 140
+  type: open_text
+  question: What hard natural tissue forms the outer protective layer of human teeth?
+  correct:
+  - Enamel
+  - Tooth Enamel
+- id: 141
+  type: multiple_choice
+  question: Which conflict took place between North and South Korea from 1950 to 1953?
+  choices:
+  - Vietnam War
+  - Korean War
+  - Sino-Japanese War
+  - First Indochina War
+  correct: Korean War
+- id: 142
+  type: open_text
+  question: What stone wall across northern England marked the northern frontier of
+    the Roman Empire?
+  correct:
+  - Hadrian's Wall
+  - Hadrians Wall
+- id: 143
+  type: multiple_choice
+  question: In which country is the Great Barrier Reef located?
+  choices:
+  - Indonesia
+  - Australia
+  - Philippines
+  - Fiji
+  correct: Australia
+- id: 144
+  type: open_text
+  question: What is the capital city of New Zealand?
+  correct:
+  - Wellington
+- id: 145
+  type: multiple_choice
+  question: Who recorded the popular 1983 dance-pop song 'Girls Just Want to Have
+    Fun'?
+  choices:
+  - Cyndi Lauper
+  - Madonna
+  - Paula Abdul
+  - Janet Jackson
+  correct: Cyndi Lauper
+- id: 146
+  type: open_text
+  question: Which pop singer released the hit album 'Teenage Dream' in 2010?
+  correct:
+  - Katy Perry
+- id: 147
+  type: multiple_choice
+  question: What farming simulation game set in Pelican Town was developed by ConcernedApe?
+  choices:
+  - Harvest Moon
+  - Stardew Valley
+  - Animal Crossing
+  - Slime Rancher
+  correct: Stardew Valley
+- id: 148
+  type: open_text
+  question: What open-world Western video game series by Rockstar Games features Arthur
+    Morgan?
+  correct:
+  - Red Dead Redemption
+  - Red Dead Redemption 2
+  - Red Dead
+- id: 149
+  type: multiple_choice
+  question: What is the traditional birthstone associated with the month of April?
+  choices:
+  - Emerald
+  - Sapphire
+  - Diamond
+  - Ruby
+  correct: Diamond
+- id: 150
+  type: open_text
+  question: What gas is produced by yeast during fermentation that causes bread dough
+    to rise?
+  correct:
+  - Carbon Dioxide
+  - CO2
+- id: 151
+  type: multiple_choice
+  question: How many bookshelves are required around an Enchanting Table to unlock
+    level 30 enchantments in Minecraft?
+  choices:
+  - '10'
+  - '12'
+  - '15'
+  - '18'
+  correct: '15'
+- id: 152
+  type: open_text
+  question: What metal ingot is crafted by combining four gold ingots with four netherite
+    scraps in Minecraft?
+  correct:
+  - Netherite Ingot
+  - Netherite
+- id: 153
+  type: open_text
+  question: What scale from 0 to 14 is used to measure the acidity or alkalinity of
+    a water-based solution?
+  correct:
+  - pH
+  - pH scale
+  - pH Scale
+- id: 154
+  type: multiple_choice
+  question: Who was the queen of Egypt who allied with Julius Caesar and Mark Antony?
+  choices:
+  - Nefertiti
+  - Hatshepsut
+  - Cleopatra VII
+  - Arsinoe IV
+  correct: Cleopatra VII
+- id: 155
+  type: open_text
+  question: Which empire was ruled by Suleiman the Magnificent during the 16th century?
+  correct:
+  - Ottoman Empire
+  - Ottoman
+- id: 156
+  type: multiple_choice
+  question: What is the capital city of Brazil?
+  choices:
+  - Rio de Janeiro
+  - São Paulo
+  - Brasília
+  - Salvador
+  correct: Brasília
+- id: 157
+  type: open_text
+  question: What body of water lies between the Arabian Peninsula and Iran?
+  correct:
+  - Persian Gulf
+  - Arabian Gulf
+- id: 158
+  type: multiple_choice
+  question: Which Swedish DJ and producer recorded global electronic hits like 'Levels'
+    and 'Wake Me Up'?
+  choices:
+  - Kygo
+  - Avicii
+  - Zedd
+  - Calvin Harris
+  correct: Avicii
+- id: 159
+  type: open_text
+  question: Which Canadian singer released global pop hits like 'Baby' and 'Sorry'?
+  correct:
+  - Justin Bieber
+- id: 160
+  type: multiple_choice
+  question: Which video game franchise introduced the battle royale mode called 'Warzone'?
+  choices:
+  - Battlefield
+  - Call of Duty
+  - Apex Legends
+  - Halo
+  correct: Call of Duty
+- id: 161
+  type: open_text
+  question: In what franchise do players battle and collect creatures using Poké Balls?
+  correct:
+  - Pokémon
+  - Pokemon
+- id: 162
+  type: multiple_choice
+  question: Who painted the famous ceiling of the Sistine Chapel in Rome?
+  choices:
+  - Leonardo da Vinci
+  - Raphael
+  - Michelangelo
+  - Donatello
+  correct: Michelangelo
+- id: 163
+  type: open_text
+  question: How many legs does a spider typically have?
+  correct:
+  - '8'
+  - Eight
+- id: 164
+  type: multiple_choice
+  question: What item is required to craft a Spyglass in Minecraft alongside an Amethyst
+    Shard?
+  choices:
+  - Copper Ingot
+  - Gold Ingot
+  - Iron Ingot
+  - Netherite Scrap
+  correct: Copper Ingot
+- id: 165
+  type: open_text
+  question: What primary color must be mixed with blue to create green?
+  correct:
+  - Yellow
+- id: 166
+  type: multiple_choice
+  question: What type of galaxy structure is the Milky Way classified as?
+  choices:
+  - Elliptical galaxy
+  - Barred spiral galaxy
+  - Irregular galaxy
+  - Lenticular galaxy
+  correct: Barred spiral galaxy
+- id: 167
+  type: open_text
+  question: What standard piece in chess is the only one capable of jumping over other
+    pieces?
+  correct:
+  - Knight
+- id: 168
+  type: multiple_choice
+  question: What is the speed of sound in dry air at 20 degrees Celsius?
+  choices:
+  - 150 meters per second
+  - 343 meters per second
+  - 761 meters per second
+  - 1235 meters per second
+  correct: 343 meters per second
+- id: 169
+  type: open_text
+  question: What is the primary official language spoken in Brazil?
+  correct:
+  - Portuguese
+- id: 170
+  type: multiple_choice
+  question: What is the maximum Y-level height for block placement in Minecraft as
+    of version 1.18?
+  choices:
+  - '256'
+  - '320'
+  - '512'
+  - '128'
+  correct: '320'
+- id: 171
+  type: open_text
+  question: What global quadrennial multi-sport event features both summer and winter
+    games?
+  correct:
+  - Olympic Games
+  - Olympics
+  - The Olympics
+- id: 172
+  type: multiple_choice
+  question: Which Minecraft biome is the only one where Gold Ore generates at higher
+    Y-levels in large quantities?
+  choices:
+  - Desert
+  - Badlands
+  - Savanna
+  - Dark Forest
+  correct: Badlands
+- id: 173
+  type: open_text
+  question: What pop artist was famously dubbed the 'Queen of Pop' and recorded 'Material
+    Girl'?
+  correct:
+  - Madonna
+- id: 174
+  type: multiple_choice
+  question: What is absolute zero temperature on the Celsius scale?
+  choices:
+  - -100.00 °C
+  - -273.15 °C
+  - -459.67 °C
+  - 0.00 °C
+  correct: -273.15 °C
+- id: 175
+  type: open_text
+  question: In what strategy game franchise do players defend their lawn against zombies
+    using plants?
+  correct:
+  - Plants vs Zombies
+  - Plants vs. Zombies
+  - Plants vs Zombies 2
+- id: 176
+  type: multiple_choice
+  question: Which tree type in Minecraft requires four saplings arranged in a 2x2
+    square to grow?
+  choices:
+  - Birch
+  - Dark Oak
+  - Acacia
+  - Oak
+  correct: Dark Oak
+- id: 177
+  type: open_text
+  question: What is the name of the green dinosaur who serves as Mario's companion
+    in Nintendo games?
+  correct:
+  - Yoshi
+- id: 178
+  type: open_text
+  question: Which country presented the Statue of Liberty as a gift to the United
+    States?
+  correct:
+  - France
+- id: 179
+  type: multiple_choice
+  question: In which city was the United States Declaration of Independence signed
+    in 1776?
+  choices:
+  - New York
+  - Boston
+  - Philadelphia
+  - Washington D.C.
+  correct: Philadelphia
+- id: 180
+  type: open_text
+  question: What item in Minecraft is crafted using nine Wheat blocks?
+  correct:
+  - Hay Bale
+  - Hay Block
+  - Haybale
+  - Hay
+- id: 181
+  type: open_text
+  question: What video game franchise created by Nintendo features a hero named Link?
+  correct:
+  - The Legend of Zelda
+  - Zelda
+  - Legend of Zelda
+- id: 182
+  type: open_text
+  question: What is the capital city of Ireland?
+  correct:
+  - Dublin
+- id: 183
+  type: multiple_choice
+  question: What material is required along with string to craft a Lead in Minecraft?
+  choices:
+  - Slimeball
+  - Leather
+  - Iron Ingot
+  - Honeycomb
+  correct: Slimeball
+- id: 184
+  type: open_text
+  question: Which pop star released the hit single 'Bad Guy' in 2019?
+  correct:
+  - Billie Eilish
+  - Eilish
+- id: 185
+  type: multiple_choice
+  question: Which country is famously shaped like a boot?
+  choices:
+  - Greece
+  - Italy
+  - Spain
+  - Portugal
+  correct: Italy
+- id: 186
+  type: open_text
+  question: What hostile aquatic mob spawns in ocean monuments and attacks players
+    with lasers?
+  correct:
+  - Guardian
+  - Guardians
+- id: 187
+  type: multiple_choice
+  question: Which chemical element has the atomic number 1?
+  choices:
+  - Helium
+  - Hydrogen
+  - Oxygen
+  - Carbon
+  correct: Hydrogen
+- id: 188
+  type: open_text
+  question: What major global conflict took place from 1939 to 1945?
+  correct:
+  - World War 2
+  - World War II
+  - WW2
+  - WWII
+  - Second World War
+- id: 189
+  type: multiple_choice
+  question: Which mob in Minecraft is naturally immune to fire and lava?
+  choices:
+  - Piglin
+  - Strider
+  - Husk
+  - Enderman
+  correct: Strider
+- id: 190
+  type: open_text
+  question: What pigment is responsible for giving human skin, hair, and eyes their
+    color?
+  correct:
+  - Melanin
+- id: 191
+  type: multiple_choice
+  question: What is the best-selling video game console of all time?
+  choices:
+  - Nintendo DS
+  - PlayStation 2
+  - Nintendo Switch
+  - Game Boy
+  correct: PlayStation 2
+- id: 192
+  type: open_text
+  question: What mob in Minecraft turns into a Zombie Piglin when struck by lightning?
+  correct:
+  - Pig
+  - Pigs
+- id: 193
+  type: multiple_choice
+  question: What is the maximum stack size for Ender Pearls in Minecraft?
+  choices:
+  - '64'
+  - '16'
+  - '32'
+  - '1'
+  correct: '16'
+- id: 194
+  type: open_text
+  question: Who was the primary leader of the nonviolent Indian independence movement?
+  correct:
+  - Mahatma Gandhi
+  - Gandhi
+  - Mohandas Gandhi
+- id: 195
+  type: multiple_choice
+  question: Which planet in our solar system is famous for its large and visible ring
+    system?
+  choices:
+  - Jupiter
+  - Saturn
+  - Uranus
+  - Neptune
+  correct: Saturn
+- id: 196
+  type: open_text
+  question: What is the capital city of Sweden?
+  correct:
+  - Stockholm
+- id: 197
+  type: multiple_choice
+  question: Which British rock band recorded the famous 1969 album 'Abbey Road'?
+  choices:
+  - The Rolling Stones
+  - The Who
+  - The Beatles
+  - Led Zeppelin
+  correct: The Beatles
+- id: 198
+  type: open_text
+  question: What is the freezing point of water in degrees Celsius?
+  correct:
+  - '0'
+  - 0 degrees
+  - 0 C
+  - 0C
+  - zero
+  - zero degrees
+- id: 199
+  type: multiple_choice
+  question: Which status effect in Minecraft prevents players from breaking blocks
+    at normal speed?
+  choices:
+  - Weakness
+  - Mining Fatigue
+  - Slowness
+  - Blindness
+  correct: Mining Fatigue
+- id: 200
+  type: multiple_choice
+  question: Who was the principal author of the United States Declaration of Independence?
+  choices:
+  - Thomas Jefferson
+  - Benjamin Franklin
+  - George Washington
+  - John Adams
+  correct: Thomas Jefferson
+- id: 201
+  type: open_text
+  question: What famous block-stacking puzzle game was created by Alexey Pajitnov
+    in 1984?
+  correct:
+  - Tetris
+- id: 202
+  type: multiple_choice
+  question: What is the most abundant gas in Earth's atmosphere?
+  choices:
+  - Oxygen
+  - Nitrogen
+  - Carbon Dioxide
+  - Argon
+  correct: Nitrogen
+- id: 203
+  type: open_text
+  question: What is the capital city of Argentina?
+  correct:
+  - Buenos Aires
+- id: 204
+  type: multiple_choice
+  question: In which multiplayer game do players jump out of a Battle Bus onto an
+    island?
+  choices:
+  - Apex Legends
+  - PUBG
+  - Fortnite
+  - Call of Duty
+  correct: Fortnite
+- id: 205
+  type: open_text
+  question: What temple in Athens, Greece, was built on the Acropolis and dedicated
+    to Athena?
+  correct:
+  - Parthenon
+  - The Parthenon
+- id: 206
+  type: open_text
+  question: Which American rock band released the iconic 1976 song 'Hotel California'?
+  correct:
+  - Eagles
+  - The Eagles
+- id: 207
+  type: multiple_choice
+  question: Who won the first season of American Idol in 2002?
+  choices:
+  - Carrie Underwood
+  - Kelly Clarkson
+  - Adam Lambert
+  - Jennifer Hudson
+  correct: Kelly Clarkson
+- id: 208
+  type: open_text
+  question: What plant block in Minecraft can be smelted in a furnace to produce Green
+    Dye?
+  correct:
+  - Cactus
+  - Cacti
+- id: 209
+  type: multiple_choice
+  question: Which historical period of European rebirth in art and learning followed
+    the Middle Ages?
+  choices:
+  - Enlightenment
+  - Baroque
+  - Industrial Era
+  - Renaissance
+  correct: Renaissance
+- id: 210
+  type: multiple_choice
+  question: Which item drops from a Phantom when slain by a player?
+  choices:
+  - Phantom Membrane
+  - Feather
+  - Bone
+  - Ender Tear
+  correct: Phantom Membrane
+- id: 211
+  type: multiple_choice
+  question: What science branch focuses on the study of celestial bodies like stars
+    and planets?
+  choices:
+  - Geology
+  - Astronomy
+  - Meteorology
+  - Botany
+  correct: Astronomy
+- id: 212
+  type: open_text
+  question: In which Greek city were the ancient Olympic Games held?
+  correct:
+  - Olympia
+- id: 213
+  type: multiple_choice
+  question: Which long mountain range extends along the entire western coast of South
+    America?
+  choices:
+  - Andes
+  - Rockies
+  - Alps
+  - Himalayas
+  correct: Andes
+- id: 214
+  type: open_text
+  question: Which video game series features Kratos, the Spartan warrior who fights
+    mythological gods?
+  correct:
+  - God of War
+- id: 215
+  type: multiple_choice
+  question: 'Which Polish game studio developed ''The Witcher 3: Wild Hunt''?'
+  choices:
+  - Bethesda
+  - CD Projekt Red
+  - BioWare
+  - Ubisoft
+  correct: CD Projekt Red
+- id: 216
+  type: open_text
+  question: What potion ingredient increases the duration of a potion's effect in
+    Minecraft?
+  correct:
+  - Redstone
+  - Redstone Dust
+- id: 217
+  type: multiple_choice
+  question: How long is a full day-night cycle in Minecraft in real-world time?
+  choices:
+  - 10 minutes
+  - 15 minutes
+  - 20 minutes
+  - 30 minutes
+  correct: 20 minutes
+- id: 218
+  type: open_text
+  question: What is the capital city of South Korea?
+  correct:
+  - Seoul
+- id: 219
+  type: multiple_choice
+  question: Which wall divided Berlin into East and West sectors from 1961 to 1989?
+  choices:
+  - Iron Curtain
+  - Berlin Wall
+  - Maginot Line
+  - Hadrian Wall
+  correct: Berlin Wall
+- id: 220
+  type: open_text
+  question: What is the name of the closest star to planet Earth?
+  correct:
+  - Sun
+  - The Sun
+- id: 221
+  type: open_text
+  question: Which English singer-songwriter released the hit album 'Divide' in 2017?
+  correct:
+  - Ed Sheeran
+  - Sheeran
+- id: 222
+  type: open_text
+  question: What item, along with a Potion of Weakness, is used to cure a Zombie Villager?
+  correct:
+  - Golden Apple
+  - Enchanted Golden Apple
+- id: 223
+  type: multiple_choice
+  question: What was the name of Lady Gaga's debut studio album released in 2008?
+  choices:
+  - Born This Way
+  - The Fame
+  - Artpop
+  - Chromatica
+  correct: The Fame
+- id: 224
+  type: open_text
+  question: Which famous physicist formulated the theories of special and general
+    relativity?
+  correct:
+  - Albert Einstein
+  - Einstein
+- id: 225
+  type: multiple_choice
+  question: Which treaty signed in 1919 officially brought World War I to an end?
+  choices:
+  - Treaty of Versailles
+  - Treaty of Paris
+  - Treaty of Ghent
+  - Treaty of Utrecht
+  correct: Treaty of Versailles
+- id: 226
+  type: multiple_choice
+  question: In addition to Absorption, what status effect is granted by consuming
+    a normal Golden Apple?
+  choices:
+  - Resistance
+  - Regeneration
+  - Strength
+  - Speed
+  correct: Regeneration
+- id: 227
+  type: open_text
+  question: What is molten rock called while it remains underground before erupting?
+  correct:
+  - Magma
+- id: 228
+  type: multiple_choice
+  question: What device is used to measure atmospheric pressure?
+  choices:
+  - Thermometer
+  - Barometer
+  - Hygrometer
+  - Anemometer
+  correct: Barometer
+- id: 229
+  type: multiple_choice
+  question: What is the largest hot desert in the world?
+  choices:
+  - Gobi
+  - Kalahari
+  - Sahara
+  - Atacama
+  correct: Sahara
+- id: 230
+  type: open_text
+  question: What item drops from a Wither Skeleton and is necessary to construct and
+    summon the Wither?
+  correct:
+  - Wither Skeleton Skull
+  - Wither Skull
+  - Wither Skeleton Head
+- id: 231
+  type: multiple_choice
+  question: Which classic 1980 arcade game features a yellow character eating dots
+    while dodging ghosts?
+  choices:
+  - Galaga
+  - Pac-Man
+  - Space Invaders
+  - Donkey Kong
+  correct: Pac-Man
+- id: 232
+  type: open_text
+  question: What is the capital city of the Netherlands?
+  correct:
+  - Amsterdam
+- id: 233
+  type: open_text
+  question: What is the structural and functional basic unit of all living organisms?
+  correct:
+  - Cell
+  - Cells
+- id: 234
+  type: multiple_choice
+  question: Which vitamin is synthesized by the human skin when exposed to sunlight?
+  choices:
+  - Vitamin A
+  - Vitamin D
+  - Vitamin C
+  - Vitamin B12
+  correct: Vitamin D
+- id: 235
+  type: open_text
+  question: Which European country was ruled by Tsar Nicholas II until the revolution
+    in 1917?
+  correct:
+  - Russia
+  - Russian Empire
+- id: 236
+  type: open_text
+  question: Which European country is famous for its steep coastal fjords and capital
+    city Oslo?
+  correct:
+  - Norway
+- id: 237
+  type: multiple_choice
+  question: What major global war began following the assassination of Archduke Franz
+    Ferdinand in 1914?
+  choices:
+  - World War I
+  - World War II
+  - Crimean War
+  - Franco-Prussian War
+  correct: World War I
+- id: 238
+  type: multiple_choice
+  question: Which subatomic particle located in an atom's nucleus carries no electrical
+    charge?
+  choices:
+  - Proton
+  - Electron
+  - Neutron
+  - Positron
+  correct: Neutron
+- id: 239
+  type: open_text
+  question: What popular open-world sandbox game was created by Mojang and fully released
+    in 2011?
+  correct:
+  - Minecraft
+- id: 240
+  type: multiple_choice
+  question: Which famous ocean liner sank in the North Atlantic Ocean in April 1912
+    after hitting an iceberg?
+  choices:
+  - Lusitania
+  - Titanic
+  - Britannic
+  - Bismarck
+  correct: Titanic
+- id: 241
+  type: open_text
+  question: What period of human history marked by the use of stone tools preceded
+    the Bronze Age?
+  correct:
+  - Stone Age
+  - Paleolithic
+  - Neolithic
+- id: 242
+  type: open_text
+  question: What subatomic particle carries a positive electric charge within an atom's
+    nucleus?
+  correct:
+  - Proton
+  - Protons
+- id: 243
+  type: multiple_choice
+  question: What ingredient is added to an Awkward Potion to brew a Potion of Swiftness
+    in Minecraft?
+  choices:
+  - Glowstone Dust
+  - Sugar
+  - Redstone Dust
+  - Blaze Powder
+  correct: Sugar
+- id: 244
+  type: multiple_choice
+  question: Which game developer created the 'Grand Theft Auto' video game series?
+  choices:
+  - Rockstar Games
+  - Ubisoft
+  - Electronic Arts
+  - Bethesda Softworks
+  correct: Rockstar Games
+- id: 245
+  type: multiple_choice
+  question: What type of electrical charge does an electron carry?
+  choices:
+  - Positive
+  - Negative
+  - Neutral
+  - Variable
+  correct: Negative
+- id: 246
+  type: open_text
+  question: What food item in Minecraft is crafted using three Wheat, two Sugar, one
+    Egg, and three Milk Buckets?
+  correct:
+  - Cake
+- id: 247
+  type: multiple_choice
+  question: Which pop star sang the hit single 'Roar' released in 2013?
+  choices:
+  - Taylor Swift
+  - Katy Perry
+  - Rihanna
+  - Ariana Grande
+  correct: Katy Perry
+- id: 248
+  type: open_text
+  question: What force pulls objects toward the center of the Earth?
+  correct:
+  - Gravity
+  - Gravitational force
+- id: 249
+  type: multiple_choice
+  question: What minimum tier of pickaxe is required to successfully mine Diamond
+    Ore in Minecraft?
+  choices:
+  - Stone Pickaxe
+  - Iron Pickaxe
+  - Golden Pickaxe
+  - Copper Pickaxe
+  correct: Iron Pickaxe
+- id: 250
+  type: multiple_choice
+  question: Which country's national flag is a red square featuring a white cross
+    in the center?
+  choices:
+  - Denmark
+  - Austria
+  - Switzerland
+  - Norway
+  correct: Switzerland
+- id: 251
+  type: multiple_choice
+  question: Which hero in 'Overwatch' uses the iconic catchphrase 'Cheers, love! The
+    cavalry's here!'?
+  choices:
+  - Tracer
+  - Mercy
+  - D.Va
+  - Pharah
+  correct: Tracer
+- id: 252
+  type: open_text
+  question: What redstone component in Minecraft acts as a diode, delaying signals
+    and reinforcing signal strength?
+  correct:
+  - Redstone Repeater
+  - Repeater
+- id: 253
+  type: open_text
+  question: What is the longest river in the world?
+  correct:
+  - Nile
+  - Nile River
+- id: 254
+  type: multiple_choice
+  question: Which hostile mob in Minecraft drops gunpowder upon being slain without
+    exploding?
+  choices:
+  - Zombie
+  - Skeleton
+  - Creeper
+  - Enderman
+  correct: Creeper
+- id: 255
+  type: open_text
+  question: Which ancient civilization constructed the Chichen Itza pyramid complex
+    in modern-day Mexico?
+  correct:
+  - Maya
+  - Mayan
+  - Mayans
+  - Mayan Civilization
+- id: 256
+  type: multiple_choice
+  question: Which video game series is set in the Aperture Science facility and features
+    a portal gun?
+  choices:
+  - Half-Life
+  - Portal
+  - BioShock
+  - Dead Space
+  correct: Portal
+- id: 257
+  type: open_text
+  question: What structure generated in the Nether features Blaze spawners and Nether
+    Wart in Minecraft?
+  correct:
+  - Nether Fortress
+  - Fortress
+- id: 258
+  type: multiple_choice
+  question: Which British monarch reigned over the United Kingdom for 63 years during
+    the 19th century?
+  choices:
+  - Queen Victoria
+  - Queen Elizabeth I
+  - Queen Anne
+  - Queen Mary II
+  correct: Queen Victoria
+- id: 259
+  type: multiple_choice
+  question: What rare item is required in the center of the grid to craft a Beacon
+    in Minecraft?
+  choices:
+  - Dragon Egg
+  - Heart of the Sea
+  - Nether Star
+  - Totem of Undying
+  correct: Nether Star
+- id: 260
+  type: multiple_choice
+  question: Which English pop girl group released the global smash hit single 'Wannabe'
+    in 1996?
+  choices:
+  - Little Mix
+  - Girls Aloud
+  - Spice Girls
+  - All Saints
+  correct: Spice Girls
+- id: 261
+  type: open_text
+  question: What passive mob in Minecraft can be ridden using a Saddle and guided
+    with a Carrot on a Stick?
+  correct:
+  - Pig
+- id: 262
+  type: open_text
+  question: In modern-day Egypt, in which country can you visit the Great Pyramid
+    of Giza?
+  correct:
+  - Egypt
+- id: 263
+  type: multiple_choice
+  question: What is the chemical formula for pure water?
+  choices:
+  - CO2
+  - H2O
+  - NaCl
+  - CH4
+  correct: H2O
+- id: 264
+  type: open_text
+  question: What capital city served as the heart of the Byzantine Empire before being
+    named Istanbul?
+  correct:
+  - Constantinople
+  - Istanbul
+- id: 265
+  type: multiple_choice
+  question: Which iconic character in the 'Street Fighter' series uses the legendary
+    'Hadouken' fire attack?
+  choices:
+  - Ken
+  - Ryu
+  - Guile
+  - Chun-Li
+  correct: Ryu
+- id: 266
+  type: open_text
+  question: What process do plants use to convert sunlight, carbon dioxide, and water
+    into oxygen and sugars?
+  correct:
+  - Photosynthesis
+- id: 267
+  type: open_text
+  question: What famous medieval fortress and prison in Paris was stormed on July
+    14, 1789?
+  correct:
+  - Bastille
+- id: 268
+  type: open_text
+  question: What block introduced in Minecraft 1.17 diverts lightning strikes to itself
+    during severe weather?
+  correct:
+  - Lightning Rod
+- id: 269
+  type: multiple_choice
+  question: Which material is used to repair damaged Iron Pickaxes or Anvils inside
+    an Anvil interface in Minecraft?
+  choices:
+  - Iron Nugget
+  - Iron Ingot
+  - Block of Iron
+  - Raw Iron
+  correct: Iron Ingot
+- id: 270
+  type: open_text
+  question: Who was the last active ruler of the Ptolemaic Kingdom of Egypt, famous
+    for her story with Julius Caesar?
+  correct:
+  - Cleopatra
+- id: 271
+  type: multiple_choice
+  question: Which body of water separates Southern Europe from Northern Africa?
+  choices:
+  - Red Sea
+  - Black Sea
+  - Mediterranean Sea
+  - Caribbean Sea
+  correct: Mediterranean Sea
+- id: 272
+  type: multiple_choice
+  question: Which tactical first-person hero shooter was developed and published by
+    Riot Games in 2020?
+  choices:
+  - Counter-Strike
+  - Valorant
+  - Overwatch
+  - Paladins
+  correct: Valorant
+- id: 273
+  type: open_text
+  question: What item can be inserted into a Jukebox block in Minecraft to play music?
+  correct:
+  - Music Disc
+  - Disc
+  - Music Discs
+- id: 274
+  type: multiple_choice
+  question: Which female artist broke records in 2021 with her debut hit single 'Drivers
+    License'?
+  choices:
+  - Olivia Rodrigo
+  - Sabrina Carpenter
+  - Tate McRae
+  - Gracie Abrams
+  correct: Olivia Rodrigo
+- id: 275
+  type: multiple_choice
+  question: Which structure in Minecraft generates underwater or in caves and contains
+    End Portal Frames?
+  choices:
+  - Ocean Monument
+  - Stronghold
+  - Trial Chamber
+  - Mineshaft
+  correct: Stronghold
+- id: 276
+  type: open_text
+  question: What is the largest planet in our solar system?
+  correct:
+  - Jupiter
+- id: 277
+  type: multiple_choice
+  question: Which major war in the United States took place between the Northern Union
+    and Southern Confederacy?
+  choices:
+  - American Revolutionary War
+  - American Civil War
+  - War of 1812
+  - Mexican-American War
+  correct: American Civil War
+- id: 278
+  type: open_text
+  question: What ocean lies along the west coast of the United States?
+  correct:
+  - Pacific Ocean
+  - Pacific
+- id: 279
+  type: multiple_choice
+  question: What is the primary role of red blood cells in the human body?
+  choices:
+  - Fighting infections
+  - Transporting oxygen
+  - Clotting blood
+  - Producing hormones
+  correct: Transporting oxygen
+- id: 280
+  type: open_text
+  question: What video game series features the iconic plumber character Mario and
+    his brother Luigi?
+  correct:
+  - Super Mario
+  - Mario
+  - Super Mario Bros
+- id: 281
+  type: multiple_choice
+  question: Which Swedish pop group famously won the 1974 Eurovision Song Contest
+    with the song 'Waterloo'?
+  choices:
+  - Roxette
+  - ABBA
+  - Ace of Base
+  - A*Teens
+  correct: ABBA
+- id: 282
+  type: open_text
+  question: What item obtained from fishing or loot chests can apply specific magic
+    effects to items in an Anvil?
+  correct:
+  - Enchanted Book
+  - Enchanted Books
+  - Book
+- id: 283
+  type: open_text
+  question: What MMORPG set in the fantasy world of Azeroth was released by Blizzard
+    Entertainment in 2004?
+  correct:
+  - World of Warcraft
+  - WoW
+- id: 284
+  type: multiple_choice
+  question: Which long-running RPG video game franchise includes major entries titled
+    'Skyrim' and 'Oblivion'?
+  choices:
+  - The Witcher
+  - Dark Souls
+  - The Elder Scrolls
+  - Dragon Age
+  correct: The Elder Scrolls
+- id: 285
+  type: multiple_choice
+  question: Who was the Soviet cosmonaut who became the first human to fly into space
+    in 1961?
+  choices:
+  - Yuri Gagarin
+  - Neil Armstrong
+  - Buzz Aldrin
+  - Aleksei Leonov
+  correct: Yuri Gagarin
+- id: 286
+  type: open_text
+  question: What item is dropped by Blaze mobs when defeated in the Nether in Minecraft?
+  correct:
+  - Blaze Rod
+  - Blaze Rods
+- id: 287
+  type: open_text
+  question: Which Japanese video game giant developed and manufactured the handheld
+    Switch console?
+  correct:
+  - Nintendo
+- id: 288
+  type: multiple_choice
+  question: Which British pop icon sang global chart-topping hits like 'Rolling in
+    the Deep' and 'Hello'?
+  choices:
+  - Adele
+  - Dua Lipa
+  - Ellie Goulding
+  - Jessie J
+  correct: Adele
+- id: 289
+  type: open_text
+  question: What theoretical physicist is the main playable protagonist of the 'Half-Life'
+    game series?
+  correct:
+  - Gordon Freeman
+  - Gordon
+- id: 290
+  type: multiple_choice
+  question: Which African country has Nairobi as its capital city?
+  choices:
+  - Uganda
+  - Tanzania
+  - Kenya
+  - Ethiopia
+  correct: Kenya
+- id: 291
+  type: open_text
+  question: What turned-based strategy video game series features legendary historic
+    leaders and was created by Sid Meier?
+  correct:
+  - Civilization
+  - Sid Meier's Civilization
+  - Sid Meiers Civilization
+- id: 292
+  type: multiple_choice
+  question: Which atmospheric layer blocks the majority of harmful ultraviolet solar
+    radiation from reaching Earth?
+  choices:
+  - Troposphere
+  - Ozone layer
+  - Thermosphere
+  - Exosphere
+  correct: Ozone layer
+- id: 293
+  type: open_text
+  question: What free-to-play battle royale video game developed by Respawn Entertainment
+    is set in the Titanfall universe?
+  correct:
+  - Apex Legends
+- id: 294
+  type: multiple_choice
+  question: Which ancient Roman city was preserved under volcanic ash following the
+    eruption of Mount Vesuvius in 79 AD?
+  choices:
+  - Herculaneum
+  - Pompeii
+  - Ostia
+  - Capua
+  correct: Pompeii
+- id: 295
+  type: open_text
+  question: Which pop superstar released 'Thriller', the best-selling music album
+    of all time?
+  correct:
+  - Michael Jackson
+- id: 296
+  type: multiple_choice
+  question: What is the capital city of Thailand?
+  choices:
+  - Hanoi
+  - Bangkok
+  - Kuala Lumpur
+  - Jakarta
+  correct: Bangkok
+- id: 297
+  type: open_text
+  question: Which Canadian R&B pop artist sang the global number-one hit song 'Blinding
+    Lights'?
+  correct:
+  - The Weeknd
+  - Weeknd
+- id: 298
+  type: multiple_choice
+  question: Which American boy band had major hit tracks like 'Bye Bye Bye' and 'It's
+    Gonna Be Me'?
+  choices:
+  - Backstreet Boys
+  - NSYNC
+  - 98 Degrees
+  - Boyz II Men
+  correct: NSYNC
+- id: 299
+  type: open_text
+  question: Which pop star performed 'Single Ladies (Put a Ring on It)' and 'Crazy
+    in Love'?
+  correct:
+  - Beyonce
+  - Beyoncé
+  - Beyonce Knowles
+  - Beyoncé Knowles
+- id: 300
+  type: multiple_choice
+  question: What field of science focuses on the systematic study of living organisms
+    and life processes?
+  choices:
+  - Geology
+  - Chemistry
+  - Biology
+  - Physics
+  correct: Biology
+- id: 301
+  type: multiple_choice
+  question: What famous historic English document limiting royal power was signed
+    by King John in 1215?
+  choices:
+  - Bill of Rights
+  - Magna Carta
+  - Petition of Right
+  - Edict of Nantes
+  correct: Magna Carta
+- id: 302
+  type: multiple_choice
+  question: Which company introduced and manufactured the PlayStation family of video
+    game consoles?
+  choices:
+  - Sega
+  - Nintendo
+  - Sony
+  - Microsoft
+  correct: Sony
+- id: 303
+  type: multiple_choice
+  question: In what year did Christopher Columbus make his initial voyage and reach
+    the Americas?
+  choices:
+  - '1492'
+  - '1500'
+  - '1488'
+  - '1512'
+  correct: '1492'
+- id: 304
+  type: multiple_choice
+  question: How many total keys are found on a standard full-size musical piano keyboard?
+  choices:
+  - '66'
+  - '76'
+  - '88'
+  - '100'
+  correct: '88'
+- id: 305
+  type: open_text
+  question: What flying boss mob is found in the End dimension in Minecraft?
+  correct:
+  - Ender Dragon
+  - The Ender Dragon
+  - Dragon
+- id: 306
+  type: open_text
+  question: What item drop from Phantom mobs in Minecraft is used to repair Elytra?
+  correct:
+  - Phantom Membrane
+  - Phantom Membranes
+- id: 307
+  type: open_text
+  question: What chemical element is the primary component of diamonds?
+  correct:
+  - Carbon
+  - C
+- id: 308
+  type: open_text
+  question: Which mineral item is used as the standard currency when trading with
+    Villagers in Minecraft?
+  correct:
+  - Emerald
+  - Emeralds
+- id: 309
+  type: open_text
+  question: Which British musician produced and performed on the hit song 'Uptown
+    Funk' alongside Bruno Mars?
+  correct:
+  - Mark Ronson
+- id: 310
+  type: multiple_choice
+  question: Which biome in Minecraft is the only place where Ocelots spawn naturally?
+  choices:
+  - Savanna
+  - Jungle
+  - Swamp
+  - Taiga
+  correct: Jungle
+- id: 311
+  type: open_text
+  question: What sci-fi video game franchise features the protagonist Master Chief?
+  correct:
+  - Halo
+- id: 312
+  type: open_text
+  question: What basic item drop from Spiders in Minecraft is used to craft Bows and
+    Fishing Rods?
+  correct:
+  - String
+- id: 313
+  type: multiple_choice
+  question: What is the main protagonist's name in 'The Witcher' video game series?
+  choices:
+  - Vesemir
+  - Geralt of Rivia
+  - Eskel
+  - Lambert
+  correct: Geralt of Rivia
+- id: 314
+  type: open_text
+  question: What block placed beneath a Campfire in Minecraft makes its smoke signal
+    float much higher?
+  correct:
+  - Hay Bale
+  - Haybale
+  - Hay Bales
+  - Haybales
+- id: 315
+  type: multiple_choice
+  question: What plant in Minecraft can be placed on Soul Sand and is used to brew
+    Awkward Potions?
+  choices:
+  - Chorus Flower
+  - Crimson Fungus
+  - Nether Wart
+  - Spore Blossom
+  correct: Nether Wart
+- id: 316
+  type: open_text
+  question: Equations, what single lowercase letter represents the speed of light
+    in a vacuum?
+  correct:
+  - c
+- id: 317
+  type: multiple_choice
+  question: How many sides does a standard geometric hexagon have?
+  choices:
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  correct: '6'
+- id: 318
+  type: open_text
+  question: What red crafting component in Minecraft emits a constant redstone power
+    signal?
+  correct:
+  - Redstone Torch
+  - Redstone Torches
+- id: 319
+  type: multiple_choice
+  question: Which American pop singer released the smash hit single 'Toxic' in 2003?
+  choices:
+  - Christina Aguilera
+  - Britney Spears
+  - Madonna
+  - Pink
+  correct: Britney Spears
+- id: 320
+  type: multiple_choice
+  question: What is the name of the fictional spooky town setting in the 'Silent Hill'
+    survival horror game series?
+  choices:
+  - Raccoon City
+  - Silent Hill
+  - Bright Falls
+  - Vice City
+  correct: Silent Hill
+- id: 321
+  type: open_text
+  question: What is the dense central region of an atom called?
+  correct:
+  - Nucleus
+- id: 322
+  type: multiple_choice
+  question: In which century did the French Revolution occur?
+  choices:
+  - 17th century
+  - 18th century
+  - 19th century
+  - 16th century
+  correct: 18th century
+- id: 323
+  type: open_text
+  question: What fiery underworld dimension in Minecraft is accessed by constructing
+    an Obsidian portal?
+  correct:
+  - Nether
+  - The Nether
+- id: 324
+  type: multiple_choice
+  question: Which South American nation is the only country on the continent where
+    Portuguese is the primary official language?
+  choices:
+  - Argentina
+  - Colombia
+  - Brazil
+  - Peru
+  correct: Brazil
+- id: 325
+  type: multiple_choice
+  question: Which tool material in Minecraft possesses the highest durability and
+    fastest mining speed?
+  choices:
+  - Diamond
+  - Iron
+  - Gold
+  - Netherite
+  correct: Netherite
+- id: 326
+  type: open_text
+  question: Which battle royale game made by Epic Games features a mechanic called
+    'Victory Royale'?
+  correct:
+  - Fortnite
+- id: 327
+  type: open_text
+  question: What neutral mob in Minecraft becomes hostile when a player looks directly
+    into its eyes?
+  correct:
+  - Enderman
+  - Endermen
+- id: 328
+  type: multiple_choice
+  question: What food item can be used to breed and tame wild Foxes?
+  choices:
+  - Sweet Berries
+  - Raw Salmon
+  - Bone
+  - Wheat
+  correct: Sweet Berries
+- id: 329
+  type: open_text
+  question: What speedy video game character created by Sega is known as the 'Blue
+    Blur'?
+  correct:
+  - Sonic
+  - Sonic the Hedgehog
+- id: 330
+  type: open_text
+  question: What is the capital city of China?
+  correct:
+  - Beijing
+  - Peking
+- id: 331
+  type: open_text
+  question: In which European country did the ancient Olympic Games originate?
+  correct:
+  - Greece
+  - Ancient Greece
+- id: 332
+  type: multiple_choice
+  question: What scientific instrument is primarily used to measure temperature?
+  choices:
+  - Barometer
+  - Thermometer
+  - Hygrometer
+  - Anemometer
+  correct: Thermometer
+- id: 333
+  type: open_text
+  question: Which astronomical object's gravitational attraction causes ocean tides
+    on Earth?
+  correct:
+  - The Moon
+  - Moon
+- id: 334
+  type: open_text
+  question: Which pop superstar released chart-topping tracks like 'Shake It Off'
+    and 'Blank Space'?
+  correct:
+  - Taylor Swift
+- id: 335
+  type: multiple_choice
+  question: What legendary video game involves fitting falling geometric blocks called
+    tetrominoes into full lines?
+  choices:
+  - Bejeweled
+  - Tetris
+  - Candy Crush
+  - Pac-Man
+  correct: Tetris
+- id: 336
+  type: multiple_choice
+  question: Who was the primary leader of the Soviet Union throughout World War II?
+  choices:
+  - Vladimir Lenin
+  - Joseph Stalin
+  - Nikita Khrushchev
+  - Leon Trotsky
+  correct: Joseph Stalin
+- id: 337
+  type: multiple_choice
+  question: In 'Sonic the Hedgehog' games, what golden objects does Sonic collect
+    to stay alive?
+  choices:
+  - Rings
+  - Coins
+  - Gems
+  - Stars
+  correct: Rings
+- id: 338
+  type: open_text
+  question: Which pop star sang the global hit song 'Poker Face' released in 2008?
+  correct:
+  - Lady Gaga
+- id: 339
+  type: open_text
+  question: What iconic survival horror video game franchise features Raccoon City
+    and the Umbrella Corporation?
+  correct:
+  - Resident Evil
+  - Biohazard
+- id: 340
+  type: multiple_choice
+  question: What basic color is created when mixing equal parts blue and yellow paint?
+  choices:
+  - Purple
+  - Green
+  - Orange
+  - Brown
+  correct: Green
+- id: 341
+  type: open_text
+  question: What historic empire was ruled by leaders such as Julius Caesar and Augustus?
+  correct:
+  - Roman Empire
+  - Roman
+  - Rome
+- id: 342
+  type: open_text
+  question: Which Barbadian pop singer recorded hit tracks like 'Diamonds' and 'Umbrella'?
+  correct:
+  - Rihanna
+- id: 343
+  type: multiple_choice
+  question: Which classic board game involves purchasing properties, collecting rent,
+    and avoiding Jail?
+  choices:
+  - Scrabble
+  - Monopoly
+  - Clue
+  - Risk
+  correct: Monopoly
+- id: 344
+  type: open_text
+  question: What mob in Minecraft drops Leather and Raw Beef when killed?
+  correct:
+  - Cow
+  - Cows
+- id: 345
+  type: multiple_choice
+  question: Which Minecraft mob drops Ender Pearls when defeated?
+  choices:
+  - Skeleton
+  - Creeper
+  - Enderman
+  - Zombie
+  correct: Enderman
+- id: 346
+  type: open_text
+  question: Who was the ancient Macedonian king who conquered the Persian Empire?
+  correct:
+  - Alexander the Great
+  - Alexander
+- id: 347
+  type: multiple_choice
+  question: In which year did World War I begin?
+  choices:
+  - '1914'
+  - '1918'
+  - '1939'
+  - '1905'
+  correct: '1914'
+- id: 348
+  type: multiple_choice
+  question: What is the chemical symbol for Gold?
+  choices:
+  - Au
+  - Ag
+  - Fe
+  - Gd
+  correct: Au
+- id: 349
+  type: open_text
+  question: Which British singer sang the hit song 'Watermelon Sugar'?
+  correct:
+  - Harry Styles
+- id: 350
+  type: open_text
+  question: What main protagonist character wears a green tunic in 'The Legend of
+    Zelda'?
+  correct:
+  - Link
+- id: 351
+  type: multiple_choice
+  question: What title character is a pink, round hero created by Nintendo who inhales
+    enemies?
+  choices:
+  - Jigglypuff
+  - Kirby
+  - Yoshi
+  - Toad
+  correct: Kirby
+- id: 352
+  type: open_text
+  question: What item crafted from sugar cane is used to craft books in Minecraft?
+  correct:
+  - Paper
+- id: 353
+  type: open_text
+  question: In which US city was President John F. Kennedy assassinated in 1963?
+  correct:
+  - Dallas
+- id: 354
+  type: multiple_choice
+  question: What type of animal is a Komodo dragon?
+  choices:
+  - Lizard
+  - Snake
+  - Turtle
+  - Amphibian
+  correct: Lizard
+- id: 355
+  type: multiple_choice
+  question: Which potion ingredient in Minecraft is crafted using Gold Nuggets and
+    a Melon Slice?
+  choices:
+  - Golden Apple
+  - Glistering Melon Slice
+  - Golden Carrot
+  - Magma Cream
+  correct: Glistering Melon Slice
+- id: 356
+  type: multiple_choice
+  question: Which Egyptian queen was the last active ruler of the Ptolemaic Kingdom?
+  choices:
+  - Nefertiti
+  - Cleopatra
+  - Hatshepsut
+  - Sobekneferu
+  correct: Cleopatra
+- id: 357
+  type: multiple_choice
+  question: Which strategy game series by Blizzard features the Zerg, Protoss, and
+    Terran factions?
+  choices:
+  - StarCraft
+  - Warcraft
+  - Diablo
+  - Heroes of the Storm
+  correct: StarCraft
+- id: 358
+  type: multiple_choice
+  question: How many iron ingots are required to craft a standard Anvil in Minecraft?
+  choices:
+  - '24'
+  - '31'
+  - '18'
+  - '3'
+  correct: '31'
+- id: 359
+  type: open_text
+  question: Which South Korean boy band released the global smash hit 'Dynamite' in
+    2020?
+  correct:
+  - BTS
+- id: 360
+  type: multiple_choice
+  question: Which European country has Madrid as its capital city?
+  choices:
+  - Portugal
+  - Spain
+  - Italy
+  - France
+  correct: Spain
+- id: 361
+  type: open_text
+  question: What open-world video game series developed by Rockstar Games is abbreviated
+    as GTA?
+  correct:
+  - Grand Theft Auto
+  - GTA
+- id: 362
+  type: multiple_choice
+  question: What organ in the human body produces insulin?
+  choices:
+  - Liver
+  - Pancreas
+  - Kidney
+  - Stomach
+  correct: Pancreas
+- id: 363
+  type: multiple_choice
+  question: Which enchantment allows a Trident to return to the player after being
+    thrown?
+  choices:
+  - Riptide
+  - Loyalty
+  - Channeling
+  - Impaling
+  correct: Loyalty
+- id: 364
+  type: open_text
+  question: What famous ancient Egyptian Pharaoh's intact tomb was discovered by Howard
+    Carter in 1922?
+  correct:
+  - Tutankhamun
+  - King Tut
+  - Tutankhamen
+  - Tut
+- id: 365
+  type: multiple_choice
+  question: What popular sandbox game platform allows players to create games using
+    Lua, developed by its namesake corporation?
+  choices:
+  - Terraria
+  - Roblox
+  - Cube World
+  - Trove
+  correct: Roblox
+- id: 366
+  type: multiple_choice
+  question: Which mob in Minecraft can be sheared to collect mushrooms?
+  choices:
+  - Mooshroom
+  - Sheep
+  - Cow
+  - Goat
+  correct: Mooshroom
+- id: 367
+  type: open_text
+  question: What iconic musician performed 'Superstition' and 'Sir Duke'?
+  correct:
+  - Stevie Wonder
+- id: 368
+  type: open_text
+  question: What block in Minecraft allows players to set their respawn point inside
+    the Nether?
+  correct:
+  - Respawn Anchor
+- id: 369
+  type: multiple_choice
+  question: What item is needed to tame a Wolf in Minecraft?
+  choices:
+  - Raw Beef
+  - Bone
+  - Rotten Flesh
+  - Stick
+  correct: Bone
+- id: 370
+  type: open_text
+  question: Which empire was ruled by Napoleon Bonaparte?
+  correct:
+  - French Empire
+  - France
+  - French
+- id: 371
+  type: multiple_choice
+  question: What famous boy band was Harry Styles originally a member of?
+  choices:
+  - The Wanted
+  - One Direction
+  - 5 Seconds of Summer
+  - Big Time Rush
+  correct: One Direction
+- id: 372
+  type: multiple_choice
+  question: In the game 'Portal', what company manufactured the Aperture Science Handheld
+    Portal Device?
+  choices:
+  - Aperture Science
+  - Black Mesa
+  - Vault-Tec
+  - Abstergo
+  correct: Aperture Science
+- id: 373
+  type: open_text
+  question: What tool item in Minecraft is used to shear wool from sheep?
+  correct:
+  - Shears
+  - Shear
+- id: 374
+  type: open_text
+  question: How many total days are in a leap year?
+  correct:
+  - '366'
+- id: 375
+  type: multiple_choice
+  question: Which video game series features Link trying to save Princess Zelda?
+  choices:
+  - Final Fantasy
+  - The Legend of Zelda
+  - Dragon Quest
+  - Fire Emblem
+  correct: The Legend of Zelda
+- id: 376
+  type: open_text
+  question: Which female singer recorded the hit single 'Levitating'?
+  correct:
+  - Dua Lipa
+- id: 377
+  type: multiple_choice
+  question: How many wheat items are required to craft a Hay Bale in Minecraft?
+  choices:
+  - '9'
+  - '6'
+  - '3'
+  - '8'
+  correct: '9'
+- id: 378
+  type: open_text
+  question: In 'Overwatch', what gorilla scientist hero originates from the Horizon
+    Lunar Colony?
+  correct:
+  - Winston
+- id: 379
+  type: open_text
+  question: What item dropped by Squid mobs when defeated is used to craft Black Dye
+    in Minecraft?
+  correct:
+  - Ink Sac
+  - Ink Sacs
+  - Ink Sack
+  - Ink Sacks
+- id: 380
+  type: multiple_choice
+  question: What chemical element does 'Fe' represent on the periodic table?
+  choices:
+  - Gold
+  - Iron
+  - Silver
+  - Lead
+  correct: Iron
+- id: 381
+  type: multiple_choice
+  question: Who was the primary leader of Nazi Germany during World War II?
+  choices:
+  - Benito Mussolini
+  - Adolf Hitler
+  - Joseph Stalin
+  - Winston Churchill
+  correct: Adolf Hitler
+- id: 382
+  type: open_text
+  question: What chemical element is liquid at standard room temperature and pressure?
+  correct:
+  - Mercury
+  - Quicksilver
+- id: 383
+  type: multiple_choice
+  question: Which female rap artist released the hit track 'Super Bass' in 2011?
+  choices:
+  - Cardi B
+  - Nicki Minaj
+  - Doja Cat
+  - Megan Thee Stallion
+  correct: Nicki Minaj
+- id: 384
+  type: multiple_choice
+  question: Which 2011 2D action-adventure sandbox game was developed by Re-Logic?
+  choices:
+  - Starbound
+  - Terraria
+  - Don't Starve
+  - RimWorld
+  correct: Terraria
+- id: 385
+  type: open_text
+  question: How many continents are there on Earth?
+  correct:
+  - '7'
+  - Seven
+- id: 386
+  type: open_text
+  question: What string instrument is slightly larger and deeper in pitch than a violin?
+  correct:
+  - Viola
+- id: 387
+  type: open_text
+  question: What is the total number of cards in a standard playing deck, excluding
+    jokers?
+  correct:
+  - '52'
+- id: 388
+  type: open_text
+  question: What type of triangle has three sides of equal length?
+  correct:
+  - Equilateral
+  - Equilateral triangle
+- id: 389
+  type: open_text
+  question: What tool item in Minecraft is used to clear blocks like dirt, sand, and
+    gravel fastest?
+  correct:
+  - Shovel
+  - Spade
+- id: 390
+  type: open_text
+  question: What block in Minecraft is crafted using nine iron ingots?
+  correct:
+  - Block of Iron
+  - Iron Block
+- id: 391
+  type: multiple_choice
+  question: 'In ''The Elder Scrolls V: Skyrim'', what legendary order of monks resides
+    at High Hrothgar?'
+  choices:
+  - Greybeards
+  - Blades
+  - Companions
+  - Nightingales
+  correct: Greybeards
+- id: 392
+  type: multiple_choice
+  question: What item dropped by Blazes in Minecraft can be crafted into Blaze Powder?
+  choices:
+  - Blaze Rod
+  - Magma Cream
+  - Fire Charge
+  - Ghast Tear
+  correct: Blaze Rod
+- id: 393
+  type: open_text
+  question: What underwater variant does a zombie transform into after remaining submerged
+    in water in Minecraft?
+  correct:
+  - Drowned
+- id: 394
+  type: multiple_choice
+  question: Which music artist sang the viral 2019 hit song 'Old Town Road'?
+  choices:
+  - Lil Nas X
+  - Post Malone
+  - Drake
+  - Kendrick Lamar
+  correct: Lil Nas X
+- id: 395
+  type: multiple_choice
+  question: What status effect is inflicted by a Cave Spider's bite on Normal difficulty
+    in Minecraft?
+  choices:
+  - Poison
+  - Wither
+  - Weakness
+  - Slowness
+  correct: Poison
+- id: 396
+  type: open_text
+  question: What plant food item do Pandas eat in Minecraft?
+  correct:
+  - Bamboo
+- id: 397
+  type: open_text
+  question: What basic geometric shape is standard for road yield signs?
+  correct:
+  - Triangle
+  - Inverted triangle
+- id: 398
+  type: multiple_choice
+  question: How many obsidian blocks are required at minimum to construct a standard
+    Nether Portal frame?
+  choices:
+  - '8'
+  - '10'
+  - '12'
+  - '14'
+  correct: '10'
+- id: 399
+  type: open_text
+  question: What item crafted from string and sticks is used to catch fish in Minecraft?
+  correct:
+  - Fishing Rod
+- id: 400
+  type: multiple_choice
+  question: Which Australian singer-songwriter recorded hit tracks like 'Chandelier'
+    and 'Cheap Thrills'?
+  choices:
+  - Sia
+  - Lorde
+  - Adele
+  - Kylie Minogue
+  correct: Sia
+- id: 401
+  type: open_text
+  question: 'What game development studio created ''The Elder Scrolls V: Skyrim''
+    and ''Fallout 4''?'
+  correct:
+  - Bethesda
+  - Bethesda Game Studios
+  - Bethesda Softworks
+- id: 402
+  type: multiple_choice
+  question: What crop is the primary raw ingredient used to make tofu?
+  choices:
+  - Rice
+  - Soybeans
+  - Wheat
+  - Corn
+  correct: Soybeans
+- id: 403
+  type: open_text
+  question: What mammal is recognised as the fastest land animal in the world?
+  correct:
+  - Cheetah
+- id: 404
+  type: multiple_choice
+  question: What chest-slot item allows players to glide through the skies in Minecraft?
+  choices:
+  - Cape
+  - Elytra
+  - Feather
+  - Wind Charge
+  correct: Elytra
+- id: 405
+  type: multiple_choice
+  question: Which classic 1981 arcade video game introduced Mario under the original
+    name 'Jumpman'?
+  choices:
+  - Donkey Kong
+  - Frogger
+  - Galaga
+  - Asteroids
+  correct: Donkey Kong
+- id: 406
+  type: multiple_choice
+  question: Which planet is closest in distance to the Sun?
+  choices:
+  - Venus
+  - Mercury
+  - Earth
+  - Mars
+  correct: Mercury
+- id: 407
+  type: open_text
+  question: How many standard time zones is the Earth divided into globally?
+  correct:
+  - '24'
+  - twenty four
+  - twenty-four
+- id: 408
+  type: open_text
+  question: What major conflict was fought between the Northern and Southern United
+    States from 1861 to 1865?
+  correct:
+  - American Civil War
+  - Civil War
+  - US Civil War
+- id: 409
+  type: open_text
+  question: What fruit serves as the primary base ingredient in traditional guacamole?
+  correct:
+  - Avocado
+  - Avocados
+- id: 410
+  type: multiple_choice
+  question: Which flying hostile mob drops Phantom Membranes when slain in Minecraft?
+  choices:
+  - Phantom
+  - Vex
+  - Ghast
+  - Bat
+  correct: Phantom
+- id: 411
+  type: open_text
+  question: Mount Everest lies directly on the border between Nepal and which country?
+  correct:
+  - China
+  - Tibet
+- id: 412
+  type: multiple_choice
+  question: Which South American civilization constructed the mountain citadel of
+    Machu Picchu?
+  choices:
+  - Aztec
+  - Maya
+  - Inca
+  - Olmec
+  correct: Inca
+- id: 413
+  type: open_text
+  question: Which New Zealand singer-songwriter achieved international fame with her
+    2013 single 'Royals'?
+  correct:
+  - Lorde
+- id: 414
+  type: multiple_choice
+  question: What is the boiling point of pure water in degrees Celsius at sea level?
+  choices:
+  - '50'
+  - '90'
+  - '100'
+  - '120'
+  correct: '100'
+- id: 415
+  type: open_text
+  question: What is the largest living animal species on Earth?
+  correct:
+  - Blue Whale
+  - Whale
+  - Blue whale
+- id: 416
+  type: multiple_choice
+  question: Which food item can be fed to wild Cats in Minecraft to tame them?
+  choices:
+  - Raw Salmon
+  - Wheat
+  - Carrot
+  - Bone
+  correct: Raw Salmon
+- id: 417
+  type: multiple_choice
+  question: Which vast African desert is recognized as the largest hot desert in the
+    world?
+  choices:
+  - Gobi Desert
+  - Kalahari Desert
+  - Sahara Desert
+  - Atacama Desert
+  correct: Sahara Desert
+- id: 418
+  type: open_text
+  question: What item dropped by Ghasts in Minecraft is essential for brewing Potions
+    of Regeneration?
+  correct:
+  - Ghast Tear
+- id: 419
+  type: open_text
+  question: Which tactical first-person shooter series features popular game maps
+    like Dust II and Inferno?
+  correct:
+  - Counter-Strike
+  - Counter Strike
+  - CS:GO
+  - CSGO
+  - CS2
+- id: 420
+  type: multiple_choice
+  question: How many total sides does an octagon have?
+  choices:
+  - '6'
+  - '7'
+  - '8'
+  - '10'
+  correct: '8'
+- id: 421
+  type: open_text
+  question: What region of Earth's stratosphere shields the surface from harmful ultraviolet
+    solar radiation?
+  correct:
+  - Ozone layer
+  - Ozone
+- id: 422
+  type: open_text
+  question: What chest block in Minecraft shares inventory contents across all other
+    chests of its kind for a player?
+  correct:
+  - Ender Chest
+- id: 423
+  type: multiple_choice
+  question: What is the name of the demigod protagonist in the 'God of War' series?
+  choices:
+  - Kratos
+  - Zeus
+  - Thor
+  - Atreus
+  correct: Kratos
+- id: 424
+  type: open_text
+  question: What is the solid state of liquid water called?
+  correct:
+  - Ice
+- id: 425
+  type: multiple_choice
+  question: Which Minecraft villager profession uses a Lectern as its job site block?
+  choices:
+  - Librarian
+  - Cartographer
+  - Cleric
+  - Armorer
+  correct: Librarian
+- id: 426
+  type: multiple_choice
+  question: Which major river flows north through northeastern Africa into the Mediterranean
+    Sea?
+  choices:
+  - Amazon River
+  - Nile River
+  - Yangtze River
+  - Mississippi River
+  correct: Nile River
+- id: 427
+  type: open_text
+  question: What timekeeping item in Minecraft is crafted using four gold ingots and
+    a piece of redstone dust?
+  correct:
+  - Clock
+- id: 428
+  type: multiple_choice
+  question: Which viral hit song by Korean artist Psy became the first video to reach
+    1 billion views on YouTube?
+  choices:
+  - Gangnam Style
+  - Gentleman
+  - Baby
+  - Despacito
+  correct: Gangnam Style
+- id: 429
+  type: open_text
+  question: What iconic protagonist, also known as John-117, serves as the main hero
+    of the Halo franchise?
+  correct:
+  - Master Chief
+  - John-117
+  - John 117
+- id: 430
+  type: open_text
+  question: What is the chemical symbol for Silver on the periodic table of elements?
+  correct:
+  - Ag
+- id: 431
+  type: open_text
+  question: What item created by combining Blaze Powder and Slimeballs is used to
+    brew Potions of Fire Resistance?
+  correct:
+  - Magma Cream
+  - Magma cream
+- id: 432
+  type: open_text
+  question: What chemical symbol represents Gold on the periodic table of elements?
+  correct:
+  - Au
+  - au
+- id: 433
+  type: open_text
+  question: Which Canadian pop singer achieved international fame with songs like
+    'Baby' and 'Sorry'?
+  correct:
+  - Justin Bieber
+  - Bieber
+- id: 434
+  type: open_text
+  question: What iconic Nintendo video game character wears red overalls and a red
+    cap with an 'M' on it?
+  correct:
+  - Mario
+  - Super Mario
+- id: 435
+  type: open_text
+  question: What friendly airborne mob introduced in Minecraft 1.19 collects dropped
+    items for the player?
+  correct:
+  - Allay
+  - The Allay
+- id: 436
+  type: open_text
+  question: What force opposes motion between two surfaces sliding against each other?
+  correct:
+  - Friction
+- id: 437
+  type: multiple_choice
+  question: Which ocean is the largest and deepest of Earth's oceanic divisions?
+  choices:
+  - Atlantic Ocean
+  - Pacific Ocean
+  - Indian Ocean
+  - Arctic Ocean
+  correct: Pacific Ocean
+- id: 438
+  type: multiple_choice
+  question: In 'League of Legends', what is the primary 5v5 map played in competitive
+    matches?
+  choices:
+  - Howling Abyss
+  - Summoner's Rift
+  - Twisted Treeline
+  - Crystal Scar
+  correct: Summoner's Rift
+- id: 439
+  type: multiple_choice
+  question: The ancient historical region of Mesopotamia was primarily located within
+    the borders of which modern country?
+  choices:
+  - Iran
+  - Egypt
+  - Iraq
+  - Turkey
+  correct: Iraq
+- id: 440
+  type: open_text
+  question: Which French national heroine led troops during the Hundred Years' War
+    before being executed in 1431?
+  correct:
+  - Joan of Arc
+  - Jeanne d'Arc
+  - Jeanne d Arc
+  - Joan of arc
+- id: 441
+  type: multiple_choice
+  question: Which European capital city is famous for landmarks like the Eiffel Tower
+    and the Louvre Museum?
+  choices:
+  - Rome
+  - Madrid
+  - Berlin
+  - Paris
+  correct: Paris
+- id: 442
+  type: open_text
+  question: What large cold desert stretches across southern Mongolia and northern
+    China?
+  correct:
+  - Gobi
+  - Gobi Desert
+  - The Gobi
+- id: 443
+  type: open_text
+  question: Reggae legend Bob Marley was born in which Caribbean island nation?
+  correct:
+  - Jamaica
+- id: 444
+  type: multiple_choice
+  question: Which video game series, created by Sid Meier, lets players guide a civilization
+    from the Ancient Era to the Modern Era?
+  choices:
+  - Age of Empires
+  - Civilization
+  - Total War
+  - Command & Conquer
+  correct: Civilization
+- id: 445
+  type: open_text
+  question: Which stealth action video game franchise features tactical agent Solid
+    Snake?
+  correct:
+  - Metal Gear
+  - Metal Gear Solid
+- id: 446
+  type: multiple_choice
+  question: What block in Minecraft changes the pitch of the sound it emits when right-clicked
+    by a player?
+  choices:
+  - Jukebox
+  - Sculk Sensor
+  - Note Block
+  - Target
+  correct: Note Block
+- id: 447
+  type: open_text
+  question: What rare ancient ore found deep in the Nether must be smelted to obtain
+    Netherite Scraps in Minecraft?
+  correct:
+  - Ancient Debris
+- id: 448
+  type: open_text
+  question: Which powerful ancient empire was centered around the city of Rome in
+    Italy?
+  correct:
+  - Roman Empire
+  - The Roman Empire
+  - Rome
+- id: 449
+  type: open_text
+  question: Which paired organ in the human urinary system filters waste products
+    from blood to produce urine?
+  correct:
+  - Kidney
+  - Kidneys
+- id: 450
+  type: multiple_choice
+  question: Which European mountain range stretches across countries like Switzerland,
+    France, Italy, and Austria?
+  choices:
+  - Pyrenees
+  - Carpathians
+  - Alps
+  - Urals
+  correct: Alps
+- id: 451
+  type: open_text
+  question: What island nation in North Western Europe has Reykjavik as its capital
+    city?
+  correct:
+  - Iceland
+- id: 452
+  type: multiple_choice
+  question: Which British rock band performed hit songs like 'Yellow', 'Viva La Vida',
+    and 'Fix You'?
+  choices:
+  - Oasis
+  - Coldplay
+  - Radiohead
+  - Keane
+  correct: Coldplay
+- id: 453
+  type: multiple_choice
+  question: In the classic arcade game 'Pac-Man', what item allows Pac-Man to temporarily
+    turn the tables and eat the ghosts?
+  choices:
+  - Cherry
+  - Speed Boot
+  - Power Pellet
+  - Star
+  correct: Power Pellet
+- id: 454
+  type: open_text
+  question: What wooden vehicle item is used by players to traverse body surfaces
+    of water in Minecraft?
+  correct:
+  - Boat
+  - Boats
+- id: 455
+  type: multiple_choice
+  question: In what year did the Berlin Wall fall, leading to the reunification of
+    Germany?
+  choices:
+  - '1981'
+  - '1989'
+  - '1991'
+  - '1975'
+  correct: '1989'
+- id: 456
+  type: open_text
+  question: Which large northern US state was purchased from the Russian Empire in
+    1867?
+  correct:
+  - Alaska
+- id: 457
+  type: multiple_choice
+  question: Cairo is the capital city of which African nation?
+  choices:
+  - Morocco
+  - Nigeria
+  - Egypt
+  - Kenya
+  correct: Egypt
+- id: 458
+  type: open_text
+  question: Which British 1990s girl group had a massive debut hit single called 'Wannabe'
+    in 1996?
+  correct:
+  - Spice Girls
+  - The Spice Girls
+- id: 459
+  type: multiple_choice
+  question: Which item can be fed to passive Rabbits in Minecraft to breed them?
+  choices:
+  - Wheat
+  - Carrot
+  - Beetroot Seeds
+  - Apple
+  correct: Carrot
+- id: 460
+  type: open_text
+  question: What temporary health bonus effect is granted to players after eating
+    a Golden Apple in Minecraft?
+  correct:
+  - Absorption
+- id: 461
+  type: multiple_choice
+  question: In traditional color theory, how many primary colors exist?
+  choices:
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  correct: '3'
+- id: 462
+  type: multiple_choice
+  question: What is the largest organ in the human body by surface area and weight?
+  choices:
+  - Liver
+  - Brain
+  - Skin
+  - Lungs
+  correct: Skin
+- id: 463
+  type: open_text
+  question: What is the chemical symbol for the element Oxygen?
+  correct:
+  - O
+- id: 464
+  type: multiple_choice
+  question: Which continent contains the geographic South Pole and is almost entirely
+    covered by ice?
+  choices:
+  - Greenland
+  - Antarctica
+  - Australia
+  - Europe
+  correct: Antarctica
+- id: 465
+  type: open_text
+  question: What is the default name given to the standard blue-shirt male player
+    character skin in Minecraft?
+  correct:
+  - Steve
+- id: 466
+  type: multiple_choice
+  question: What type of vessel is engineered to operate completely underwater?
+  choices:
+  - Hovercraft
+  - Submarine
+  - Hydrofoil
+  - Catamaran
+  correct: Submarine
+- id: 467
+  type: open_text
+  question: What primary color is traditionally associated with emerald gemstones?
+  correct:
+  - Green
+  - green
+- id: 468
+  type: multiple_choice
+  question: What is the geometric term for a polygon that has exactly five sides?
+  choices:
+  - Hexagon
+  - Pentagon
+  - Octagon
+  - Heptagon
+  correct: Pentagon
+- id: 469
+  type: open_text
+  question: What gas essential for respiration do humans inhale to survive?
+  correct:
+  - Oxygen
+  - O2
+- id: 470
+  type: open_text
+  question: What animal species is recognized as the tallest living land mammal on
+    Earth?
+  correct:
+  - Giraffe
+  - Giraffes
+- id: 471
+  type: multiple_choice
+  question: What natural hazard is measured on the Richter magnitude scale?
+  choices:
+  - Tornado
+  - Earthquake
+  - Hurricane
+  - Tsunami
+  correct: Earthquake
+- id: 472
+  type: open_text
+  question: What is the name of the galaxy that contains our Solar System?
+  correct:
+  - Milky Way
+  - Milky Way Galaxy
+  - The Milky Way
+- id: 473
+  type: multiple_choice
+  question: Which language has the highest number of native speakers in the world?
+  choices:
+  - English
+  - Spanish
+  - Mandarin Chinese
+  - Hindi
+  correct: Mandarin Chinese
+- id: 474
+  type: open_text
+  question: Which month in the modern Gregorian calendar contains the fewest number
+    of days?
+  correct:
+  - February
+- id: 475
+  type: multiple_choice
+  question: Which enchantment in Minecraft allows a Crossbow to shoot three arrows
+    at once for the cost of one?
+  choices:
+  - Piercing
+  - Multishot
+  - Quick Charge
+  - Infinity
+  correct: Multishot
+- id: 476
+  type: multiple_choice
+  question: Combining the primary colors red and blue produces which secondary color?
+  choices:
+  - Green
+  - Orange
+  - Purple
+  - Yellow
+  correct: Purple
+- id: 477
+  type: multiple_choice
+  question: How many interconnected rings appear on the official Olympic flag?
+  choices:
+  - '4'
+  - '5'
+  - '6'
+  - '7'
+  correct: '5'
+- id: 478
+  type: open_text
+  question: What is the official currency of the United Kingdom?
+  correct:
+  - Pound
+  - Pound Sterling
+  - Pounds
+  - GBP
+- id: 479
+  type: open_text
+  question: What female pop artist recorded the hit song 'Toxic' in 2003?
+  correct:
+  - Britney Spears
+- id: 480
+  type: open_text
+  question: What color is the bullseye worth 50 points on a standard dartboard?
+  correct:
+  - Red
+- id: 481
+  type: open_text
+  question: What is the primary currency used in Japan?
+  correct:
+  - Yen
+  - Japanese Yen
+  - JPY
+  - ¥
+- id: 482
+  type: multiple_choice
+  question: In 'Overwatch', which hero uses the ultimate ability 'Dragonstrike'?
+  choices:
+  - Hanzo
+  - Genji
+  - Tracer
+  - Reaper
+  correct: Hanzo
+- id: 483
+  type: open_text
+  question: How many degrees are in a full circle rotation?
+  correct:
+  - '360'
+  - 360 degrees
+  - 360°
+- id: 484
+  type: open_text
+  question: What narrow body of water separates Southern England from Northern France?
+  correct:
+  - English Channel
+  - The English Channel
+  - La Manche
+- id: 485
+  type: open_text
+  question: What underwater hostile mob drops Prismarine Shards upon death in Minecraft?
+  correct:
+  - Guardian
+  - Guardians
+  - Elder Guardian
+  - Elder Guardians
+- id: 486
+  type: open_text
+  question: What is the main fictional city setting of Grand Theft Auto V?
+  correct:
+  - Los Santos
+- id: 487
+  type: multiple_choice
+  question: What item is created when you smelt Cobblestone in a Furnace in Minecraft?
+  choices:
+  - Stone
+  - Smooth Stone
+  - Stone Bricks
+  - Deepslate
+  correct: Stone
+- id: 488
+  type: multiple_choice
+  question: What is the main ingredient in traditional hummus?
+  choices:
+  - Chickpeas
+  - Lentils
+  - Black beans
+  - Soybeans
+  correct: Chickpeas
+- id: 489
+  type: multiple_choice
+  question: Which country has the longest total coastline in the world?
+  choices:
+  - Canada
+  - Russia
+  - Indonesia
+  - Australia
+  correct: Canada
+- id: 490
+  type: open_text
+  question: What mob does a regular Skeleton turn into if left submerged in powder
+    snow in Minecraft?
+  correct:
+  - Stray
+  - Strays
+  - A stray
+- id: 491
+  type: multiple_choice
+  question: Which mob can occasionally spawn as a 'jockey' riding on top of a spider
+    in Minecraft?
+  choices:
+  - Skeleton
+  - Zombie
+  - Pillager
+  - Witch
+  correct: Skeleton
+- id: 492
+  type: open_text
+  question: What primary color must be mixed with yellow to make green paint?
+  correct:
+  - Blue
+- id: 493
+  type: multiple_choice
+  question: Which military leader declared himself Emperor of France in 1804?
+  choices:
+  - Napoleon Bonaparte
+  - Louis XIV
+  - Charles de Gaulle
+  - Charlemagne
+  correct: Napoleon Bonaparte
+- id: 494
+  type: open_text
+  question: What rare item dropped by Wither Skeletons is required to construct and
+    spawn the Wither in Minecraft?
+  correct:
+  - Wither Skeleton Skull
+  - Wither Skeleton Skulls
+  - Wither Skull
+  - Wither Skulls
+- id: 495
+  type: multiple_choice
+  question: What status effect is provided to a player when drinking a standard Potion
+    of Swiftness in Minecraft?
+  choices:
+  - Speed
+  - Haste
+  - Jump Boost
+  - Resistance
+  correct: Speed
+- id: 496
+  type: multiple_choice
+  question: What type of tree nut is the main ingredient used to make traditional
+    marzipan?
+  choices:
+  - Almonds
+  - Walnuts
+  - Pecans
+  - Hazelnuts
+  correct: Almonds
+- id: 497
+  type: open_text
+  question: What South American country has Buenos Aires as its capital city?
+  correct:
+  - Argentina
+- id: 498
+  type: open_text
+  question: What 100-player battle royale mode became a massive hit for Epic Games
+    in 2017?
+  correct:
+  - Fortnite Battle Royale
+  - Fortnite
+  - Battle Royale
+- id: 499
+  type: multiple_choice
+  question: What happens when a player attempts to sleep in a bed in the Nether dimension
+    in Minecraft?
+  choices:
+  - The bed explodes
+  - The player catches fire
+  - Nothing happens
+  - A phantom spawns
+  correct: The bed explodes
+- id: 500
+  type: multiple_choice
+  question: What is the chemical formula for table salt?
+  choices:
+  - NaCl
+  - H2O
+  - CO2
+  - KCl
+  correct: NaCl
+- id: 501
+  type: multiple_choice
+  question: What is the chemical symbol for Sodium on the periodic table?
+  choices:
+  - Na
+  - So
+  - Sd
+  - Sm
+  correct: Na
+- id: 502
+  type: open_text
+  question: In the 'Portal' video game series, what testing subject protagonist does
+    the player control?
+  correct:
+  - Chell
+- id: 503
+  type: multiple_choice
+  question: Which tool enchantment combination allows a player to harvest Ice blocks
+    without melting them in Minecraft?
+  choices:
+  - Pickaxe with Silk Touch
+  - Shovel with Silk Touch
+  - Axe with Efficiency
+  - Shears with Unbreaking
+  correct: Pickaxe with Silk Touch
+- id: 504
+  type: multiple_choice
+  question: What layer of the Earth lies directly beneath the crust?
+  choices:
+  - Mantle
+  - Outer Core
+  - Inner Core
+  - Lithosphere
+  correct: Mantle
+- id: 505
+  type: open_text
+  question: What ore block must be mined with an iron pickaxe or better to drop Redstone
+    Dust in Minecraft?
+  correct:
+  - Redstone Ore
+  - Redstone ore
+  - Redstone
+- id: 506
+  type: multiple_choice
+  question: Which music band released the smash hit single 'Stressed Out' in 2015?
+  choices:
+  - Twenty One Pilots
+  - The Chainsmokers
+  - Daft Punk
+  - Macklemore & Ryan Lewis
+  correct: Twenty One Pilots
+- id: 507
+  type: open_text
+  question: What survival horror video game franchise takes place in underwater cities
+    like Rapture?
+  correct:
+  - BioShock
+  - Bioshock
+- id: 508
+  type: multiple_choice
+  question: What branch of science deals with the study of weather and atmospheric
+    phenomena?
+  choices:
+  - Meteorology
+  - Geology
+  - Astronomy
+  - Oceanography
+  correct: Meteorology
+- id: 509
+  type: open_text
+  question: What British singer performed the hit songs 'Shape of You' and 'Thinking
+    Out Loud'?
+  correct:
+  - Ed Sheeran
+- id: 510
+  type: multiple_choice
+  question: The ocean liner Titanic sank in 1912 after colliding with what?
+  choices:
+  - An iceberg
+  - A sea mine
+  - A coral reef
+  - Another vessel
+  correct: An iceberg
+- id: 511
+  type: open_text
+  question: What invisible force attracts objects with mass toward one another?
+  correct:
+  - Gravity
+  - Gravitational force
+  - Gravitational pull
+- id: 512
+  type: open_text
+  question: What power suit hero is the main protagonist of the Metroid video game
+    series?
+  correct:
+  - Samus Aran
+  - Samus
+- id: 513
+  type: multiple_choice
+  question: What skull item is required on a loom to craft a Skeleton Skull banner
+    pattern in Minecraft?
+  choices:
+  - Wither Skeleton Skull
+  - Skeleton Skull
+  - Oxeye Daisy
+  - Creeper Head
+  correct: Wither Skeleton Skull
+- id: 514
+  type: open_text
+  question: Which ancient civilization constructed the Colosseum in Rome?
+  correct:
+  - Romans
+  - Roman Empire
+  - Ancient Rome
+  - Roman
+- id: 515
+  type: multiple_choice
+  question: Which fruit is famous for bearing its seeds on the outside of its flesh?
+  choices:
+  - Strawberry
+  - Raspberry
+  - Blueberry
+  - Apple
+  correct: Strawberry
+- id: 516
+  type: multiple_choice
+  question: What color is Nintendo's spherical character Kirby?
+  choices:
+  - Pink
+  - Yellow
+  - Blue
+  - Red
+  correct: Pink
+- id: 517
+  type: multiple_choice
+  question: What block in Minecraft cannot be pushed or pulled by a Piston?
+  choices:
+  - Obsidian
+  - Diamond Block
+  - Iron Ore
+  - Stone
+  correct: Obsidian
+- id: 518
+  type: open_text
+  question: What passive mob in Minecraft can be sheared to collect Wool?
+  correct:
+  - Sheep
+- id: 519
+  type: multiple_choice
+  question: Which river flows through the city of Paris?
+  choices:
+  - Seine
+  - Thames
+  - Danube
+  - Rhine
+  correct: Seine
+- id: 520
+  type: multiple_choice
+  question: What item is created when you combine 4 Quartz in a 2x2 crafting grid
+    in Minecraft?
+  choices:
+  - Block of Quartz
+  - Quartz Pillars
+  - Chiseled Quartz Block
+  - Smooth Quartz
+  correct: Block of Quartz
+- id: 521
+  type: open_text
+  question: What main craftable tool is used to light a Nether Portal or ignite TNT
+    in Minecraft?
+  correct:
+  - Flint and Steel
+  - Flint & Steel
+- id: 522
+  type: multiple_choice
+  question: How many chromosomes are normally present in a standard human cell nucleus?
+  choices:
+  - '46'
+  - '23'
+  - '44'
+  - '48'
+  correct: '46'
+- id: 523
+  type: open_text
+  question: What famous ancient structures were built in Egypt as tombs for pharaohs?
+  correct:
+  - Pyramids
+  - Pyramid
+  - The Pyramids
+  - Pyramids of Giza
+- id: 524
+  type: open_text
+  question: What is the chemical symbol for Iron on the periodic table?
+  correct:
+  - Fe
+- id: 525
+  type: open_text
+  question: Which American singer sang hit songs like 'Shake It Off' and 'Blank Space'?
+  correct:
+  - Taylor Swift
+  - Swift
+- id: 526
+  type: multiple_choice
+  question: What multiplayer hero shooter game features characters like Tracer, Reinhardt,
+    and Mercy?
+  choices:
+  - Overwatch
+  - Valorant
+  - Apex Legends
+  - Team Fortress 2
+  correct: Overwatch
+- id: 527
+  type: multiple_choice
+  question: What culinary term describes pasta cooked so it remains firm to the bite?
+  choices:
+  - Al dente
+  - Flambé
+  - Julienne
+  - Sauté
+  correct: Al dente
+- id: 528
+  type: open_text
+  question: What object must plumbers Mario and Luigi jump onto at the end of standard
+    levels in classic Super Mario Bros.?
+  correct:
+  - Flagpole
+  - Flag pole
+  - Flag
+- id: 529
+  type: multiple_choice
+  question: Which chess piece moves in an 'L' shape?
+  choices:
+  - Knight
+  - Bishop
+  - Rook
+  - Queen
+  correct: Knight
+- id: 530
+  type: open_text
+  question: In Pac-Man, what yellow item allows Pac-Man to temporarily eat ghosts?
+  correct:
+  - Power Pellet
+  - Power Pellets
+  - Energizer
+  - Power Dot
+- id: 531
+  type: open_text
+  question: In the sandbox game Terraria, what is the final boss of Hardmode called?
+  correct:
+  - Moon Lord
+  - The Moon Lord
+- id: 532
+  type: multiple_choice
+  question: What status effect limits visibility and darkens the view, caused by the
+    Warden in Minecraft?
+  choices:
+  - Darkness
+  - Blindness
+  - Nausea
+  - Slowness
+  correct: Darkness
+- id: 533
+  type: open_text
+  question: What animal is commonly called the 'Ship of the Desert'?
+  correct:
+  - Camel
+  - Camels
+- id: 534
+  type: multiple_choice
+  question: Which British monarch reigned for 70 years from 1952 until 2022?
+  choices:
+  - Queen Elizabeth II
+  - Queen Victoria
+  - King George VI
+  - Queen Mary
+  correct: Queen Elizabeth II
+- id: 535
+  type: multiple_choice
+  question: What item is needed to tame a Parrot in Minecraft?
+  choices:
+  - Wheat Seeds
+  - Pumpkin Seeds
+  - Golden Apple
+  - Raw Fish
+  correct: Wheat Seeds
+- id: 536
+  type: open_text
+  question: What planet is famously known as the Red Planet?
+  correct:
+  - Mars
+- id: 537
+  type: multiple_choice
+  question: What year was the original Nintendo Entertainment System (NES) released
+    in Japan as the Famicom?
+  choices:
+  - '1983'
+  - '1985'
+  - '1989'
+  - '1980'
+  correct: '1983'
+- id: 538
+  type: multiple_choice
+  question: Which standard playing card suit features a black three-lobed leaf shape?
+  choices:
+  - Clubs
+  - Spades
+  - Hearts
+  - Diamonds
+  correct: Clubs
+- id: 539
+  type: open_text
+  question: What element does 'H' stand for on the periodic table?
+  correct:
+  - Hydrogen
+- id: 540
+  type: multiple_choice
+  question: What unit of electric current is named after a French physicist and abbreviated
+    as 'A'?
+  choices:
+  - Ampere
+  - Volt
+  - Watt
+  - Joule
+  correct: Ampere
+- id: 541
+  type: multiple_choice
+  question: Which biome is the only place where Armadillos naturally spawn in Minecraft?
+  choices:
+  - Savanna
+  - Desert
+  - Jungle
+  - Swamp
+  correct: Savanna
+- id: 542
+  type: multiple_choice
+  question: What mineral ingredient is required to upgrade diamond gear to netherite
+    gear at a Smithing Table in Minecraft?
+  choices:
+  - Netherite Ingot
+  - Netherite Scrap
+  - Ancient Debris
+  - Gold Ingot
+  correct: Netherite Ingot
+- id: 543
+  type: open_text
+  question: What term is given to a baby kangaroo?
+  correct:
+  - Joey
+  - Joeys
+- id: 544
+  type: open_text
+  question: What structure in the End dimension spawns Shulkers and contains Elytra
+    wings in Minecraft?
+  correct:
+  - End City
+  - End Cities
+  - End Ship
+- id: 545
+  type: multiple_choice
+  question: Which country has the world's highest population density among major sovereign
+    nations?
+  choices:
+  - Monaco
+  - Singapore
+  - Vatican City
+  - San Marino
+  correct: Monaco
+- id: 546
+  type: multiple_choice
+  question: What primary color is created by mixing red and yellow paint?
+  choices:
+  - Orange
+  - Green
+  - Purple
+  - Brown
+  correct: Orange
+- id: 547
+  type: open_text
+  question: Which agricultural crop in Minecraft is grown on farmland and harvested
+    to craft Bread?
+  correct:
+  - Wheat
+- id: 548
+  type: open_text
+  question: What Scottish musical instrument features a cloth bag and pipes blown
+    by the player?
+  correct:
+  - Bagpipes
+  - Bagpipe
+- id: 549
+  type: open_text
+  question: What rare structure can be found deep underground in Minecraft containing
+    an activated or unactivated portal to the End?
+  correct:
+  - Stronghold
+  - Strongholds
+- id: 550
+  type: open_text
+  question: What was the name of the first artificial satellite launched into space
+    by the Soviet Union in 1957?
+  correct:
+  - Sputnik 1
+  - Sputnik
+  - Sputnik-1
+- id: 551
+  type: multiple_choice
+  question: What is the national flower of Japan?
+  choices:
+  - Rose
+  - Cherry blossom
+  - Tulip
+  - Orchid
+  correct: Cherry blossom
+- id: 552
+  type: multiple_choice
+  question: In which year did World War I officially end?
+  choices:
+  - '1914'
+  - '1939'
+  - '1918'
+  - '1945'
+  correct: '1918'
+- id: 553
+  type: open_text
+  question: Which American singer-songwriter released the hit song 'Bad Guy' in 2019?
+  correct:
+  - Billie Eilish
+- id: 554
+  type: multiple_choice
+  question: Which ingredient is added to a Potion of Night Vision to turn it into
+    a Potion of Invisibility in Minecraft?
+  choices:
+  - Magma Cream
+  - Fermented Spider Eye
+  - Glowstone Dust
+  - Redstone Dust
+  correct: Fermented Spider Eye
+- id: 555
+  type: open_text
+  question: What green-clad plumber is the younger brother of Mario?
+  correct:
+  - Luigi
+- id: 556
+  type: open_text
+  question: Which singer performed the hit song 'Uptown Funk' with producer Mark Ronson?
+  correct:
+  - Bruno Mars
+- id: 557
+  type: multiple_choice
+  question: What mob spawns in Nether Fortresses and shoots fireballs at the player?
+  choices:
+  - Ghast
+  - Blaze
+  - Magma Cube
+  - Piglin
+  correct: Blaze
+- id: 558
+  type: multiple_choice
+  question: What item is needed alongside a Heart of the Sea to craft a Conduit in
+    Minecraft?
+  choices:
+  - Prismarine Shard
+  - Nautilus Shell
+  - Dark Prismarine
+  - Turtle Shell
+  correct: Nautilus Shell
+- id: 559
+  type: multiple_choice
+  question: Which gemstone is a red variety of the mineral corundum?
+  choices:
+  - Emerald
+  - Sapphire
+  - Ruby
+  - Amethyst
+  correct: Ruby
+- id: 560
+  type: multiple_choice
+  question: What positively charged subatomic particle is found in the nucleus of
+    an atom?
+  choices:
+  - Proton
+  - Electron
+  - Neutron
+  - Photon
+  correct: Proton
+- id: 561
+  type: multiple_choice
+  question: Mount Everest is located in which mountain range?
+  choices:
+  - Andes
+  - Himalayas
+  - Alps
+  - Rockies
+  correct: Himalayas
+- id: 562
+  type: multiple_choice
+  question: What popular video game franchise by Rockstar Games features cities like
+    Vice City and Los Santos?
+  choices:
+  - Red Dead Redemption
+  - Grand Theft Auto
+  - Mafia
+  - Saints Row
+  correct: Grand Theft Auto
+- id: 563
+  type: open_text
+  question: What mob in Minecraft is transformed into a Powered Creeper when struck
+    by lightning?
+  correct:
+  - Creeper
+  - Creepers
+- id: 564
+  type: open_text
+  question: What 5v5 tactical hero shooter video game was released by Riot Games in
+    2020?
+  correct:
+  - Valorant
+- id: 565
+  type: multiple_choice
+  question: Cold-blooded vertebrates that live both in water and on land belong to
+    which animal class?
+  choices:
+  - Reptiles
+  - Amphibians
+  - Mammals
+  - Fish
+  correct: Amphibians
+- id: 566
+  type: open_text
+  question: What item dropped by Blazes in Minecraft is combined with Ender Pearls
+    to craft Eyes of Ender?
+  correct:
+  - Blaze Rod
+  - Blaze Rods
+  - Blaze Powder
+- id: 567
+  type: open_text
+  question: What device is used to measure temperature?
+  correct:
+  - Thermometer
+- id: 568
+  type: multiple_choice
+  question: Which biome in Minecraft features red and brown Mooshroom mobs and giant
+    mushrooms?
+  choices:
+  - Dark Forest
+  - Mushroom Fields
+  - Swamp
+  - Mangrove Swamp
+  correct: Mushroom Fields
+- id: 569
+  type: open_text
+  question: What sport is played using rocket-powered cars in the video game Rocket
+    League?
+  correct:
+  - Soccer
+  - Football
+  - Association football
+- id: 570
+  type: multiple_choice
+  question: What legendary Japanese game designer created Mario, Donkey Kong, and
+    The Legend of Zelda?
+  choices:
+  - Hideo Kojima
+  - Shigeru Miyamoto
+  - Gabe Newell
+  - Todd Howard
+  correct: Shigeru Miyamoto
+- id: 571
+  type: open_text
+  question: What massive stone fortification was built across northern China to defend
+    against invasions?
+  correct:
+  - Great Wall of China
+  - Great Wall
+- id: 572
+  type: open_text
+  question: What item is obtained by smelting Ancient Debris in a furnace or blast
+    furnace in Minecraft?
+  correct:
+  - Netherite Scrap
+  - Netherite Scraps
+- id: 573
+  type: multiple_choice
+  question: What is the main component gas found in natural gas?
+  choices:
+  - Propane
+  - Ethane
+  - Methane
+  - Butane
+  correct: Methane
+- id: 574
+  type: multiple_choice
+  question: What primary source of energy do solar panels collect to generate electricity?
+  choices:
+  - Wind
+  - Sunlight
+  - Geothermal heat
+  - Ocean currents
+  correct: Sunlight
+- id: 575
+  type: multiple_choice
+  question: In the hero shooter Overwatch, what main role does the character Mercy
+    fulfill?
+  choices:
+  - Tank
+  - Damage
+  - Support
+  - Flanker
+  correct: Support
+- id: 576
+  type: multiple_choice
+  question: What international peace organisation was founded in 1945 following World
+    War II?
+  choices:
+  - United Nations
+  - League of Nations
+  - NATO
+  - Red Cross
+  correct: United Nations
+- id: 577
+  type: multiple_choice
+  question: Which island nation lies just off the southeastern coast of India in the
+    Indian Ocean?
+  choices:
+  - Madagascar
+  - Sri Lanka
+  - Maldives
+  - Indonesia
+  correct: Sri Lanka
+- id: 578
+  type: multiple_choice
+  question: What tool in Minecraft mines dirt, sand, and gravel most efficiently?
+  choices:
+  - Hoe
+  - Shovel
+  - Pickaxe
+  - Axe
+  correct: Shovel
+- id: 579
+  type: open_text
+  question: What puzzle device is used by Chell to create instant portals in the game
+    Portal?
+  correct:
+  - Portal Gun
+  - Aperture Science Handheld Portal Device
+  - Portal Device
+- id: 580
+  type: open_text
+  question: What passive aquatic mob in Minecraft drops Ink Sacs when killed?
+  correct:
+  - Squid
+  - Squids
+- id: 581
+  type: open_text
+  question: What tool enchantment in Minecraft increases the speed at which blocks
+    are mined?
+  correct:
+  - Efficiency
+- id: 582
+  type: open_text
+  question: Which Soviet leader led the USSR during World War II?
+  correct:
+  - Joseph Stalin
+  - Stalin
+- id: 583
+  type: open_text
+  question: Which pop artist released the hit song 'Single Ladies (Put a Ring on It)'?
+  correct:
+  - Beyoncé
+  - Beyonce
+- id: 584
+  type: multiple_choice
+  question: In which year did the Apollo 11 moon landing take place?
+  choices:
+  - '1965'
+  - '1969'
+  - '1972'
+  - '1975'
+  correct: '1969'
+- id: 585
+  type: open_text
+  question: What passive amphibious mob in Minecraft comes in variants like Pink,
+    Brown, and Gold, and can regenerate health?
+  correct:
+  - Axolotl
+  - Axolotls
+- id: 586
+  type: multiple_choice
+  question: What weapon in Minecraft can be enchanted with Loyalty, Riptide, or Channeling?
+  choices:
+  - Crossbow
+  - Trident
+  - Bow
+  - Sword
+  correct: Trident
+- id: 587
+  type: open_text
+  question: Which enchantment in Minecraft allows armor or tools to repair themselves
+    using experience orbs?
+  correct:
+  - Mending
+- id: 588
+  type: multiple_choice
+  question: What is the hard outer layer of Earth called?
+  choices:
+  - Mantle
+  - Core
+  - Crust
+  - Lithosphere
+  correct: Crust
+- id: 589
+  type: multiple_choice
+  question: Which band released the iconic 1977 album 'Rumours'?
+  choices:
+  - Fleetwood Mac
+  - Eagles
+  - The Rumours
+  - Led Zeppelin
+  correct: Fleetwood Mac
+- id: 590
+  type: multiple_choice
+  question: Which African lake is the largest by surface area?
+  choices:
+  - Lake Tanganyika
+  - Lake Malawi
+  - Lake Victoria
+  - Lake Chad
+  correct: Lake Victoria
+- id: 591
+  type: open_text
+  question: What is the hottest planet in our solar system?
+  correct:
+  - Venus
+- id: 592
+  type: multiple_choice
+  question: What type of celestial body is Ceres, located in the asteroid belt?
+  choices:
+  - Comet
+  - Dwarf planet
+  - Moon
+  - Gas giant
+  correct: Dwarf planet
+- id: 593
+  type: multiple_choice
+  question: Who was the first emperor of the Roman Empire?
+  choices:
+  - Julius Caesar
+  - Augustus
+  - Nero
+  - Caligula
+  correct: Augustus
+- id: 594
+  type: open_text
+  question: Which French military commander and emperor was exiled to the island of
+    Saint Helena?
+  correct:
+  - Napoleon
+  - Napoleon Bonaparte
+  - Bonaparte
+- id: 595
+  type: open_text
+  question: Which Nether biome features blue fog, Warped Nylium, and Endermen in Minecraft?
+  correct:
+  - Warped Forest
+- id: 596
+  type: open_text
+  question: What soft mineral ranks as 1 on the Mohs hardness scale?
+  correct:
+  - Talc
+- id: 597
+  type: multiple_choice
+  question: What redstone component in Minecraft acts as a diode and can delay redstone
+    signals by up to 4 ticks?
+  choices:
+  - Redstone Repeater
+  - Redstone Comparator
+  - Observer
+  - Dispenser
+  correct: Redstone Repeater
+- id: 598
+  type: open_text
+  question: What British singer sang 'Watermelon Sugar' and was a member of One Direction?
+  correct:
+  - Harry Styles
+  - Styles
+- id: 599
+  type: open_text
+  question: What crafting station in Minecraft is used to create custom banners, apply
+    patterns, and dye them?
+  correct:
+  - Loom
+- id: 600
+  type: multiple_choice
+  question: What empire was ruled by Genghis Khan in the 13th century?
+  choices:
+  - Ottoman Empire
+  - Mongol Empire
+  - Roman Empire
+  - Byzantine Empire
+  correct: Mongol Empire
+- id: 601
+  type: open_text
+  question: What life simulation video game series developed by Maxis lets players
+    control virtual people called Sims?
+  correct:
+  - The Sims
+  - Sims
+- id: 602
+  type: multiple_choice
+  question: Which tree species in Minecraft has dark brown wood and produces apples
+    when its leaves decay?
+  choices:
+  - Birch
+  - Spruce
+  - Oak
+  - Acacia
+  correct: Oak
+- id: 603
+  type: multiple_choice
+  question: What canal connects the Mediterranean Sea to the Red Sea?
+  choices:
+  - Panama Canal
+  - Suez Canal
+  - Erie Canal
+  - Kiel Canal
+  correct: Suez Canal
+- id: 604
+  type: multiple_choice
+  question: In the game Stardew Valley, what town does the player move near to farm?
+  choices:
+  - Riverwood
+  - Pelican Town
+  - Pallet Town
+  - Oakhaven
+  correct: Pelican Town
+- id: 605
+  type: open_text
+  question: Which singer performed hits like 'Firework', 'Roar', and 'Dark Horse'?
+  correct:
+  - Katy Perry
+  - Perry
+- id: 606
+  type: open_text
+  question: In League of Legends, what is the main objective map called?
+  correct:
+  - Summoners Rift
+  - Summoner's Rift
+- id: 607
+  type: multiple_choice
+  question: Which US state is made entirely of islands?
+  choices:
+  - Florida
+  - Hawaii
+  - Alaska
+  - California
+  correct: Hawaii
+- id: 608
+  type: multiple_choice
+  question: Which naturally generating structure found in the Nether is made primarily
+    of Nether Bricks and guarded by Wither Skeletons?
+  choices:
+  - Bastion Remnant
+  - Nether Fortress
+  - End City
+  - Ocean Monument
+  correct: Nether Fortress
+- id: 609
+  type: open_text
+  question: What is the common name for the larynx in humans?
+  correct:
+  - Voice box
+  - Voicebox
+- id: 610
+  type: open_text
+  question: What action-adventure video game series stars the treasure hunter Nathan
+    Drake?
+  correct:
+  - Uncharted
+- id: 611
+  type: multiple_choice
+  question: Which instrument has 88 keys, most of which are black and white?
+  choices:
+  - Harpsichord
+  - Accordion
+  - Piano
+  - Organ
+  correct: Piano
+- id: 612
+  type: multiple_choice
+  question: Which ancient city-state was famous for its military training and fought
+    Persia at Thermopylae?
+  choices:
+  - Athens
+  - Sparta
+  - Corinth
+  - Thebes
+  correct: Sparta
+- id: 613
+  type: open_text
+  question: How many sides does a triangle have?
+  correct:
+  - '3'
+  - Three
+- id: 614
+  type: multiple_choice
+  question: What major ocean lies between the Americas and Europe/Africa?
+  choices:
+  - Pacific Ocean
+  - Indian Ocean
+  - Atlantic Ocean
+  - Arctic Ocean
+  correct: Atlantic Ocean
+- id: 615
+  type: open_text
+  question: What American rapper released the critically acclaimed album 'To Pimp
+    a Butterfly'?
+  correct:
+  - Kendrick Lamar
+  - Lamar
+- id: 616
+  type: multiple_choice
+  question: Which British band released the hit song 'Wonderwall' in 1995?
+  choices:
+  - Blur
+  - Oasis
+  - Radiohead
+  - Pulp
+  correct: Oasis
+- id: 617
+  type: open_text
+  question: What female pop artist had hits like 'Problem', '7 Rings', and 'Thank
+    U, Next'?
+  correct:
+  - Ariana Grande
+  - Grande
+- id: 618
+  type: open_text
+  question: What is the highest mountain peak in North America, formerly known as
+    Mount McKinley?
+  correct:
+  - Denali
+  - Mount Denali
+- id: 619
+  type: open_text
+  question: What famous clock tower structure in London is attached to the Palace
+    of Westminster?
+  correct:
+  - Big Ben
+  - Elizabeth Tower
+- id: 620
+  type: open_text
+  question: What British band released the hit album 'A Rush of Blood to the Head'
+    featuring 'Clocks'?
+  correct:
+  - Coldplay
+- id: 621
+  type: open_text
+  question: What piece in chess is the most valuable and must be protected from checkmate?
+  correct:
+  - King
+- id: 622
+  type: multiple_choice
+  question: What was the subtitle of the second main installment in 'The Legend of
+    Zelda' game series released on the NES?
+  choices:
+  - Link's Awakening
+  - Adventure of Link
+  - A Link to the Past
+  - Ocarina of Time
+  correct: Adventure of Link
+- id: 623
+  type: open_text
+  question: What mob in Minecraft turns into a Zombie Villager if killed by a Zombie
+    on Hard difficulty?
+  correct:
+  - Villager
+  - Villagers
+- id: 624
+  type: open_text
+  question: What tool enchantment in Minecraft causes killed mobs to drop extra loot?
+  correct:
+  - Looting
+- id: 625
+  type: open_text
+  question: What is the capital city of Greece?
+  correct:
+  - Athens
+- id: 626
+  type: multiple_choice
+  question: What primary color is Sega's iconic video game character Sonic the Hedgehog?
+  choices:
+  - Blue
+  - Red
+  - Green
+  - Yellow
+  correct: Blue
+- id: 627
+  type: open_text
+  question: What powerful item in Minecraft is crafted using a Nether Star, glass,
+    and obsidian?
+  correct:
+  - Beacon
+  - Beacons
+- id: 628
+  type: multiple_choice
+  question: What mob drops Prismarine Shards and Prismarine Crystals when defeated?
+  choices:
+  - Drowned
+  - Guardian
+  - Phantom
+  - Strider
+  correct: Guardian
+- id: 629
+  type: open_text
+  question: Which utility mob in Minecraft is constructed using four iron blocks and
+    a carved pumpkin?
+  correct:
+  - Iron Golem
+  - Iron Golems
+  - Golem
+- id: 630
+  type: open_text
+  question: What mob in Minecraft spawns in ocean monuments and inflicts Mining Fatigue
+    on players?
+  correct:
+  - Elder Guardian
+  - Elder Guardians
+- id: 631
+  type: multiple_choice
+  question: Which battle royale game was developed by Respawn Entertainment and launched
+    in 2019?
+  choices:
+  - PUBG
+  - Apex Legends
+  - 'Call of Duty: Warzone'
+  - Hyper Scape
+  correct: Apex Legends
+- id: 632
+  type: multiple_choice
+  question: Which ore block in Minecraft can only be found generating naturally in
+    mountain biomes?
+  choices:
+  - Emerald Ore
+  - Diamond Ore
+  - Lapis Lazuli Ore
+  - Gold Ore
+  correct: Emerald Ore
+- id: 633
+  type: open_text
+  question: What Japanese city was the target of the first atomic bomb used in warfare
+    in 1945?
+  correct:
+  - Hiroshima
+- id: 634
+  type: open_text
+  question: Which Renaissance master painted the famous portrait known as the Mona
+    Lisa?
+  correct:
+  - Leonardo da Vinci
+  - da Vinci
+  - Leonardo Da Vinci
+- id: 635
+  type: multiple_choice
+  question: In the game League of Legends, what role traditionally plays in the bottom
+    lane alongside a Support character?
+  choices:
+  - Jungler
+  - Mid Laner
+  - ADC
+  - Top Laner
+  correct: ADC
+- id: 636
+  type: multiple_choice
+  question: Which American boy band had a massive worldwide hit with 'I Want It That
+    Way' in 1999?
+  choices:
+  - '''N Sync'
+  - Backstreet Boys
+  - 98 Degrees
+  - Boyz II Men
+  correct: Backstreet Boys
+- id: 637
+  type: multiple_choice
+  question: Which biome in Minecraft features giant spruce trees and podzol blocks?
+  choices:
+  - Dark Forest
+  - Old Growth Taiga
+  - Savanna Plateau
+  - Jungle
+  correct: Old Growth Taiga
+- id: 638
+  type: multiple_choice
+  question: What is the approximate speed of light in a vacuum?
+  choices:
+  - 150,000 km/s
+  - 300,000 km/s
+  - 500,000 km/s
+  - 1,000,000 km/s
+  correct: 300,000 km/s
+- id: 639
+  type: multiple_choice
+  question: The historical ancient city of Carthage was located in which modern-day
+    North African nation?
+  choices:
+  - Egypt
+  - Morocco
+  - Tunisia
+  - Algeria
+  correct: Tunisia
+- id: 640
+  type: open_text
+  question: Which British rock band recorded the classic 1971 song 'Stairway to Heaven'?
+  correct:
+  - Led Zeppelin
+  - Zeppelin
+- id: 641
+  type: open_text
+  question: What musical instrument did legendary musician Jimi Hendrix play?
+  correct:
+  - Guitar
+  - Electric guitar
+- id: 642
+  type: open_text
+  question: Which country music legend wrote and recorded the 1973 hit song 'Jolene'?
+  correct:
+  - Dolly Parton
+  - Parton
+- id: 643
+  type: multiple_choice
+  question: What branch of scientific study focuses on rocks, Earth structure, and
+    physical history?
+  choices:
+  - Meteorology
+  - Geology
+  - Astronomy
+  - Botany
+  correct: Geology
+- id: 644
+  type: open_text
+  question: What video game development studio created Minecraft?
+  correct:
+  - Mojang
+  - Mojang Studios
+- id: 645
+  type: multiple_choice
+  question: What virtual currency is used to make purchases within the video game
+    Roblox?
+  choices:
+  - V-Bucks
+  - Minecoins
+  - Robux
+  - Riot Points
+  correct: Robux
+- id: 646
+  type: open_text
+  question: What survival video game challenges players to gather floating debris
+    and build a home floating on the ocean?
+  correct:
+  - Raft
+- id: 647
+  type: multiple_choice
+  question: What status effect is granted to nearby players by an active Conduit underwater?
+  choices:
+  - Dolphin's Grace
+  - Conduit Power
+  - Water Breathing
+  - Haste
+  correct: Conduit Power
+- id: 648
+  type: open_text
+  question: What secondary color do you obtain by mixing red and yellow together?
+  correct:
+  - Orange
+- id: 649
+  type: multiple_choice
+  question: What classic fighting game series features famous rival ninjas Scorpion
+    and Sub-Zero?
+  choices:
+  - Street Fighter
+  - Tekken
+  - Mortal Kombat
+  - Soulcalibur
+  correct: Mortal Kombat
+- id: 650
+  type: open_text
+  question: What geometry term refers to a polygon that has exactly eight sides?
+  correct:
+  - Octagon
+- id: 651
+  type: multiple_choice
+  question: Who was featured as the lead vocalist on Mark Ronson's 2014 hit track
+    'Uptown Funk'?
+  choices:
+  - Bruno Mars
+  - Justin Timberlake
+  - Pharrell Williams
+  - Usher
+  correct: Bruno Mars
+- id: 652
+  type: open_text
+  question: What city serves as the federal capital of Switzerland?
+  correct:
+  - Bern
+  - Berne
+- id: 653
+  type: multiple_choice
+  question: Which flower in Minecraft is used to craft Suspicious Stew that inflicts
+    the Blindness status effect?
+  choices:
+  - Oxeye Daisy
+  - Azure Bluet
+  - Dandelion
+  - Cornflower
+  correct: Azure Bluet
+- id: 654
+  type: open_text
+  question: What custom-built planned city became the official capital of Brazil in
+    1960?
+  correct:
+  - Brasilia
+  - Brasília
+- id: 655
+  type: open_text
+  question: In which century did Christopher Columbus make his famous first voyage
+    to the Americas?
+  correct:
+  - 15th
+  - 15th century
+  - '15'
+  - fifteenth
+  - fifteenth century
+- id: 656
+  type: multiple_choice
+  question: In the game Among Us, what title is given to players assigned to sabotage
+    the ship and eliminate crewmates?
+  choices:
+  - Traitor
+  - Impostor
+  - Spy
+  - Saboteur
+  correct: Impostor
+- id: 657
+  type: open_text
+  question: What mob in Minecraft turns into a Zombified Piglin if brought into the
+    Overworld?
+  correct:
+  - Piglin
+- id: 658
+  type: multiple_choice
+  question: What video game franchise created by Valve stars the scientist Gordon
+    Freeman?
+  choices:
+  - Portal
+  - Left 4 Dead
+  - Half-Life
+  - Counter-Strike
+  correct: Half-Life
+- id: 659
+  type: multiple_choice
+  question: How many total interior degrees are in a straight line?
+  choices:
+  - '90'
+  - '180'
+  - '270'
+  - '360'
+  correct: '180'
+- id: 660
+  type: open_text
+  question: What metal ingot is obtained in Minecraft by smelting raw copper in a
+    furnace?
+  correct:
+  - Copper Ingot
+  - Copper
+  - Copper ingots
+- id: 661
+  type: multiple_choice
+  question: What item potion effect must be applied to a Zombie Villager alongside
+    a Golden Apple to cure it in Minecraft?
+  choices:
+  - Weakness
+  - Slowness
+  - Poison
+  - Harming
+  correct: Weakness
+- id: 662
+  type: multiple_choice
+  question: What type of rock is formed from the cooling and solidification of molten
+    magma or lava?
+  choices:
+  - Sedimentary rock
+  - Metamorphic rock
+  - Igneous rock
+  - Composite rock
+  correct: Igneous rock
+- id: 663
+  type: multiple_choice
+  question: Which South Korean pop group gained worldwide stardom with their 2020
+    English single 'Dynamite'?
+  choices:
+  - BLACKPINK
+  - BTS
+  - EXO
+  - SEVENTEEN
+  correct: BTS
+- id: 664
+  type: multiple_choice
+  question: In the Pokémon video game series, which electric-type mouse Pokémon is
+    the main franchise mascot?
+  choices:
+  - Raichu
+  - Pikachu
+  - Pichu
+  - Dedenne
+  correct: Pikachu
+- id: 665
+  type: open_text
+  question: What weapon or tool in Minecraft can be dropped by Drowned mobs and thrown
+    underwater?
+  correct:
+  - Trident
+- id: 666
+  type: open_text
+  question: What popular open-world fantasy RPG series features game titles like Skyrim
+    and Oblivion?
+  correct:
+  - The Elder Scrolls
+  - Elder Scrolls
+- id: 667
+  type: open_text
+  question: What is the full name of the popular multiplayer online battle arena game
+    developed by Riot Games and abbreviated as LoL?
+  correct:
+  - League of Legends
+- id: 668
+  type: open_text
+  question: How many total minutes are in one full hour?
+  correct:
+  - '60'
+  - sixty
+- id: 669
+  type: open_text
+  question: What geometric shape features four equal straight sides and four right
+    angles?
+  correct:
+  - Square
+- id: 670
+  type: multiple_choice
+  question: Which Minecraft mob floats in End Cities and fires homing bullets that
+    cause levitation?
+  choices:
+  - Shulker
+  - Phantom
+  - Vex
+  - Breeze
+  correct: Shulker
+- id: 671
+  type: multiple_choice
+  question: Which Canadian pop star launched his career with the viral 2010 song 'Baby'?
+  choices:
+  - Justin Bieber
+  - Shawn Mendes
+  - Drake
+  - Troye Sivan
+  correct: Justin Bieber
+- id: 672
+  type: open_text
+  question: What type of watercraft is engineered to navigate entirely underwater?
+  correct:
+  - Submarine
+  - Sub
+- id: 673
+  type: multiple_choice
+  question: What dimension in Minecraft is home to Shulkers and Chorus Plants?
+  choices:
+  - The Overworld
+  - The Nether
+  - The End
+  - The Aether
+  correct: The End
+- id: 674
+  type: multiple_choice
+  question: Which food item in Minecraft restores 10 hunger points (5 drumsticks)?
+  choices:
+  - Golden Apple
+  - Cooked Porkchop
+  - Rabbit Stew
+  - Enchanted Golden Apple
+  correct: Rabbit Stew
+- id: 675
+  type: open_text
+  question: What mob in Minecraft can be tamed using raw cod or raw salmon?
+  correct:
+  - Cat
+  - Cats
+  - Ocelot
+  - Ocelots
+- id: 676
+  type: open_text
+  question: What organ in the human body controls thought, memory, and emotion?
+  correct:
+  - Brain
+  - The brain
+- id: 677
+  type: multiple_choice
+  question: What is the maximum number of items that can fit into a single regular
+    stack in Minecraft?
+  choices:
+  - '16'
+  - '32'
+  - '64'
+  - '128'
+  correct: '64'
+- id: 678
+  type: multiple_choice
+  question: Which action RPG video game developed by FromSoftware won Game of the
+    Year in 2022?
+  choices:
+  - Elden Ring
+  - Dark Souls III
+  - Bloodborne
+  - Sekiro
+  correct: Elden Ring
+- id: 679
+  type: open_text
+  question: What potion effect in Minecraft allows players to see clearly in complete
+    darkness and underwater?
+  correct:
+  - Night Vision
+  - Night vision
+- id: 680
+  type: multiple_choice
+  question: What animal in Minecraft can be bred using Seagrass?
+  choices:
+  - Dolphin
+  - Turtle
+  - Axolotl
+  - Squid
+  correct: Turtle
+- id: 681
+  type: multiple_choice
+  question: Which French queen is famously attributed with saying 'Let them eat cake'?
+  choices:
+  - Marie Antoinette
+  - Joan of Arc
+  - Catherine de' Medici
+  - Eleanor of Aquitaine
+  correct: Marie Antoinette
+- id: 682
+  type: multiple_choice
+  question: Which European country is bordered by Spain to its east and north?
+  choices:
+  - Portugal
+  - France
+  - Italy
+  - Andorra
+  correct: Portugal
+- id: 683
+  type: multiple_choice
+  question: Which album released by Michael Jackson in 1982 became the best-selling
+    album of all time?
+  choices:
+  - Bad
+  - Thriller
+  - Off the Wall
+  - Dangerous
+  correct: Thriller
+- id: 684
+  type: multiple_choice
+  question: What is the main ingredient in traditional guacamole?
+  choices:
+  - Tomato
+  - Avocado
+  - Onion
+  - Pepper
+  correct: Avocado
+- id: 685
+  type: open_text
+  question: What famous FPS franchise features games like 'Modern Warfare' and 'Black
+    Ops'?
+  correct:
+  - Call of Duty
+  - CoD
+- id: 686
+  type: open_text
+  question: What weapon in Minecraft is crafted using three sticks and three strings?
+  correct:
+  - Bow
+  - Bows
+- id: 687
+  type: open_text
+  question: Which ancient Greek city-state was famous for its military culture and
+    strict societal discipline?
+  correct:
+  - Sparta
+- id: 688
+  type: multiple_choice
+  question: Which volcano famously erupted in 79 AD, destroying the city of Pompeii?
+  choices:
+  - Mount Etna
+  - Mount Vesuvius
+  - Krakatoa
+  - Mount St. Helens
+  correct: Mount Vesuvius
+- id: 689
+  type: multiple_choice
+  question: What is the fundamental unit of life in biology?
+  choices:
+  - Atom
+  - Cell
+  - Tissue
+  - Organ
+  correct: Cell
+- id: 690
+  type: open_text
+  question: Which reggae legend performed 'No Woman, No Cry' and 'Three Little Birds'?
+  correct:
+  - Bob Marley
+- id: 691
+  type: multiple_choice
+  question: Which band performed the hit song 'Radioactive' on their 2012 album Night
+    Visions?
+  choices:
+  - OneRepublic
+  - Imagine Dragons
+  - Coldplay
+  - Maroon 5
+  correct: Imagine Dragons
+- id: 692
+  type: multiple_choice
+  question: What game genre does 'StarCraft' belong to?
+  choices:
+  - Real-Time Strategy
+  - First-Person Shooter
+  - Turn-Based RPG
+  - Sports
+  correct: Real-Time Strategy
+- id: 693
+  type: open_text
+  question: What branch of science studies celestial objects such as stars, planets,
+    and galaxies?
+  correct:
+  - Astronomy
+- id: 694
+  type: multiple_choice
+  question: In the game 'Portal', what device does the player use to solve physics
+    puzzles?
+  choices:
+  - Gravity Gun
+  - Aperture Science Handheld Portal Device
+  - Plasma Cutter
+  - Lancer
+  correct: Aperture Science Handheld Portal Device
+- id: 695
+  type: open_text
+  question: What red mineral block in Minecraft powers redstone circuitry continuously
+    without switches or torches?
+  correct:
+  - Block of Redstone
+  - Redstone Block
+- id: 696
+  type: open_text
+  question: What multiplayer hero shooter game was developed by Blizzard Entertainment
+    and released in 2016?
+  correct:
+  - Overwatch
+- id: 697
+  type: open_text
+  question: What popular indie platformer video game features a blue knight wielding
+    a shovel as his main weapon?
+  correct:
+  - Shovel Knight
+- id: 698
+  type: multiple_choice
+  question: Which English monarch had six wives during his reign?
+  choices:
+  - Henry V
+  - Henry VIII
+  - Edward VI
+  - Charles I
+  correct: Henry VIII
+- id: 699
+  type: open_text
+  question: Which Australian singer-songwriter released the hit single 'Chandelier'
+    in 2014?
+  correct:
+  - Sia
+  - Sia Furler
+- id: 700
+  type: multiple_choice
+  question: Which female pop artist sang the 2017 global smash hit single 'Havana'?
+  choices:
+  - Dua Lipa
+  - Camila Cabello
+  - Selena Gomez
+  - Bebe Rexha
+  correct: Camila Cabello
+- id: 701
+  type: open_text
+  question: What tool in Minecraft is crafted using three diamonds and two sticks?
+  correct:
+  - Diamond Pickaxe
+  - Pickaxe
+- id: 702
+  type: multiple_choice
+  question: Which African nation contains Mount Kilimanjaro, the highest peak on the
+    continent?
+  choices:
+  - Kenya
+  - Tanzania
+  - Ethiopia
+  - Uganda
+  correct: Tanzania
+- id: 703
+  type: multiple_choice
+  question: What species of animal is Sonic's best friend and sidekick Tails?
+  choices:
+  - Hedgehog
+  - Fox
+  - Echidna
+  - Squirrel
+  correct: Fox
+- id: 704
+  type: multiple_choice
+  question: Which singer gained widespread fame after her single 'Video Games' went
+    viral in 2011?
+  choices:
+  - Lana Del Rey
+  - Lorde
+  - Halsey
+  - Florence Welch
+  correct: Lana Del Rey
+- id: 705
+  type: multiple_choice
+  question: What is the longest river located entirely within Europe?
+  choices:
+  - Danube
+  - Volga
+  - Rhine
+  - Elbe
+  correct: Volga
+- id: 706
+  type: multiple_choice
+  question: 'Which game studio developed the original 2001 video game ''Halo: Combat
+    Evolved''?'
+  choices:
+  - Bungie
+  - 343 Industries
+  - Epic Games
+  - Respawn Entertainment
+  correct: Bungie
+- id: 707
+  type: open_text
+  question: What Roman statesman and general was assassinated on the Ides of March
+    in 44 BC?
+  correct:
+  - Julius Caesar
+  - Caesar
+- id: 708
+  type: multiple_choice
+  question: What is the fictional setting city where Cyberpunk 2077 takes place?
+  choices:
+  - Raccoon City
+  - Night City
+  - Gothan City
+  - Neo-Tokyo
+  correct: Night City
+- id: 709
+  type: open_text
+  question: What Spartan warrior is the central protagonist in the God of War video
+    game series?
+  correct:
+  - Kratos
+- id: 710
+  type: multiple_choice
+  question: Which ancient empire was established by Cyrus the Great in the 6th century
+    BC?
+  choices:
+  - Persian Empire
+  - Roman Empire
+  - Ottoman Empire
+  - Byzantine Empire
+  correct: Persian Empire
+- id: 711
+  type: open_text
+  question: What is the capital city of Iceland?
+  correct:
+  - Reykjavik
+  - Reykjavík
+  - Reykjavik city
+- id: 712
+  type: open_text
+  question: Which armor enchantment in Minecraft increases a player's underwater breathing
+    time?
+  correct:
+  - Respiration
+- id: 713
+  type: multiple_choice
+  question: In Skyrim, what title is given to the player character who possesses the
+    soul of a dragon?
+  choices:
+  - Dragonborn
+  - Spellbreaker
+  - Nightingale
+  - Stormcloak
+  correct: Dragonborn
+- id: 714
+  type: open_text
+  question: What handheld 8-bit gaming console was released by Nintendo in 1989?
+  correct:
+  - Game Boy
+  - Gameboy
+- id: 715
+  type: multiple_choice
+  question: What block can be used to breed Llamas in Minecraft?
+  choices:
+  - Wheat
+  - Hay Bale
+  - Golden Carrot
+  - Sweet Berries
+  correct: Hay Bale
+- id: 716
+  type: multiple_choice
+  question: Which body of water is bordered by Turkey, Bulgaria, Romania, Ukraine,
+    Russia, and Georgia?
+  choices:
+  - Black Sea
+  - Caspian Sea
+  - Mediterranean Sea
+  - Baltic Sea
+  correct: Black Sea
+- id: 717
+  type: open_text
+  question: Which Japanese video game development company co-created the Pokémon franchise
+    alongside Nintendo?
+  correct:
+  - Game Freak
+  - GameFreak
+- id: 718
+  type: multiple_choice
+  question: Which ancient Egyptian queen was famous for her legendary painted limestone
+    bust discovered in 1912?
+  choices:
+  - Cleopatra
+  - Nefertiti
+  - Hatshepsut
+  - Nefertari
+  correct: Nefertiti
+- id: 719
+  type: open_text
+  question: What mathematical scale is most commonly used to measure the magnitude
+    of earthquakes?
+  correct:
+  - Richter scale
+  - Richter
+  - Moment magnitude scale
+- id: 720
+  type: multiple_choice
+  question: Which country is home to the ancient city of Petra, carved directly into
+    red rock cliffs?
+  choices:
+  - Jordan
+  - Egypt
+  - Lebanon
+  - Syria
+  correct: Jordan
+- id: 721
+  type: multiple_choice
+  question: What type of tree leaf produces maple syrup traditionally?
+  choices:
+  - Oak
+  - Birch
+  - Maple
+  - Pine
+  correct: Maple
+- id: 722
+  type: multiple_choice
+  question: Which album released in 2011 by Adele won Grammy Album of the Year?
+  choices:
+  - '21'
+  - '19'
+  - '25'
+  - '30'
+  correct: '21'
+- id: 723
+  type: multiple_choice
+  question: 'In ''The Witcher 3: Wild Hunt'', what is the name of Geralt''s horse?'
+  choices:
+  - Roach
+  - Shadowmere
+  - Epona
+  - Agro
+  correct: Roach
+- id: 724
+  type: open_text
+  question: What item do cows produce when right-clicked with an empty bucket in Minecraft?
+  correct:
+  - Milk
+  - Bucket of milk
+  - Milk bucket
+- id: 725
+  type: multiple_choice
+  question: What item do you get when you smelt sand in a furnace in Minecraft?
+  choices:
+  - Glass
+  - Brick
+  - Smooth Sandstone
+  - Terracotta
+  correct: Glass
+- id: 726
+  type: open_text
+  question: Which status effect do Cave Spiders inflict on players in Minecraft?
+  correct:
+  - Poison
+- id: 727
+  type: multiple_choice
+  question: What official collective term describes a group of flamingos?
+  choices:
+  - Flamboyance
+  - Murder
+  - Colony
+  - Pride
+  correct: Flamboyance
+- id: 728
+  type: open_text
+  question: What is the primary organ of the human respiratory system?
+  correct:
+  - Lungs
+  - Lung
+- id: 729
+  type: multiple_choice
+  question: What type of star is located at the center of our Solar System?
+  choices:
+  - Yellow dwarf
+  - Red giant
+  - White dwarf
+  - Blue supergiant
+  correct: Yellow dwarf
+- id: 730
+  type: open_text
+  question: What item drops from Creepers when killed by a Skeleton's arrow in Minecraft?
+  correct:
+  - Music disc
+  - Music record
+  - Record
+  - Disc
+- id: 731
+  type: open_text
+  question: What Swedish DJ produced the hit electronic songs 'Levels' and 'Wake Me
+    Up'?
+  correct:
+  - Avicii
+  - Tim Bergling
+- id: 732
+  type: open_text
+  question: Which female pop star released the hit single 'Drivers License' in 2021?
+  correct:
+  - Olivia Rodrigo
+  - Rodrigo
+- id: 733
+  type: open_text
+  question: What is the primary callsign or title of John-117 in the Halo franchise?
+  correct:
+  - Master Chief
+  - The Master Chief
+- id: 734
+  type: open_text
+  question: What video game company published 'The Sims' and 'FIFA'?
+  correct:
+  - EA
+  - Electronic Arts
+- id: 735
+  type: open_text
+  question: In Tetris, how many square blocks make up each falling tile?
+  correct:
+  - '4'
+  - Four
+- id: 736
+  type: open_text
+  question: What musical instrument standardly features 88 keys?
+  correct:
+  - Piano
+- id: 737
+  type: open_text
+  question: What is the national sport of Japan?
+  correct:
+  - Sumo
+  - Sumo wrestling
+- id: 738
+  type: open_text
+  question: What color do you get when you mix equal parts of red and blue light or
+    paint?
+  correct:
+  - Purple
+  - Violet
+- id: 739
+  type: open_text
+  question: What country has Lisbon as its capital city?
+  correct:
+  - Portugal
+- id: 740
+  type: multiple_choice
+  question: What melee weapon is famously wielded by Gordon Freeman in 'Half-Life'?
+  choices:
+  - Crowbar
+  - Gravity Gun
+  - Wrench
+  - Plasma Pistol
+  correct: Crowbar
+- id: 741
+  type: multiple_choice
+  question: Which American singer performed the hit 2019 pop track 'Bad Guy'?
+  choices:
+  - Billie Eilish
+  - Dua Lipa
+  - Olivia Rodrigo
+  - Lorde
+  correct: Billie Eilish
+- id: 742
+  type: multiple_choice
+  question: What prismarine block construction is required to activate a Conduit frame
+    in Minecraft?
+  choices:
+  - Prismarine
+  - Obsidian
+  - Quartz
+  - Sea Lantern
+  correct: Prismarine
+- id: 743
+  type: open_text
+  question: Which ore must be mined using an Iron Pickaxe or better and drops Diamonds
+    when destroyed in Minecraft?
+  correct:
+  - Diamond Ore
+  - Deepslate Diamond Ore
+  - Diamond
+- id: 744
+  type: open_text
+  question: What block in Minecraft, crafted by surrounding an open space with eight
+    blocks of cobblestone, is used to smelt ores and cook food?
+  correct:
+  - Furnace
+- id: 745
+  type: open_text
+  question: In the Super Mario series, what red-and-white power-up item causes Mario
+    to grow larger?
+  correct:
+  - Super Mushroom
+  - Mushroom
+- id: 746
+  type: open_text
+  question: What rare Minecraft biome is covered in Mycelium and generates giant mushrooms
+    alongside Mooshrooms?
+  correct:
+  - Mushroom Fields
+  - Mushroom Island
+  - Mushroom Biome
+  - Mushroom Field
+- id: 747
+  type: open_text
+  question: Which Canadian rapper achieved massive success with his 2015 hit single
+    'Hotline Bling'?
+  correct:
+  - Drake
+  - Aubrey Drake Graham
+- id: 748
+  type: open_text
+  question: What block in Minecraft, crafted using iron blocks and iron ingots, allows
+    players to repair items and combine enchantment books?
+  correct:
+  - Anvil
+- id: 749
+  type: open_text
+  question: On which continent is the geographic South Pole located?
+  correct:
+  - Antarctica
+- id: 750
+  type: open_text
+  question: Which American pop singer came to fame with her debut 1998 single '...Baby
+    One More Time'?
+  correct:
+  - Britney Spears
+  - Spears
+- id: 751
+  type: open_text
+  question: What is the name of the ruler of the Mushroom Kingdom whom Mario frequently
+    rescues?
+  correct:
+  - Princess Peach
+  - Peach
+- id: 752
+  type: open_text
+  question: Which hostile crossbow-wielding illager mob in Minecraft patrols in groups
+    and spawns during village raids?
+  correct:
+  - Pillager
+- id: 753
+  type: open_text
+  question: Which hostile mob found in Minecraft's End dimension shoots guided levitation
+    bullets and drops shells when killed?
+  correct:
+  - Shulker
+  - Shulkers
+  - shulker
+- id: 754
+  type: open_text
+  question: What is the name of the main female protagonist in the 'Tomb Raider' video
+    game series?
+  correct:
+  - Lara Croft
+  - Lara
+  - Croft
+- id: 755
+  type: multiple_choice
+  question: Which pop rock band released the hit singles 'Sugar' and 'Payphone'?
+  choices:
+  - OneRepublic
+  - Maroon 5
+  - Imagine Dragons
+  - Coldplay
+  correct: Maroon 5
+- id: 756
+  type: multiple_choice
+  question: Which 2018 western action-adventure game by Rockstar Games follows the
+    story of outlaw Arthur Morgan?
+  choices:
+  - Red Dead Redemption 2
+  - Call of Juarez
+  - Gun
+  - Mafia III
+  correct: Red Dead Redemption 2
+- id: 757
+  type: open_text
+  question: What animal species is the famous Nintendo video game character Donkey
+    Kong?
+  correct:
+  - Gorilla
+  - Ape
+- id: 758
+  type: multiple_choice
+  question: Which human blood type is considered the universal red blood cell donor?
+  choices:
+  - A positive
+  - AB positive
+  - O negative
+  - B negative
+  correct: O negative
+- id: 759
+  type: open_text
+  question: Which golden vegetable item is required to brew a Potion of Night Vision
+    in Minecraft?
+  correct:
+  - Golden Carrot
+  - Golden carrots
+  - Golden carrot
+- id: 760
+  type: multiple_choice
+  question: Which primary device is used by the player in Valve's puzzle game 'Portal'
+    to solve test chambers?
+  choices:
+  - Gravity Gun
+  - Portal Gun
+  - Physgun
+  - Tool Gun
+  correct: Portal Gun
+- id: 761
+  ul-specific: true
+  type: open_text
+  question: What is the currency on United Lands?
+  correct:
+  - Gold

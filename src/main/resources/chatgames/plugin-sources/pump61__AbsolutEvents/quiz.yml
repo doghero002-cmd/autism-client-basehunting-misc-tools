@@ -1,0 +1,297 @@
+Evento:
+  Title: Quiz
+  Type: quiz
+  Calls: 10
+  Calls interval: 15
+  Mininum players: 2
+  Eliminate on quit: true
+  Empty inventory: true
+  Spectator mode: true
+  Permission: absolutevents.evento
+  Count participation: true
+  Count victory: true
+  Time: 15
+  Interval: 5
+  Max questions: 50
+  First question delay: 5
+
+Title:
+  Enabled: true
+  FadeIn: 10
+  Stay: 30
+  FadeOut: 10
+  
+  Question:
+    Title: '&e&lQUIZ'
+    Subtitle: '&f@question'
+  
+  Answer:
+    Title: '&a&lRESPOSTA CORRETA'
+    Subtitle: '&f@answer'
+
+  First question:
+    Title: '&6&lPRIMEIRA PERGUNTA'
+    Subtitle: '&fComeçará em @time segundos'
+  
+  Next round:
+    Title: '&b&lPRÓXIMA RODADA'
+    Subtitle: '&fPróxima pergunta em @time segundos'
+
+Messages:
+  Broadcast:
+    - ''
+    - '&#ff69f0Evento &f@name &#ff69f0Clique @join_button &#ff69f0para participar!'
+    - '&#ff69f0Prêmio: &#0088ff$&f@money'
+    - '&#ff69f0Jogadores: &#0088ff@players &#ff69f0Chamadas restantes: &#0088ff@broadcasts'
+    - ''
+
+  Start:
+    - ''
+    - '&#ff69f0Iniciando evento...'
+    - ''
+
+  Winner:
+    - ''
+    - '&#ff69f0O evento &f@name &#ff69f0foi finalizado!'
+    - '&#ff69f0O vencedor foi &f@winner&#ff69f0!'
+    - ''
+
+  No winner:
+    - ''
+    - '&#ff69f0O evento &f@name &#ff69f0foi finalizado!'
+    - '&#ff69f0Não houveram vencedores.'
+    - ''
+
+  No players:
+    - ''
+    - '&#ff69f0Evento cancelado.'
+    - '&#ff69f0A quantidade mínima de jogadores não foi atingida.'
+    - ''
+
+  Cancelled:
+    - ''
+    - '&#ff69f0O evento foi cancelado manualmente.'
+    - ''
+
+  Question:
+    - '&#ff69f0Pergunta &#0088ff@currentquestion&#ff69f0: &f@question'
+
+  Side info: '&aVerde = VERDADEIRO &8| &cVermelho = FALSO'
+  
+  Countdown actionbar: '&eResponda em &f@time &esegundos &8| &aVerde = Verdadeiro &8| &cVermelho = Falso'
+  
+  Answer true: 'VERDADEIRO'
+  Answer false: 'FALSO'
+  Answer free: 'SEM RESPOSTA DEFINIDA'
+  
+  Player correct: '&aVocê acertou!'
+  Player wrong: '&cVocê errou!'
+  
+  Result correct:
+    - '&aAcertaram: &f@players'
+  
+  Result wrong:
+    - '&cErraram e foram eliminados: &f@players'
+  
+  No one: 'Ninguém'
+
+  First question:
+    - '&#ff69f0A primeira pergunta começará em &#0088ff@time &#ff69f0segundos.'
+
+  Next question:
+    - '&#ff69f0Próxima pergunta em &#0088ff@time &#ff69f0segundos.'
+
+Questions:
+  - "Um Enderman pode se teleportar mesmo estando preso dentro de um barco?-false"
+  - "É possível sobreviver a uma explosão de Creeper usando apenas armadura de couro completa?-false"
+  - "A eficiência da picareta influencia na chance de dropar diamante?-false"
+  - "Um aldeão pode trocar itens sem profissão definida?-false"
+  - "Blocos de slime anulam completamente o dano de queda independente da altura?-true"
+  - "É possível mover um spawner com pistões?-false"
+  - "A Fortune aumenta a quantidade de redstone dropada?-true"
+  - "O Wither pode quebrar obsidian naturalmente?-true"
+  - "Um jogador pode bloquear completamente dano de flecha apenas com escudo sempre?-false"
+  - "O gelo compacto derrete sob luz normal?-false"
+  - "Se você olhar para um Enderman e fechar os olhos (tirar a visão), ele continua agressivo?-true"
+  - "É possível encantar um item além do limite normal usando apenas mesa de encantamento?-false"
+  - "Um tridente pode ser usado infinitamente sem quebrar?-false"
+  - "O dragão do End pode ser morto sem destruir os cristais?-true"
+  - "Blocos de honey reduzem velocidade de queda?-true"
+  - "É possível respirar indefinidamente debaixo d’água usando apenas porta?-true"
+  - "A lava empurra entidades como água?-false"
+  - "É possível pescar itens encantados?-true"
+  - "Zumbis podem quebrar portas em qualquer dificuldade?-false"
+  - "O beacon funciona sem estrutura abaixo?-false"
+  - "A velocidade da luz é maior que a velocidade do som?-true"
+  - "Existe gravidade no espaço?-true"
+  - "O ouro é mais denso que o ferro?-true"
+  - "Um ano luz mede tempo?-false"
+  - "A água é composta por três átomos?-true"
+  - "O cérebro humano consome energia?-true"
+  - "A Lua tem gravidade zero?-false"
+  - "O som se propaga no vácuo?-false"
+  - "O Sol é maior que Júpiter?-true"
+  - "A eletricidade pode existir sem movimento de elétrons?-false"
+  - "Se duas pessoas empurrarem uma parede com a mesma força em lados opostos, ela se move?-false"
+  - "A força centrífuga é real em sistemas de referência não inerciais?-true"
+  - "Um objeto em queda livre não sofre ação da gravidade?-false"
+  - "A energia pode ser criada do nada?-false"
+  - "A água pode ferver abaixo de 100°C?-true"
+  - "Um corpo mais pesado cai mais rápido que um leve no vácuo?-false"
+  - "O calor sempre flui do mais quente para o mais frio?-true"
+  - "Um espelho inverte esquerda e direita?-false"
+  - "É possível dividir por zero em matemática convencional?-false"
+  - "Números negativos possuem raiz quadrada real?-false"
+  - "Um jogador pode morrer mesmo com barra de fome cheia?-true"
+  - "É possível zerar o Minecraft sem ir ao Nether?-false"
+  - "O relógio funciona corretamente no Nether?-false"
+  - "A bússola sempre aponta para o spawn?-true"
+  - "É possível impedir spawn de mobs apenas com carpet?-true"
+  - "O efeito de invisibilidade remove completamente a detecção por mobs?-false"
+  - "Armaduras de netherite queimam na lava?-false"
+  - "O dano de queda pode ser reduzido com poção?-true"
+  - "É possível farmar XP sem mobs?-true"
+  - "Um aldeão pode aumentar preços permanentemente?-true"
+  - "Um Enderman pode pegar blocos que não são naturais do Overworld?-true"
+  - "Um jogador com efeito de lentidão máxima consegue pular normalmente?-false"
+  - "A hitbox de um bebê zumbi é menor que a de um zumbi normal?-true"
+  - "É possível resetar trades de villager apenas esperando?-false"
+  - "Um creeper carregado causa mais dano que um creeper normal?-true"
+  - "O dano de queda depende apenas da altura e não da velocidade?-false"
+  - "Um jogador pode evitar dano de queda usando água colocada no último tick?-true"
+  - "O efeito de resistência reduz dano mágico?-true"
+  - "É possível mover aldeões usando trilhos e minecart?-true"
+  - "Um mob pode spawnar em bloco com nível de luz 0 apenas?-false"
+  - "Um player invisível ainda pode ser detectado por mobs hostis?-true"
+  - "Poções de força aumentam dano de arco?-false"
+  - "É possível quebrar bedrock no survival usando glitches?-true"
+  - "Um portal do Nether pode ser aceso sem pederneira?-true"
+  - "Blocos transparentes impedem spawn de mobs?-false"
+  - "O Wither regenera vida automaticamente?-true"
+  - "Um escudo bloqueia dano de explosão totalmente?-false"
+  - "Um jogador pode morrer de fome no modo hard?-true"
+  - "É possível stackar efeitos de velocidade além do limite normal?-false"
+  - "A armadura reduz todo tipo de dano igualmente?-false"
+  - "O ferro oxida naturalmente no Minecraft?-false"
+  - "Um funil pode puxar itens através de blocos sólidos?-true"
+  - "É possível farmar ferro automaticamente com villagers?-true"
+  - "O gato afasta creepers?-true"
+  - "A neve reduz dano de queda?-false"
+  - "O tridente com Riptide funciona na chuva?-true"
+  - "Um jogador pode atravessar blocos usando glitch?-true"
+  - "O XP dropado por mobs é sempre fixo?-false"
+  - "Um bloco de mel impede pulo normal ao encostar?-true"
+  - "É possível morrer instantaneamente sem dano visível (void)?-true"
+  - "O tempo passa mais rápido no Nether comparado ao Overworld?-false"
+  - "Um tick no Minecraft equivale a 1 segundo?-false"
+  - "A luz do bloco influencia crescimento de plantas?-true"
+  - "É possível plantar sementes no Nether?-false"
+  - "Villagers podem abrir portas sozinhos?-true"
+  - "O golem de ferro ataca todos os mobs hostis?-false"
+  - "Um jogador pode bloquear dano de queda com escudo?-false"
+  - "O leite remove todos os efeitos de poção?-true"
+  - "É possível empurrar mobs com água?-true"
+  - "Um bloco de magma causa dano ao pisar?-true"
+  - "O zero absoluto é a menor temperatura possível?-true"
+  - "A luz pode ser desacelerada em meios diferentes?-true"
+  - "O tempo pode ser relativo dependendo da velocidade?-true"
+  - "O som pode viajar mais rápido que a luz?-false"
+  - "A matéria pode ser convertida em energia?-true"
+  - "O vácuo possui absolutamente nada?-false"
+  - "Buracos negros possuem gravidade?-true"
+  - "A energia total do universo é sempre conservada?-true"
+  - "Um objeto pode estar em dois lugares ao mesmo tempo (quântico)?-true"
+  - "O frio é ausência de calor?-true"
+
+Rewards:
+  Money: 1000
+  Commands:
+    - "# adicione seus comandos aqui"
+  Broadcast:
+    - '&#0088ff$&f1.000'
+
+Locations:
+  Lobby:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+  
+  Entrance:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Spectator:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+  
+  Exit:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Pos1:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Pos2:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Pos3:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Pos4:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Pos5:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Pos6:
+    world: world
+    x: 0.0
+    y: 0.0
+    z: 0.0
+    Yaw: 0.0
+    Pitch: 0.0
+
+  Server: 'null'
+
+Itens:
+  Inventory: ''
