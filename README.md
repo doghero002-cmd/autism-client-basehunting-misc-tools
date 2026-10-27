@@ -9,7 +9,6 @@
 [![Minecraft](https://img.shields.io/badge/Minecraft-26.2-52a535?style=flat-square&logo=minecraft&logoColor=white)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Fabric-0.19.3%2B-dbd0b3?style=flat-square)](https://fabricmc.net/)
 [![Java](https://img.shields.io/badge/Java-25%2B-e76f51?style=flat-square&logo=openjdk&logoColor=white)](https://adoptium.net/)
-[![License](https://img.shields.io/badge/distribution-GPL--3.0--only-f4a261?style=flat-square)](src/main/resources/SPECTRE-NOTICES.txt)
 
 </div>
 
@@ -192,8 +191,6 @@ AH Flipper currently excludes spawners, shulker boxes (including empty boxes), b
 
 ### Shared automation behavior
 
-The [catalogue-wide Anubis comparison](docs/2026-10-11_reverse-anubis-report.md#catalogue-wide-module-comparison) records all 130 reference modules, 63 direct/workflow matches, adopted improvements and retained implementations. The comparison does not claim full engine parity or live anticheat validation.
-
 - **AH Sniper:** Target settings support name include/exclude and minimum stack count; live listing and confirmation checks still apply.
 - **AH Sell:** configure an Items list, or deliberately enable **Sell all hotbar items**. Unfiltered selling is off by default. Unconfirmed listings stop without retries.
 - **Auto Eat/Tool/Replenish:** risky or rare foods are excluded by default, manual slot changes are respected, and replenishment uses an atomic inventory swap with depleted-stack tracking.
@@ -336,14 +333,7 @@ The runtime dependency is `autism: "*"`; the addon's API handshake still checks 
 ## Credits
 
 - **SeedCrackerX** by KaptainWutax and 19MisterX98 (MIT) — seed-cracking engine.
-- **Spectre** by cody-raves (GPL-3.0-only) — DonutSMP and Base Raid module ports, supporting algorithms, Fake Stats and Region Map. GoNuts-derived parts retain their MIT notice.
 
 ## License
 
-The combined addon containing the Spectre ports is distributed under
-[GPL-3.0-only](src/main/resources/SPECTRE-LICENSE.txt). The original project code
-retains [The Unlicense](LICENSE); bundled third-party components retain their own
-notices, including the [GoNuts MIT notice](src/main/resources/GONUTS-LICENSE.txt).
-See [SPECTRE-NOTICES.txt](src/main/resources/SPECTRE-NOTICES.txt) for the pinned
-source revision and adaptation details. Provide corresponding source when
-redistributing the combined binary as required by GPLv3.
+[The Unlicense](LICENSE)
